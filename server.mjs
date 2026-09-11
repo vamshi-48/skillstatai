@@ -59,7 +59,7 @@ CRITICAL RULES:
 1. Skills are: ${skillsList.join(', ')}. Distribute the 15 questions evenly across each of these selected skills. For every question, include the specific "skill" field matching one of their selected skills.
 2. ${
       hasCodingSkill
-        ? `Because a coding skill (${codingLang}) is selected, include 3 practical coding challenges of type "code" specifically for ${codingLang}. The other 12 questions must be type "choice" scenario questions.`
+        ? `Because a coding skill (${codingLang}) is selected, include exactly 5 practical coding challenges of type "code" specifically for ${codingLang}. The user must type code for each challenge, and each challenge must include at least 2 independently checkable requirements. The other 10 questions must be type "choice" scenario questions.`
         : `STRICT REQUIREMENT: This is a NON-CODING profile. You MUST NEVER generate any coding challenges, syntax questions, code blocks, or 'code' type questions. ALL 15 questions MUST be type "choice" scenario questions covering practical real-world situations, problem-solving, and domain judgment.`
     }
 3. Each 'choice' question must have:

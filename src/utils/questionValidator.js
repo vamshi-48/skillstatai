@@ -32,6 +32,12 @@ export function isQuestionValid(q) {
     return false
   }
 
+  if (q.type === 'code') {
+    if (!q.language || typeof q.language !== 'string' || !q.starter || typeof q.starter !== 'string') return false
+    if (!Array.isArray(q.checks) || q.checks.length < 2) return false
+    return q.checks.every((check) => check instanceof RegExp || typeof check === 'string')
+  }
+
   // Validate options array: must have EXACTLY 4 options
   if (!Array.isArray(q.options) || q.options.length !== 4) {
     return false
@@ -146,6 +152,20 @@ export function validateAndCleanQuiz(questions, fallbackTopic = 'Document Concep
   const validQuestions = []
   for (let i = 0; i < questions.length; i++) {
     const q = questions[i]
+    if (q?.type === 'code' && isQuestionValid(q)) {
+      const checks = q.checks.map((check) => {
+        if (check instanceof RegExp) return check
+        try {
+          return new RegExp(check, 'i')
+        } catch {
+          return null
+        }
+      }).filter(Boolean)
+      if (checks.length >= 2) {
+        validQuestions.push({ ...q, checks, sourceBadge: q.sourceBadge || `Coding • ${q.language}` })
+      }
+      continue
+    }
     if (isQuestionValid(q)) {
       validQuestions.push({
         ...q,

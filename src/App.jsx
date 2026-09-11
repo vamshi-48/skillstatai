@@ -123,7 +123,61 @@ const initialCompetencyGaps = [
 ]
 
 const codingLanguages = ['C', 'C#', 'C++', 'Java', 'JavaScript', 'TypeScript', 'Python', 'Ruby', 'Kotlin', 'SQL', 'HTML', 'CSS', 'Node.js', 'React', 'Coding', 'C programming']
-const pureCodingLanguages = ['C', 'C#', 'C++', 'Java', 'JavaScript', 'TypeScript', 'Python', 'Ruby', 'Kotlin', 'C programming']
+const supportedLanguages = [
+  ['en', 'English'], ['hi', 'हिन्दी (Hindi)'], ['ta', 'தமிழ் (Tamil)'], ['te', 'తెలుగు (Telugu)'],
+  ['bn', 'বাংলা (Bengali)'], ['mr', 'मराठी (Marathi)'], ['gu', 'ગુજરાતી (Gujarati)'], ['kn', 'ಕನ್ನಡ (Kannada)'], ['ml', 'മലയാളം (Malayalam)'],
+]
+
+const isCodingSkill = (skill) => codingLanguages.includes(skill)
+
+const governmentDepartments = [
+  { name: 'Ministry of Statistics and Programme Implementation', designations: ['Statistical Officer', 'Senior Statistical Officer', 'Statistical Investigator', 'Data Analyst', 'Research Officer'] },
+  { name: 'Ministry of Electronics and Information Technology', designations: ['Digital / IT Officer', 'Data Management Officer', 'Cybersecurity Analyst', 'Software Engineer', 'Systems Administrator'] },
+  { name: 'Ministry of Health and Family Welfare', designations: ['Medical Officer', 'Public Health Officer', 'Health Programme Manager', 'Health Data Analyst', 'Research Officer'] },
+  { name: 'Ministry of Education', designations: ['Teacher', 'Education Officer', 'Research Officer', 'Training Specialist', 'Data Analyst', 'Programme Manager'] },
+  { name: 'Ministry of Finance', designations: ['Finance Officer', 'Accounts Officer', 'Economic Officer', 'Budget Analyst', 'Audit Officer'] },
+  { name: 'Ministry of Home Affairs', designations: ['Administrative Officer', 'Security Officer', 'Research Officer', 'Data Analyst', 'Section Officer'] },
+  { name: 'Ministry of Rural Development', designations: ['Development Officer', 'Programme Officer', 'Project Manager', 'Social Development Officer', 'Data Analyst'] },
+  { name: 'Ministry of Agriculture and Farmers Welfare', designations: ['Agriculture Officer', 'Agricultural Statistician', 'Research Officer', 'Field Officer', 'Data Analyst'] },
+  { name: 'Ministry of Labour and Employment', designations: ['Labour Officer', 'Employment Officer', 'Labour Statistician', 'Welfare Officer', 'Research Officer'] },
+  { name: 'Ministry of Environment, Forest and Climate Change', designations: ['Environmental Officer', 'Forest Officer', 'Climate Data Analyst', 'Research Officer', 'GIS Analyst'] },
+  { name: 'Ministry of Road Transport and Highways', designations: ['Transport Officer', 'Highways Engineer', 'Project Manager', 'Civil Engineer', 'Data Analyst'] },
+  { name: 'Ministry of Housing and Urban Affairs', designations: ['Urban Planner', 'Town Planning Officer', 'Civil Engineer', 'Project Manager', 'GIS Analyst'] },
+  { name: 'Ministry of Commerce and Industry', designations: ['Commercial Officer', 'Industry Officer', 'Economic Officer', 'Trade Analyst', 'Research Officer'] },
+  { name: 'Ministry of External Affairs', designations: ['Foreign Service Officer', 'Administrative Officer', 'Policy Analyst', 'Research Officer', 'Protocol Officer'] },
+  { name: 'Ministry of Women and Child Development', designations: ['Child Development Officer', 'Programme Officer', 'Social Worker', 'Research Officer', 'Data Analyst'] },
+  { name: 'Ministry of Social Justice and Empowerment', designations: ['Social Welfare Officer', 'Programme Officer', 'Rehabilitation Officer', 'Research Officer', 'Data Analyst'] },
+  { name: 'Department of Personnel and Training', designations: ['Administrative Officer', 'Human Resources Officer', 'Training Specialist', 'Section Officer', 'Policy Analyst'] },
+  { name: 'Department of Telecommunications', designations: ['Telecom Engineer', 'Network Administrator', 'Digital / IT Officer', 'Policy Analyst', 'Data Analyst'] },
+  { name: 'Department of Revenue', designations: ['Income Tax Officer', 'Customs Officer', 'Tax Specialist', 'Finance Officer', 'Audit Officer'] },
+  { name: 'National Statistical Office', designations: ['Statistical Officer', 'Senior Statistical Officer', 'Statistical Investigator', 'Data Analyst', 'Data Scientist'] },
+]
+
+const getDepartmentDetails = (departmentName) => governmentDepartments.find((department) => department.name === departmentName)
+
+const designationRoleMap = {
+  teacher: ['Physics Teacher', 'Mathematics Teacher', 'Chemistry Teacher', 'Biology Teacher', 'Computer Science Teacher', 'English Teacher', 'Social Science Teacher', 'Primary School Teacher'],
+  'statistical officer': ['Economic Statistics Officer', 'Social Statistics Officer', 'Agricultural Statistics Officer', 'Data Quality Officer', 'Survey Operations Officer'],
+  'senior statistical officer': ['Statistical Programme Lead', 'Survey Methodology Lead', 'Data Quality Lead', 'Official Statistics Analyst'],
+  'statistical investigator': ['Field Survey Investigator', 'Census Investigator', 'Sample Survey Investigator', 'Data Validation Investigator'],
+  'data analyst': ['Policy Data Analyst', 'Public Finance Data Analyst', 'Health Data Analyst', 'Education Data Analyst', 'Monitoring & Evaluation Analyst'],
+  'data scientist': ['Machine Learning Scientist', 'Public Policy Data Scientist', 'Predictive Analytics Scientist', 'Natural Language Processing Scientist'],
+  'research officer': ['Policy Research Officer', 'Education Research Officer', 'Health Research Officer', 'Economic Research Officer', 'Social Research Officer'],
+  'digital / it officer': ['Application Support Officer', 'Government Systems Analyst', 'Cybersecurity Officer', 'Cloud Infrastructure Officer', 'Digital Services Officer'],
+  'data management officer': ['Data Governance Officer', 'Master Data Officer', 'Data Quality Officer', 'Database Administrator', 'Metadata Officer'],
+  'finance officer': ['Public Budget Officer', 'Financial Planning Officer', 'Grants Finance Officer', 'Public Expenditure Analyst'],
+  'accounts officer': ['Accounts Payable Officer', 'Accounts Receivable Officer', 'Government Ledger Officer', 'Payroll Accounts Officer'],
+  'economic officer': ['Macroeconomic Analyst', 'Trade Economics Analyst', 'Development Economics Analyst', 'Economic Policy Officer'],
+  'budget analyst': ['Programme Budget Analyst', 'Public Expenditure Analyst', 'Budget Planning Officer', 'Performance Budget Analyst'],
+  'audit officer': ['Internal Audit Officer', 'Compliance Audit Officer', 'Performance Audit Officer', 'Financial Audit Officer'],
+  'medical officer': ['Primary Care Medical Officer', 'Community Health Medical Officer', 'Emergency Medical Officer', 'Public Health Medical Officer'],
+  'health data analyst': ['Health Informatics Analyst', 'Clinical Data Analyst', 'Public Health Data Analyst', 'Health Programme Analyst'],
+  'programme manager': ['Education Programme Manager', 'Health Programme Manager', 'Rural Development Programme Manager', 'Digital Programme Manager'],
+  'project manager': ['Infrastructure Project Manager', 'IT Project Manager', 'Public Works Project Manager', 'Programme Delivery Manager'],
+  'policy analyst': ['Education Policy Analyst', 'Health Policy Analyst', 'Technology Policy Analyst', 'Social Policy Analyst'],
+}
+
+const getRolesForDesignation = (designation) => designationRoleMap[(designation || '').trim().toLowerCase()] || []
 
 function _getRelatedSkills(role) {
   if (!role) return fallbackRoleSkills
@@ -140,6 +194,11 @@ function getRecommendedRoles(profile) {
   const assignment = (profile?.assignment || '').trim().toLowerCase()
 
   const combinedSearch = `${designation} ${department} ${organization} ${assignment}`.trim()
+  const designationRoles = getRolesForDesignation(designation)
+  if (designationRoles.length > 0) {
+    return designationRoles
+  }
+
   if (!combinedSearch) {
     return officialRoles.slice(0, 6)
   }
@@ -243,6 +302,42 @@ function getRecommendedRoles(profile) {
 
 function getRoleSkillCategories(role, designation) {
   const target = `${role || ''} ${designation || ''}`.toLowerCase()
+
+  if (target.includes('teacher')) {
+    if (target.includes('physics')) {
+      return [
+        ['Physics Subject Knowledge', ['Mechanics', 'Electricity & Magnetism', 'Waves & Optics', 'Thermodynamics', 'Modern Physics', 'Numerical Problem Solving']],
+        ['Teaching Practice', ['Lesson Planning', 'Concept Explanation', 'Demonstration Experiments', 'Classroom Assessment', 'Differentiated Instruction', 'Student Engagement']],
+        ['Laboratory & Digital Tools', ['Laboratory Safety', 'Experimental Design', 'Scientific Measurement', 'Interactive Simulations', 'Digital Whiteboard', 'Learning Management Systems']],
+      ]
+    }
+    if (target.includes('mathematics')) {
+      return [
+        ['Mathematics Subject Knowledge', ['Algebra', 'Geometry', 'Calculus', 'Statistics & Probability', 'Number Theory', 'Mathematical Reasoning']],
+        ['Teaching Practice', ['Lesson Planning', 'Concept Explanation', 'Problem-Based Learning', 'Classroom Assessment', 'Differentiated Instruction', 'Student Engagement']],
+        ['Digital & Classroom Tools', ['Graphing Tools', 'Spreadsheets', 'Interactive Whiteboard', 'Learning Management Systems', 'Educational Technology', 'Data Interpretation']],
+      ]
+    }
+    if (target.includes('chemistry')) {
+      return [
+        ['Chemistry Subject Knowledge', ['Organic Chemistry', 'Inorganic Chemistry', 'Physical Chemistry', 'Chemical Reactions', 'Atomic Structure', 'Stoichiometry']],
+        ['Teaching Practice', ['Lesson Planning', 'Concept Explanation', 'Laboratory Demonstrations', 'Classroom Assessment', 'Differentiated Instruction', 'Student Engagement']],
+        ['Laboratory & Safety', ['Laboratory Safety', 'Experimental Design', 'Scientific Measurement', 'Chemical Handling', 'Data Recording', 'Learning Management Systems']],
+      ]
+    }
+    if (target.includes('biology')) {
+      return [
+        ['Biology Subject Knowledge', ['Cell Biology', 'Genetics', 'Human Physiology', 'Ecology', 'Evolution', 'Biological Classification']],
+        ['Teaching Practice', ['Lesson Planning', 'Concept Explanation', 'Field Study Activities', 'Classroom Assessment', 'Differentiated Instruction', 'Student Engagement']],
+        ['Laboratory & Digital Tools', ['Laboratory Safety', 'Microscopy', 'Experimental Design', 'Scientific Measurement', 'Interactive Simulations', 'Learning Management Systems']],
+      ]
+    }
+    return [
+      ['Teaching & Subject Delivery', ['Lesson Planning', 'Concept Explanation', 'Subject Knowledge', 'Classroom Assessment', 'Differentiated Instruction', 'Student Engagement']],
+      ['Classroom Practice', ['Classroom Management', 'Inclusive Education', 'Learning Outcomes', 'Student Mentoring', 'Parent Communication', 'Remedial Teaching']],
+      ['Digital & Professional Tools', ['Learning Management Systems', 'Digital Teaching Tools', 'Educational Technology', 'Content Creation', 'Data Interpretation', 'Continuous Learning']],
+    ]
+  }
 
   if (target.includes('architect') || target.includes('civil') || target.includes('interior') || target.includes('construction')) {
     return [
@@ -533,6 +628,14 @@ const text = {
   },
 }
 
+const extendedText = {
+  bn: { language: 'ভাষা নির্বাচন করুন', welcome: 'Skillstat AI-তে স্বাগতম', signIn: 'আপনার দক্ষতা ড্যাশবোর্ডে প্রবেশ করুন', email: 'কাজের ইমেল', password: 'পাসওয়ার্ড', continue: 'চালিয়ে যান', back: 'ফিরে যান', step1Title: 'আপনার কাজের ভূমিকা নির্বাচন করুন', step1Hint: 'আপনার দক্ষতা যাত্রা সাজাতে বর্তমান বা লক্ষ্য ভূমিকা নির্বাচন করুন।', step2Title: 'আপনার দক্ষতা নির্বাচন করুন', step2Hint: 'এর জন্য নির্দিষ্ট দক্ষতা দেখানো হচ্ছে', step3Title: 'অভিজ্ঞতার বছর', step3Hint: 'আপনার অভিজ্ঞতা অনুযায়ী প্রশ্নের কঠিনতা নির্ধারিত হবে।', searchRole: 'ভূমিকা খুঁজুন...', skillsSelected: 'টি দক্ষতা নির্বাচিত', dashboard: 'দক্ষতা ড্যাশবোর্ড', profile: 'প্রোফাইল', myProfile: 'আমার প্রোফাইল', settings: 'সেটিংস', lightMode: 'আলো মোড', darkMode: 'অন্ধকার মোড', takeQuiz: 'দক্ষতা মূল্যায়ন শুরু করুন', retakeQuiz: 'আবার মূল্যায়ন করুন', editProfile: 'প্রোফাইল সম্পাদনা করুন', logout: 'সাইন আউট', question: 'প্রশ্ন', next: 'পরের প্রশ্ন', finish: 'মূল্যায়ন শেষ করুন', gapTitle: 'মূল্যায়ন ফলাফল ও দক্ষতার ঘাটতি', openDashboard: 'ড্যাশবোর্ড খুলুন', exitQuiz: 'ড্যাশবোর্ডে ফিরুন', roleLabel: 'লক্ষ্য ভূমিকা', experienceLabel: 'অভিজ্ঞতা', skillsLabel: 'সক্রিয় দক্ষতা', progress: 'সামগ্রিক প্রস্তুতি', skillsBreakdown: 'দক্ষতা বিশ্লেষণ', pendingAssessment: 'মূল্যায়ন বাকি', highProficiency: 'দক্ষতা অর্জিত', medProficiency: 'উন্নয়নশীল', lowProficiency: 'অগ্রাধিকার', weekendQuiz: 'সাপ্তাহিক চ্যালেঞ্জ', leaderboard: 'কোম্পানি লিডারবোর্ড', notesQuiz: 'নোট / PDF থেকে AI কুইজ' },
+  mr: { language: 'भाषा निवडा', welcome: 'Skillstat AI मध्ये स्वागत', signIn: 'तुमच्या कौशल्य डॅशबोर्डमध्ये प्रवेश करा', email: 'कामाचा ईमेल', password: 'पासवर्ड', continue: 'पुढे जा', back: 'मागे', step1Title: 'तुमची नोकरीची भूमिका निवडा', step1Hint: 'तुमचा कौशल्य प्रवास तयार करण्यासाठी भूमिका निवडा.', step2Title: 'तुमची कौशल्ये निवडा', step2Hint: 'यासाठी संबंधित कौशल्ये', step3Title: 'अनुभवाची वर्षे', step3Hint: 'तुमच्या अनुभवाप्रमाणे प्रश्नांची पातळी ठरेल.', searchRole: 'भूमिका शोधा...', skillsSelected: 'कौशल्ये निवडली', dashboard: 'कौशल्य डॅशबोर्ड', profile: 'प्रोफाइल', myProfile: 'माझे प्रोफाइल', settings: 'सेटिंग्ज', lightMode: 'लाइट मोड', darkMode: 'डार्क मोड', takeQuiz: 'कौशल्य मूल्यांकन सुरू करा', retakeQuiz: 'मूल्यांकन पुन्हा करा', editProfile: 'प्रोफाइल संपादित करा', logout: 'साइन आउट', question: 'प्रश्न', next: 'पुढील प्रश्न', finish: 'मूल्यांकन पूर्ण करा', gapTitle: 'मूल्यांकन निकाल आणि कौशल्यातील अंतर', openDashboard: 'डॅशबोर्ड उघडा', exitQuiz: 'डॅशबोर्डवर परत जा', roleLabel: 'लक्ष्य भूमिका', experienceLabel: 'अनुभव', skillsLabel: 'सक्रिय कौशल्ये', progress: 'एकूण तयारी', skillsBreakdown: 'कौशल्य विश्लेषण', pendingAssessment: 'मूल्यांकन बाकी', highProficiency: 'उत्कृष्ट', medProficiency: 'विकसनशील', lowProficiency: 'प्राधान्य', weekendQuiz: 'वीकेंड चॅलेंज', leaderboard: 'कंपनी लीडरबोर्ड', notesQuiz: 'नोट्स / PDF AI क्विझ' },
+  gu: { language: 'ભાષા પસંદ કરો', welcome: 'Skillstat AI માં આપનું સ્વાગત છે', signIn: 'તમારા કૌશલ્ય ડેશબોર્ડમાં પ્રવેશ કરો', email: 'કામનો ઈમેલ', password: 'પાસવર્ડ', continue: 'ચાલુ રાખો', back: 'પાછળ', step1Title: 'તમારી નોકરીની ભૂમિકા પસંદ કરો', step1Hint: 'તમારી કૌશલ્ય યાત્રા માટે ભૂમિકા પસંદ કરો.', step2Title: 'તમારી કૌશલ્યો પસંદ કરો', step2Hint: 'માટે સંબંધિત કૌશલ્યો', step3Title: 'અનુભવના વર્ષો', step3Hint: 'તમારા અનુભવ પ્રમાણે પ્રશ્નોની મુશ્કેલી નક્કી થશે.', searchRole: 'ભૂમિકા શોધો...', skillsSelected: 'કૌશલ્યો પસંદ', dashboard: 'કૌશલ્ય ડેશબોર્ડ', profile: 'પ્રોફાઇલ', myProfile: 'મારી પ્રોફાઇલ', settings: 'સેટિંગ્સ', lightMode: 'લાઇટ મોડ', darkMode: 'ડાર્ક મોડ', takeQuiz: 'કૌશલ્ય મૂલ્યાંકન શરૂ કરો', retakeQuiz: 'મૂલ્યાંકન ફરી લો', editProfile: 'પ્રોફાઇલ સંપાદિત કરો', logout: 'સાઇન આઉટ', question: 'પ્રશ્ન', next: 'આગળનો પ્રશ્ન', finish: 'મૂલ્યાંકન પૂર્ણ કરો', gapTitle: 'મૂલ્યાંકન પરિણામો અને કૌશલ્ય અંતર', openDashboard: 'ડેશબોર્ડ ખોલો', exitQuiz: 'ડેશબોર્ડ પર પાછા જાઓ', roleLabel: 'લક્ષ્ય ભૂમિકા', experienceLabel: 'અનુભવ', skillsLabel: 'સક્રિય કૌશલ્યો', progress: 'એકંદર તૈયારી', skillsBreakdown: 'કૌશલ્ય વિશ્લેષણ', pendingAssessment: 'મૂલ્યાંકન બાકી', highProficiency: 'મજબૂત', medProficiency: 'વિકાસશીલ', lowProficiency: 'પ્રાથમિકતા', weekendQuiz: 'વીકએન્ડ ચેલેન્જ', leaderboard: 'કંપની લીડરબોર્ડ', notesQuiz: 'નોંધ / PDF AI ક્વિઝ' },
+  kn: { language: 'ಭಾಷೆ ಆಯ್ಕೆಮಾಡಿ', welcome: 'Skillstat AI ಗೆ ಸ್ವಾಗತ', signIn: 'ನಿಮ್ಮ ಕೌಶಲ್ಯ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್ ಪ್ರವೇಶಿಸಿ', email: 'ಕೆಲಸದ ಇಮೇಲ್', password: 'ಪಾಸ್‌ವರ್ಡ್', continue: 'ಮುಂದುವರಿಸಿ', back: 'ಹಿಂದೆ', step1Title: 'ನಿಮ್ಮ ಉದ್ಯೋಗ ಪಾತ್ರವನ್ನು ಆಯ್ಕೆಮಾಡಿ', step1Hint: 'ನಿಮ್ಮ ಕೌಶಲ್ಯ ಪ್ರಯಾಣಕ್ಕೆ ಪಾತ್ರವನ್ನು ಆಯ್ಕೆಮಾಡಿ.', step2Title: 'ನಿಮ್ಮ ಕೌಶಲ್ಯಗಳನ್ನು ಆಯ್ಕೆಮಾಡಿ', step2Hint: 'ಇದಕ್ಕೆ ಸಂಬಂಧಿಸಿದ ಕೌಶಲ್ಯಗಳು', step3Title: 'ಅನುಭವದ ವರ್ಷಗಳು', step3Hint: 'ನಿಮ್ಮ ಅನುಭವದ ಆಧಾರದ ಮೇಲೆ ಪ್ರಶ್ನೆಗಳ ಮಟ್ಟ ಇರುತ್ತದೆ.', searchRole: 'ಪಾತ್ರ ಹುಡುಕಿ...', skillsSelected: 'ಕೌಶಲ್ಯಗಳು ಆಯ್ಕೆ', dashboard: 'ಕೌಶಲ್ಯ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್', profile: 'ಪ್ರೊಫೈಲ್', myProfile: 'ನನ್ನ ಪ್ರೊಫೈಲ್', settings: 'ಸೆಟ್ಟಿಂಗ್‌ಗಳು', lightMode: 'ಲೈಟ್ ಮೋಡ್', darkMode: 'ಡಾರ್ಕ್ ಮೋಡ್', takeQuiz: 'ಕೌಶಲ್ಯ ಮೌಲ್ಯಮಾಪನ ಪ್ರಾರಂಭಿಸಿ', retakeQuiz: 'ಮೌಲ್ಯಮಾಪನ ಮರುಪ್ರಾರಂಭಿಸಿ', editProfile: 'ಪ್ರೊಫೈಲ್ ಸಂಪಾದಿಸಿ', logout: 'ಸೈನ್ ಔಟ್', question: 'ಪ್ರಶ್ನೆ', next: 'ಮುಂದಿನ ಪ್ರಶ್ನೆ', finish: 'ಮೌಲ್ಯಮಾಪನ ಮುಗಿಸಿ', gapTitle: 'ಮೌಲ್ಯಮಾಪನ ಫಲಿತಾಂಶಗಳು ಮತ್ತು ಕೌಶಲ್ಯ ಅಂತರ', openDashboard: 'ಡ್ಯಾಶ್‌ಬೋರ್ಡ್ ತೆರೆಯಿರಿ', exitQuiz: 'ಡ್ಯಾಶ್‌ಬೋರ್ಡ್‌ಗೆ ಹಿಂತಿರುಗಿ', roleLabel: 'ಗುರಿ ಪಾತ್ರ', experienceLabel: 'ಅನುಭವ', skillsLabel: 'ಸಕ್ರಿಯ ಕೌಶಲ್ಯಗಳು', progress: 'ಒಟ್ಟು ಸಿದ್ಧತೆ', skillsBreakdown: 'ಕೌಶಲ್ಯ ವಿಶ್ಲೇಷಣೆ', pendingAssessment: 'ಮೌಲ್ಯಮಾಪನ ಬಾಕಿ', highProficiency: 'ಉತ್ತಮ', medProficiency: 'ಅಭಿವೃದ್ಧಿಯಲ್ಲಿದೆ', lowProficiency: 'ಆದ್ಯತೆ', weekendQuiz: 'ವಾರಾಂತ್ಯ ಸವಾಲು', leaderboard: 'ಕಂಪನಿ ಲೀಡರ್‌ಬೋರ್ಡ್', notesQuiz: 'ಟಿಪ್ಪಣಿ / PDF AI ಕ್ವಿಜ್' },
+  ml: { language: 'ഭാഷ തിരഞ്ഞെടുക്കുക', welcome: 'Skillstat AI-ലേക്ക് സ്വാഗതം', signIn: 'നിങ്ങളുടെ കഴിവ് ഡാഷ്ബോർഡിലേക്ക് പ്രവേശിക്കുക', email: 'ജോലി ഇമെയിൽ', password: 'പാസ്‌വേഡ്', continue: 'തുടരുക', back: 'തിരികെ', step1Title: 'നിങ്ങളുടെ ജോലി പദവി തിരഞ്ഞെടുക്കുക', step1Hint: 'നിങ്ങളുടെ കഴിവ് യാത്രയ്ക്കായി പദവി തിരഞ്ഞെടുക്കുക.', step2Title: 'നിങ്ങളുടെ കഴിവുകൾ തിരഞ്ഞെടുക്കുക', step2Hint: 'ഇതിനുള്ള ബന്ധപ്പെട്ട കഴിവുകൾ', step3Title: 'പരിചയ വർഷങ്ങൾ', step3Hint: 'നിങ്ങളുടെ പരിചയം അനുസരിച്ച് ചോദ്യങ്ങളുടെ നില മാറും.', searchRole: 'പദവി തിരയുക...', skillsSelected: 'കഴിവുകൾ തിരഞ്ഞെടുത്തു', dashboard: 'കഴിവ് ഡാഷ്ബോർഡ്', profile: 'പ്രൊഫൈൽ', myProfile: 'എന്റെ പ്രൊഫൈൽ', settings: 'ക്രമീകരണങ്ങൾ', lightMode: 'ലൈറ്റ് മോഡ്', darkMode: 'ഡാർക്ക് മോഡ്', takeQuiz: 'കഴിവ് വിലയിരുത്തൽ ആരംഭിക്കുക', retakeQuiz: 'വിലയിരുത്തൽ വീണ്ടും എടുക്കുക', editProfile: 'പ്രൊഫൈൽ തിരുത്തുക', logout: 'സൈൻ ഔട്ട്', question: 'ചോദ്യം', next: 'അടുത്ത ചോദ്യം', finish: 'വിലയിരുത്തൽ പൂർത്തിയാക്കുക', gapTitle: 'വിലയിരുത്തൽ ഫലങ്ങളും കഴിവ് വിടവും', openDashboard: 'ഡാഷ്ബോർഡ് തുറക്കുക', exitQuiz: 'ഡാഷ്ബോർഡിലേക്ക് മടങ്ങുക', roleLabel: 'ലക്ഷ്യ പദവി', experienceLabel: 'പരിചയം', skillsLabel: 'സജീവ കഴിവുകൾ', progress: 'മൊത്തം തയ്യാറെടുപ്പ്', skillsBreakdown: 'കഴിവ് വിശകലനം', pendingAssessment: 'വിലയിരുത്തൽ ബാക്കി', highProficiency: 'മികവ്', medProficiency: 'വികസിക്കുന്നു', lowProficiency: 'മുൻഗണന', weekendQuiz: 'വാരാന്ത്യ ചലഞ്ച്', leaderboard: 'കമ്പനി ലീഡർബോർഡ്', notesQuiz: 'കുറിപ്പുകൾ / PDF AI ക്വിസ്' },
+}
+
 const uiText = {
   en: {
     initializing: 'Initializing Skillstat AI Experience...', intelligentEvaluation: 'INTELLIGENT SKILL EVALUATION',
@@ -557,11 +660,16 @@ const uiText = {
   },
 }
 
-const _navText = {
-  en: ['Dashboard', 'Skill Gaps', 'Recommendations', 'Assessments', 'AI Quiz'],
-  hi: ['डैशबोर्ड', 'कौशल अंतर', 'सिफारिशें', 'मूल्यांकन', 'AI क्विज़'],
-  ta: ['டாஷ்போர்டு', 'திறன் இடைவெளிகள்', 'பரிந்துரைகள்', 'மதிப்பீடுகள்', 'AI தேர்வு'],
-  te: ['డాష్‌బోర్డ్', 'నైపుణ్య అంతరాలు', 'సిఫార్సులు', 'మూల్యాంకనాలు', 'AI క్విజ్'],
+const navText = {
+  en: ['Dashboard', 'Recommendations', 'Weekend Challenge', 'AI Quiz', 'Profile Overview'],
+  hi: ['डैशबोर्ड', 'सिफारिशें', 'वीकेंड चैलेंज', 'AI क्विज़', 'प्रोफाइल विवरण'],
+  ta: ['டாஷ்போர்டு', 'பரிந்துரைகள்', 'வார இறுதி சவால்', 'AI வினாடி வினா', 'சுயவிவர மேலோட்டம்'],
+  te: ['డాష్‌బోర్డ్', 'సిఫార్సులు', 'వీకెండ్ ఛాలెంజ్', 'AI క్విజ్', 'ప్రొఫైల్ అవలోకనం'],
+  bn: ['ড্যাশবোর্ড', 'সুপারিশ', 'সাপ্তাহিক চ্যালেঞ্জ', 'AI কুইজ', 'প্রোফাইল'],
+  mr: ['डॅशबोर्ड', 'शिफारसी', 'वीकेंड चॅलेंज', 'AI क्विझ', 'प्रोफाइल'],
+  gu: ['ડેશબોર્ડ', 'ભલામણો', 'વીકએન્ડ ચેલેન્જ', 'AI ક્વિઝ', 'પ્રોફાઇલ'],
+  kn: ['ಡ್ಯಾಶ್‌ಬೋರ್ಡ್', 'ಶಿಫಾರಸುಗಳು', 'ವಾರಾಂತ್ಯ ಸವಾಲು', 'AI ಕ್ವಿಜ್', 'ಪ್ರೊಫೈಲ್'],
+  ml: ['ഡാഷ്ബോർഡ്', 'ശുപാർശകൾ', 'വാരാന്ത്യ ചലഞ്ച്', 'AI ക്വിസ്', 'പ്രൊഫൈൽ'],
 }
 
 function Brand() {
@@ -704,8 +812,8 @@ function validateCode(code, challenge) {
   const checks = challenge.checks || []
   if (!checks.length) return { state: 'valid', message: 'Code submitted for evaluation.' }
   const passed = checks.filter((check) => check.test(code)).length
-  if (passed >= 1) return { state: 'valid', message: `${passed} check(s) passed. Solution acceptable.` }
-  return { state: 'working', message: `${passed} of ${checks.length} structural checks matched.` }
+  if (passed >= 2) return { state: 'valid', message: `${passed} checks passed. Solution acceptable.` }
+  return { state: 'working', message: `${passed} of ${checks.length} checks passed. Pass at least 2 checks to continue.` }
 }
 
 const codingCodeChallenges = {
@@ -765,9 +873,25 @@ const codingCodeChallenges = {
   ],
 }
 
+const additionalCodingChallenges = {
+  C: { prompt: 'Implement `first_unique_char` in C and return the first non-repeating character, or `\\0` when none exists.', starter: '#include <stddef.h>\nchar first_unique_char(const char *text) {\n  /* Your solution */\n}', checks: [/first_unique_char/, /return/] },
+  'C#': { prompt: 'Implement `FirstUniqueChar` in C# and return the first non-repeating character, or null when none exists.', starter: 'public static char? FirstUniqueChar(string text)\n{\n    // Your solution\n}', checks: [/FirstUniqueChar/, /return/] },
+  Java: { prompt: 'Implement `firstUniqueChar` in Java and return the first non-repeating character, or null when none exists.', starter: 'static Character firstUniqueChar(String text) {\n    // Your solution\n}', checks: [/firstUniqueChar/, /return/] },
+  TypeScript: { prompt: 'Implement `firstUniqueChar` in TypeScript and return the first non-repeating character, or null when none exists.', starter: 'function firstUniqueChar(text: string): string | null {\n  // Your solution\n}', checks: [/firstUniqueChar/, /return/, /string/] },
+  Ruby: { prompt: 'Implement `first_unique_char` in Ruby and return the first non-repeating character, or nil when none exists.', starter: 'def first_unique_char(text)\n  # Your solution\nend', checks: [/first_unique_char/, /end/] },
+  Kotlin: { prompt: 'Implement `firstUniqueChar` in Kotlin and return the first non-repeating character, or null when none exists.', starter: 'fun firstUniqueChar(text: String): Char? {\n    // Your solution\n}', checks: [/firstUniqueChar/, /return/] },
+  SQL: { prompt: 'Write a SQL query that returns the first value appearing exactly once in an ordered `events` table.', starter: 'SELECT value\nFROM events\nGROUP BY value\nHAVING COUNT(*) = 1\nORDER BY MIN(id)\nLIMIT 1;', checks: [/SELECT/i, /GROUP BY/i, /HAVING/i] },
+  HTML: { prompt: 'Create accessible HTML for a labelled employee search field and submit button.', starter: '<form>\n  <!-- Your solution -->\n</form>', checks: [/<form/i, /label/i, /button/i] },
+  CSS: { prompt: 'Write CSS that makes a card responsive, readable, and stack its content below 640px.', starter: '.card {\n  /* Your solution */\n}', checks: [/\.card/, /@media|display|flex|grid/] },
+  'Node.js': { prompt: 'Write a Node.js function that reads JSON input safely and returns a clear error for invalid JSON.', starter: 'function parseInput(input) {\n  // Your solution\n}', checks: [/parseInput/, /JSON\.parse/, /return/] },
+  React: { prompt: 'Create a React component that renders a labelled list of skills from a `skills` prop.', starter: 'function SkillsList({ skills }) {\n  // Your solution\n}', checks: [/SkillsList/, /skills/, /return/] },
+  Coding: { prompt: 'Describe and implement a language-agnostic function that returns the first non-repeating character.', starter: '// State the language and implement the function here', checks: [/function|def|class|return/i, /algorithm|loop|map|count|frequency/i] },
+  'C programming': { prompt: 'Implement a C function that returns the first non-repeating character in a string.', starter: 'char first_unique_char(const char *text) {\n  /* Your solution */\n}', checks: [/first_unique_char/, /return/] },
+}
+
 function buildScenarioQuestions(profile, t, userSkills, quizMode = 'standard', notesContent = '', targetSkill = '') {
   const skills = targetSkill ? [targetSkill] : (userSkills.length ? userSkills : ['Problem solving', 'Communication'])
-  const exp = profile.experience || '1–3 years'
+  const exp = profile.experience || '1–2 years'
 
   // If quiz from notes / uploaded document
   if (quizMode === 'notes' && notesContent.trim()) {
@@ -779,23 +903,34 @@ function buildScenarioQuestions(profile, t, userSkills, quizMode = 'standard', n
     const concepts = extractConceptsFromText(cleanNotes, 5)
     const questions = []
     const count = 10
+    const questionTemplates = [
+      (title) => `Which action best applies the principle of ${title} in a real government workflow?`,
+      (title) => `What is the main risk to control when implementing ${title}?`,
+      (title) => `How should an officer validate work related to ${title} before publishing results?`,
+      (title) => `Which evidence would demonstrate effective practice of ${title}?`,
+      (title) => `A team is applying ${title}. Which decision best protects quality and accountability?`,
+    ]
+    const optionTemplates = [
+      ['Apply the principle with documented checks, evidence, and review before approval', 'Skip the principle because the workflow is already familiar', 'Use an unverified shortcut and remove the audit trail', 'Wait for an error before deciding how the principle applies'],
+      ['Define the risk, assign an owner, and monitor controls throughout delivery', 'Treat the risk as irrelevant unless a complaint is received', 'Transfer the risk to another team without recording it', 'Remove the related data so the risk cannot be measured'],
+      ['Compare the work with the source guidance, validate the evidence, and record exceptions', 'Approve the work from memory without checking the source', 'Change the results until they match an expected outcome', 'Publish immediately and document issues only if challenged'],
+      ['A reproducible result, clear documentation, and an independent quality check', 'A verbal claim that the process was followed correctly', 'A final number with no source or calculation trail', 'A faster result produced without peer review'],
+      ['Balance the source guidance, measurable evidence, stakeholder impact, and accountability', 'Choose the fastest option without assessing consequences', 'Delegate the decision without giving review criteria', 'Ignore conflicting evidence and proceed on assumption'],
+    ]
 
     for (let i = 0; i < count; i++) {
       const concept = concepts[i % concepts.length]
       const conceptTitle = concept?.title || `Concept ${i + 1}`
+      const conceptContext = concept?.context ? ` The source material explains: ${concept.context.slice(0, 180)}.` : ''
+      const questionPrompt = `${questionTemplates[i % questionTemplates.length](conceptTitle)}${conceptContext}`
 
       questions.push({
         type: 'choice',
         skill: conceptTitle,
         label: `Notes Concept ${i + 1}`,
         sourceBadge: `Notes • Concept ${i + 1}`,
-        prompt: `Based on your uploaded material, which application best reflects the core principle of ${conceptTitle}?`,
-        options: [
-          `Apply this standard directly to validate workflow accuracy and eliminate assumption errors`,
-          `Disregard the documented principle and rely entirely on unverified intuition`,
-          `Apply the reverse of this guideline to bypass quality control gates`,
-          `Postpone adherence until a critical production failure occurs`,
-        ],
+        prompt: questionPrompt,
+        options: optionTemplates[i % optionTemplates.length],
         correctIndex: 0,
       })
     }
@@ -933,23 +1068,27 @@ function buildScenarioQuestions(profile, t, userSkills, quizMode = 'standard', n
 
   const generatedQuestions = []
   const questionCount = 15
-
-  const selectedCoding = skills.find((s) => pureCodingLanguages.includes(s) || s === 'JavaScript' || s === 'Python' || s === 'C++')
+  const codingSkills = skills.filter(isCodingSkill)
+  const nonCodingSkills = skills.filter((skill) => !isCodingSkill(skill))
+  const codingQuestionIndexes = new Set([2, 5, 8, 11, 14])
 
   for (let i = 0; i < questionCount; i++) {
-    const currentSkill = skills[i % skills.length]
-    const isCodingQuestion = Boolean(selectedCoding && (currentSkill === selectedCoding || pureCodingLanguages.includes(currentSkill)) && [2, 7, 12].includes(i))
+    const isCodingQuestion = codingSkills.length > 0 && codingQuestionIndexes.has(i)
+    const currentSkill = isCodingQuestion
+      ? codingSkills[Math.floor(i / 3) % codingSkills.length]
+      : (nonCodingSkills.length > 0 ? nonCodingSkills[i % nonCodingSkills.length] : 'Problem solving')
 
     if (isCodingQuestion) {
-      const lang = selectedCoding || 'JavaScript'
-      const challenges = codingCodeChallenges[lang] || codingCodeChallenges.JavaScript
+      const lang = currentSkill
+      const challenges = codingCodeChallenges[lang] || [additionalCodingChallenges[lang]]
       const challenge = challenges[i % challenges.length]
       generatedQuestions.push({
         type: 'code',
         skill: currentSkill,
         label: `${t.question} ${i + 1}`,
+        experienceLevel: exp,
         prompt: challenge.prompt,
-        language: challenge.language,
+        language: challenge.language || lang,
         starter: challenge.starter,
         checks: challenge.checks,
       })
@@ -982,6 +1121,7 @@ function buildScenarioQuestions(profile, t, userSkills, quizMode = 'standard', n
         type: 'choice',
         skill: currentSkill,
         label: `${t.question} ${i + 1}`,
+        experienceLevel: exp,
         prompt: item.prompt,
         options: item.options,
         correctIndex: item.correct ?? 0,
@@ -990,6 +1130,11 @@ function buildScenarioQuestions(profile, t, userSkills, quizMode = 'standard', n
   }
 
   return generatedQuestions
+}
+
+function getSkillSpecificQuestions(profile, t, skillList) {
+  const questions = buildScenarioQuestions(profile, t, skillList, 'standard')
+  return questions.filter((question) => skillList.includes(question.skill))
 }
 
 const initialCompanyLeaderboard = [
@@ -1011,6 +1156,8 @@ function App() {
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [ssoLoading, setSsoLoading] = useState(false)
   const [roleSearch, setRoleSearch] = useState('')
+  const [departmentSearch, setDepartmentSearch] = useState('')
+  const [isDepartmentMenuOpen, setIsDepartmentMenuOpen] = useState(false)
   const [profile, setProfile] = useState({
     name: '', employeeId: '', department: '',
     organization: '', designation: '',
@@ -1036,6 +1183,7 @@ function App() {
   const [competencyGaps, setCompetencyGaps] = useState(initialCompetencyGaps)
   const [selectedSkillForRec, setSelectedSkillForRec] = useState(initialCompetencyGaps[0])
   const [recommendationData, setRecommendationData] = useState(null)
+  const [recommendationsBySkill, setRecommendationsBySkill] = useState({})
   const [isRecLoading, setIsRecLoading] = useState(false)
   const [currentQuizSkill, setCurrentQuizSkill] = useState('')
   const [gapFilter, setGapFilter] = useState('All')
@@ -1053,19 +1201,27 @@ function App() {
   const [docExtractionError, setDocExtractionError] = useState('')
   const [docExtractionSuccess, setDocExtractionSuccess] = useState('')
   const [docExtractedConcepts, setDocExtractedConcepts] = useState([])
-  const [showAllRoles, setShowAllRoles] = useState(false)
   const [activeCourseModal, setActiveCourseModal] = useState(null)
 
-  const t = text[language] || text.en
+  const t = text[language] || extendedText[language] || text.en
   const tx = (key) => uiText[language]?.[key] || uiText.en[key] || key
 
   const updateProfile = (key, value) => {
     setProfile((prev) => ({ ...prev, [key]: value }))
   }
 
+  const selectDepartment = (departmentName) => {
+    updateProfile('department', departmentName)
+    updateProfile('designation', '')
+    setDepartmentSearch(departmentName)
+    setIsDepartmentMenuOpen(false)
+  }
+
   const toggleSkill = (skill) => {
     const clean = skill.trim()
     if (!clean) return
+    const codingCount = selectedSkillList.filter(isCodingSkill).length
+    if (!selectedSkillList.includes(clean) && isCodingSkill(clean) && codingCount >= 4) return
     let updated
     if (selectedSkillList.includes(clean)) {
       updated = selectedSkillList.filter((s) => s !== clean)
@@ -1079,6 +1235,7 @@ function App() {
   const addCustomSkill = () => {
     const clean = customSkill.trim()
     if (!clean || selectedSkillList.includes(clean)) return
+    if (isCodingSkill(clean) && selectedSkillList.filter(isCodingSkill).length >= 4) return
     const updated = [...selectedSkillList, clean]
     setSelectedSkillList(updated)
     updateProfile('skills', updated.join(', '))
@@ -1093,6 +1250,20 @@ function App() {
       getRecommendations(profile, selectedSkillForRec).then(setRecommendationData)
     }
   }, [profile, selectedSkillForRec, recommendationData])
+
+  useEffect(() => {
+    if (!profile.role || selectedSkillList.length === 0) return
+    let cancelled = false
+    const skillGaps = new Map(competencyGaps.map((gap) => [gap.skill, gap]))
+    Promise.all(selectedSkillList.map((skill) => getRecommendations(profile, skillGaps.get(skill) || { skill })))
+      .then((results) => {
+        if (!cancelled) {
+          setRecommendationsBySkill(Object.fromEntries(results.map((result) => [result.skill, result])))
+        }
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [profile, selectedSkillList, competencyGaps])
 
   // Handler for viewing recommendation for a specific competency gap
   const handleViewRecommendation = useCallback(async (gapItem) => {
@@ -1161,7 +1332,12 @@ function App() {
       ? selectedSkillList
       : ['Problem solving', 'Communication']
     const hasCoding = skillList.some((s) => codingLanguages.includes(s))
-    const chosenLang = hasCoding ? skillList.find((s) => pureCodingLanguages.includes(s)) || 'JavaScript' : ''
+    const chosenLang = hasCoding ? skillList.find(isCodingSkill) : ''
+
+    if (quizMode === 'standard' && !specificSkill) {
+      const codingCount = skillList.filter(isCodingSkill).length
+      if (codingCount > 0 && (codingCount < 2 || codingCount > 4)) return
+    }
 
     if (quizMode === 'notes') {
       const clean = cleanExtractedText(uploadedNotesText)
@@ -1219,17 +1395,21 @@ function App() {
     })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error('AI fallback'))))
       .then((data) => {
-        if (Array.isArray(data.questions) && data.questions.length >= 5) {
+          if (Array.isArray(data.questions) && data.questions.length >= 5) {
           const validated = validateAndCleanQuiz(data.questions, skillList[0])
-          if (validated.length >= 5) {
-            setQuestions(validated)
+          const selectedSkillNames = new Set(skillList.map((skill) => skill.toLowerCase()))
+          const selectedQuestions = validated.filter((question) => selectedSkillNames.has(String(question.skill || '').toLowerCase()))
+          const coversEverySkill = skillList.every((skill) => selectedQuestions.some((question) => String(question.skill || '').toLowerCase() === skill.toLowerCase()))
+          const requiredCodingQuestions = hasCoding ? selectedQuestions.filter((question) => question.type === 'code').length >= 5 : true
+          if (selectedQuestions.length >= 5 && coversEverySkill && requiredCodingQuestions) {
+            setQuestions(selectedQuestions)
             return
           }
         }
-        setQuestions(buildScenarioQuestions(profile, t, skillList, 'standard'))
+        setQuestions(getSkillSpecificQuestions(profile, t, skillList))
       })
       .catch(() => {
-        setQuestions(buildScenarioQuestions(profile, t, skillList, 'standard'))
+        setQuestions(getSkillSpecificQuestions(profile, t, skillList))
       })
       .finally(() => {
         setQuestionIndex(0)
@@ -1368,11 +1548,7 @@ function App() {
   }
 
   const recommendedRoles = getRecommendedRoles(profile)
-  const baseRoles = roleSearch.trim()
-    ? [...officialRoles, ...roles.filter((role) => !officialRoles.includes(role))]
-    : showAllRoles
-    ? [...recommendedRoles, ...officialRoles.filter((r) => !recommendedRoles.includes(r)), ...roles.filter((r) => !recommendedRoles.includes(r) && !officialRoles.includes(r))]
-    : recommendedRoles
+  const baseRoles = recommendedRoles
 
   const filteredRoles = baseRoles.filter((r) =>
     r.toLowerCase().includes(roleSearch.toLowerCase())
@@ -1413,10 +1589,7 @@ function App() {
               onChange={(e) => setLanguage(e.target.value)}
               aria-label="Select Language"
             >
-              <option value="en">English</option>
-              <option value="hi">हिन्दी (Hindi)</option>
-              <option value="ta">தமிழ் (Tamil)</option>
-              <option value="te">తెలుగు (Telugu)</option>
+              {supportedLanguages.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </div>
         </div>
@@ -1448,6 +1621,8 @@ function App() {
                 externalTraining: '',
                 certifications: '',
               })
+              setDepartmentSearch('')
+              setIsDepartmentMenuOpen(false)
               setSelectedSkillList([])
               setQuizzesCompleted(0)
               setOverallScore(0)
@@ -1488,6 +1663,8 @@ function App() {
                 externalTraining: '',
                 certifications: '',
               })
+              setDepartmentSearch('')
+              setIsDepartmentMenuOpen(false)
               setSelectedSkillList([])
               setQuizzesCompleted(0)
               setOverallScore(0)
@@ -1511,10 +1688,8 @@ function App() {
   }
 
   if (step === 'profile') {
-    const profileFields = [
-          ['name', tx('fullName')], ['employeeId', tx('employeeId')], ['department', tx('department')],
-          ['organization', tx('organization')], ['designation', tx('designation')], ['assignment', tx('currentAssignment')], ['location', tx('location')],
-    ]
+    const selectedDepartment = getDepartmentDetails(profile.department)
+    const filteredDepartments = governmentDepartments.filter(({ name }) => name.toLowerCase().includes(departmentSearch.toLowerCase()))
     return (
       <div className="simple-page">
         <div className="page-centered-container selection-page">
@@ -1529,30 +1704,58 @@ function App() {
               <p className="helper">{tx('profileHint')}</p>
             </div>
             <div className="profile-form-grid">
-              {profileFields.map(([key, label]) => {
-                const placeholders = {
-                  name: 'e.g. Sathvika Sharma',
-                  employeeId: 'e.g. EMP-24018',
-                  department: 'e.g. Analytics & Official Statistics',
-                  organization: 'e.g. Ministry / Public Department',
-                  designation: 'e.g. Data Analyst',
-                  assignment: 'e.g. Data Analysis & Reporting',
-                  location: 'e.g. Hyderabad, Telangana',
-                }
-                return (
-                  <label key={key} className="profile-field">{label}
-                    <input
-                      value={profile[key] || ''}
-                      placeholder={placeholders[key] || ''}
-                      onChange={(e) => updateProfile(key, e.target.value)}
-                    />
-                  </label>
-                )
-              })}
+              <label className="profile-field">{tx('fullName')}
+                <input value={profile.name} placeholder="e.g. Sathvika Sharma" onChange={(e) => updateProfile('name', e.target.value)} />
+              </label>
+              <label className="profile-field">{tx('employeeId')}
+                <input value={profile.employeeId} placeholder="e.g. EMP-24018" onChange={(e) => updateProfile('employeeId', e.target.value)} />
+              </label>
+              <label className="profile-field department-combobox">{tx('department')}
+                <div className="department-input-wrap">
+                  <input
+                    value={departmentSearch}
+                    placeholder="Search government departments"
+                    onFocus={() => setIsDepartmentMenuOpen(true)}
+                    onChange={(e) => {
+                      setDepartmentSearch(e.target.value)
+                      setIsDepartmentMenuOpen(true)
+                      if (profile.department && e.target.value !== profile.department) updateProfile('department', '')
+                    }}
+                    aria-label="Search government departments"
+                    role="combobox"
+                    aria-expanded={isDepartmentMenuOpen}
+                  />
+                  <span className="select-chevron">⌄</span>
+                </div>
+                {isDepartmentMenuOpen && (
+                  <div className="department-options" role="listbox">
+                    {filteredDepartments.length > 0 ? filteredDepartments.map(({ name }) => (
+                      <button key={name} type="button" role="option" aria-selected={profile.department === name} onMouseDown={(e) => e.preventDefault()} onClick={() => selectDepartment(name)}>
+                        {name}
+                      </button>
+                    )) : <span className="department-empty">No department matches that search.</span>}
+                  </div>
+                )}
+              </label>
+              <label className="profile-field">{tx('designation')}
+                <select
+                  value={profile.designation}
+                  disabled={!selectedDepartment}
+                  onChange={(e) => {
+                    updateProfile('designation', e.target.value)
+                    updateProfile('role', '')
+                    setSelectedSkillList([])
+                    updateProfile('skills', '')
+                  }}
+                >
+                  <option value="">{selectedDepartment ? 'Select your designation' : 'Select a department first'}</option>
+                  {(selectedDepartment?.designations || []).map((designation) => <option key={designation} value={designation}>{designation}</option>)}
+                </select>
+              </label>
             </div>
             <div className="selection-actions">
               <button className="secondary-action btn-back" onClick={() => setStep('login')}>← {t.back}</button>
-              <button className="primary-action btn-next" onClick={() => setStep('role')}>Continue <span>→</span></button>
+              <button className="primary-action btn-next" disabled={!profile.department || !profile.designation} onClick={() => setStep('role')}>Continue <span>→</span></button>
             </div>
           </section>
         </div>
@@ -1606,14 +1809,6 @@ function App() {
                   <>Showing recommended roles based on your profile inputs</>
                 )}
               </div>
-              <button
-                type="button"
-                className="toggle-roles-link"
-                style={{ background: 'none', border: 'none', color: 'var(--green)', fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
-                onClick={() => setShowAllRoles(!showAllRoles)}
-              >
-                {showAllRoles ? '← Show Recommended Only' : `Browse All (${roles.length + officialRoles.length}) Roles`}
-              </button>
             </div>
 
             {profile.role && (
@@ -1703,6 +1898,11 @@ function App() {
   // -------------------------------------------------------------
   if (step === 'skills') {
     const isMinSkillsMet = selectedSkillList.length >= 2
+    const normalizedCodingSkills = selectedSkillList.filter(isCodingSkill)
+    const hasTooManyCodingSkills = normalizedCodingSkills.length > 4
+    const hasTooFewCodingSkills = normalizedCodingSkills.length === 1
+    const codingSelectionValid = !hasTooManyCodingSkills && !hasTooFewCodingSkills
+    const availableSkills = [...new Set(skillCategories.flatMap(([, domainSkills]) => domainSkills))]
 
     return (
       <div className="simple-page">
@@ -1725,29 +1925,26 @@ function App() {
               </p>
             </div>
 
-            <div className={`skill-requirement-banner ${isMinSkillsMet ? 'met' : 'needed'}`}>
-              <span className="banner-icon">{isMinSkillsMet ? '✓' : 'ℹ'}</span>
+            <div className={`skill-requirement-banner ${isMinSkillsMet && codingSelectionValid ? 'met' : 'needed'}`}>
+              <span className="banner-icon">{isMinSkillsMet && codingSelectionValid ? '✓' : 'ℹ'}</span>
               <span>
                 {selectedSkillList.length} {t.skillsSelected} (
-                {isMinSkillsMet
-                  ? 'Minimum 2 skills selected'
-                  : `Please select at least ${2 - selectedSkillList.length} more skill(s)`}
+                {!isMinSkillsMet
+                  ? `Please select at least ${2 - selectedSkillList.length} more skill(s)`
+                  : !codingSelectionValid
+                  ? hasTooManyCodingSkills
+                  ? 'Remove coding skills until you have a maximum of 4'
+                  : 'Select at least 2 coding skills'
+                  : 'Choose any skills that match your work'}
                 )
               </span>
             </div>
 
-            <div className="competency-domains-grid">
-              {skillCategories.map(([domain, domainSkills]) => (
-                <div className="competency-domain" key={domain}>
-                  <div className="domain-heading"><strong>{domain}</strong><span>{domainSkills.filter((skill) => selectedSkillList.includes(skill)).length} selected</span></div>
-                  <div className="domain-skills">
-                    {domainSkills.map((skill) => {
-                      const isSelected = selectedSkillList.includes(skill)
-                      return <button type="button" className={isSelected ? 'choice-card selected' : 'choice-card'} key={skill} onClick={() => toggleSkill(skill)}><span className="skill-dot" /><span className="skill-name">{skill}</span><span className="choice-check">✓</span></button>
-                    })}
-                  </div>
-                </div>
-              ))}
+            <div className="flat-skills-grid">
+              {availableSkills.map((skill) => {
+                const isSelected = selectedSkillList.includes(skill)
+                return <button type="button" className={isSelected ? 'choice-card selected' : 'choice-card'} key={skill} onClick={() => toggleSkill(skill)}><span className="skill-dot" /><span className="skill-name">{skill}</span><span className="choice-check">✓</span></button>
+              })}
             </div>
 
             <div className="custom-entry-box custom-skill-box">
@@ -1793,7 +1990,7 @@ function App() {
               </button>
               <button
                 className="primary-action btn-next"
-                disabled={!isMinSkillsMet}
+                disabled={!isMinSkillsMet || !codingSelectionValid}
                 onClick={() => setStep('experience')}
               >
                 {t.continue} <span>→</span>
@@ -1811,9 +2008,12 @@ function App() {
   if (step === 'experience') {
     const experienceOptions = [
       { value: 'Less than 1 year', detail: 'Entry Level & Foundational Knowledge' },
-      { value: '1–3 years', detail: 'Hands-on Execution & Core Workflow' },
-      { value: '3–5 years', detail: 'Independent delivery & complex analysis' },
-      { value: '5+ years', detail: 'Senior specialist, leadership & mentoring' },
+      { value: '1–2 years', detail: 'Early hands-on execution & core workflow' },
+      { value: '2–4 years', detail: 'Independent delivery & applied problem solving' },
+      { value: '4–7 years', detail: 'Complex analysis, ownership & delivery' },
+      { value: '7–10 years', detail: 'Senior specialist, mentoring & strategy' },
+      { value: '10–15 years', detail: 'Principal expertise, leadership & governance' },
+      { value: '15+ years', detail: 'Executive experience, institutional knowledge & coaching' },
     ]
 
     return (
@@ -1973,7 +2173,7 @@ function App() {
               </div>
               <div>
                 <small>{t.experienceLabel}</small>
-                <strong>{profile.experience || '1-3 years'}</strong>
+                <strong>{profile.experience || '1–2 years'}</strong>
               </div>
             </div>
 
@@ -2186,7 +2386,7 @@ function App() {
             onClick={() => setDashboardView('dashboard')}
           >
             <span className="nav-icon">▦</span>
-            <span>{language === 'hi' ? 'डैशबोर्ड' : language === 'ta' ? 'டாஷ்போர்டு' : language === 'te' ? 'డ్యాష్‌బోర్డ్' : 'Dashboard'}</span>
+            <span>{navText[language]?.[0] || navText.en[0]}</span>
           </button>
 
           <button
@@ -2195,7 +2395,7 @@ function App() {
             onClick={() => setDashboardView('recommendations')}
           >
             <span className="nav-icon">✦</span>
-            <span>{language === 'hi' ? 'सिफारिशें' : language === 'ta' ? 'பரிந்துரைகள்' : language === 'te' ? 'సిఫార్సులు' : 'Recommendations'}</span>
+            <span>{navText[language]?.[2] || navText.en[2]}</span>
           </button>
 
           <button
@@ -2204,7 +2404,7 @@ function App() {
             onClick={() => setDashboardView('weekend')}
           >
             <span className="nav-icon">🏆</span>
-            <span>{language === 'hi' ? 'वीकेंड चैलेंज' : language === 'ta' ? 'வார இறுதி சவால்' : language === 'te' ? 'వీకెండ్ ఛాలెంజ్' : 'Weekend Challenge'}</span>
+            <span>{navText[language]?.[2] || navText.en[2]}</span>
           </button>
 
           <button
@@ -2213,7 +2413,7 @@ function App() {
             onClick={() => setDashboardView('notes')}
           >
             <span className="nav-icon">📄</span>
-            <span>{language === 'hi' ? 'एआई क्विज' : language === 'ta' ? 'AI வினாடி வினா' : language === 'te' ? 'AI క్విజ్' : 'AI Quiz'}</span>
+            <span>{navText[language]?.[4] || navText.en[4]}</span>
           </button>
 
           <button
@@ -2222,7 +2422,7 @@ function App() {
             onClick={() => setDashboardView('profile')}
           >
             <span className="nav-icon">👤</span>
-            <span>{language === 'hi' ? 'प्रोफाइल विवरण' : language === 'ta' ? 'சுயவிவர மேலோட்டம்' : language === 'te' ? 'ప్రొఫైల్ అవలోకనం' : 'Profile Overview'}</span>
+            <span>{navText[language]?.[1] || navText.en[1]}</span>
           </button>
         </nav>
 
@@ -2234,10 +2434,7 @@ function App() {
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
             >
-              <option value="en">English</option>
-              <option value="hi">हिन्दी (Hindi)</option>
-              <option value="ta">தமிழ் (Tamil)</option>
-              <option value="te">తెలుగు (Telugu)</option>
+              {supportedLanguages.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </div>
 
@@ -2290,7 +2487,7 @@ function App() {
             </div>
             {isProfileEditing ? (
               <div className="profile-form-grid profile-edit-grid">
-                {[['name', tx('fullName')], ['employeeId', tx('employeeId')], ['department', tx('department')], ['organization', tx('organization')], ['designation', tx('designation')], ['location', tx('location')], ['assignment', tx('currentAssignment')]].map(([key, label]) => (
+                {[['name', tx('fullName')], ['employeeId', tx('employeeId')], ['department', tx('department')], ['designation', tx('designation')]].map(([key, label]) => (
                   <label className="profile-field" key={key}>
                     {label}
                     <input value={profileDraft[key] || ''} onChange={(event) => setProfileDraft((draft) => ({ ...draft, [key]: event.target.value }))} />
@@ -2303,7 +2500,7 @@ function App() {
               </div>
             ) : (
               <div className="profile-form-grid profile-summary-grid">
-                {[[tx('fullName'), profile.name || 'Not provided'], [tx('employeeId'), profile.employeeId || 'Not provided'], [tx('department'), profile.department || 'Not provided'], [tx('organization'), profile.organization || 'Not provided'], [tx('designation'), profile.designation || profile.role || 'Not provided'], [tx('currentAssignment'), profile.assignment || 'Not provided'], [tx('location'), profile.location || 'Not provided'], [t.experienceLabel, profile.experience || 'Not selected']].map(([label, value]) => (
+                {[[tx('fullName'), profile.name || 'Not provided'], [tx('employeeId'), profile.employeeId || 'Not provided'], [tx('department'), profile.department || 'Not provided'], [tx('designation'), profile.designation || 'Not provided'], [t.roleLabel, profile.role || 'Not selected'], [t.experienceLabel, profile.experience || 'Not selected']].map(([label, value]) => (
                   <div className="profile-summary-item" key={label}>
                     <span>{label}</span>
                     <strong>{value}</strong>
@@ -2430,9 +2627,42 @@ function App() {
               <p className="kicker">PERSONALIZED RECOMMENDATION ENGINE</p>
               <h1>AI Learning & Specialised Training Pathway</h1>
               <p className="helper">
-                Official government resources matched to your competency profile and priority gaps.
+                A complete learning path for every skill in your profile.
               </p>
             </div>
+
+            <section className="learning-path-section">
+              <div className="learning-path-heading">
+                <div>
+                  <p className="kicker">YOUR COMPLETE PATH</p>
+                  <h2>{selectedSkillList.length} skill paths ready</h2>
+                </div>
+                <span className="status-pill green">Personalized to your role</span>
+              </div>
+              <div className="learning-path-grid">
+                {selectedSkillList.map((skill, index) => {
+                  const skillRec = recommendationsBySkill[skill]
+                  const skillGap = competencyGaps.find((gap) => gap.skill === skill)
+                  return (
+                    <article className="learning-path-card" key={skill}>
+                      <div className="learning-path-number">{String(index + 1).padStart(2, '0')}</div>
+                      <div className="learning-path-card-body">
+                        <span className="path-domain">{skillGap?.domain || 'Role competency'}</span>
+                        <h3>{skill}</h3>
+                        <p>{skillRec?.explanation || `Build practical ${skill} capability through official learning and applied assessment.`}</p>
+                        <div className="path-sources">
+                          <span className="path-source igot">iGOT {skillRec?.igotCourses?.length || 0}</span>
+                          <span className="path-source nssta">NSSTA / TPAC {skillRec?.nsstaPrograms?.length || 0}</span>
+                        </div>
+                      </div>
+                      <button className="text-button path-open" type="button" onClick={() => skillGap && handleViewRecommendation(skillGap)}>
+                        Explore path →
+                      </button>
+                    </article>
+                  )
+                })}
+              </div>
+            </section>
 
             {/* Skill Gap Card Details */}
             {selectedSkillForRec && (

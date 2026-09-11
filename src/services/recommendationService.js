@@ -40,7 +40,7 @@ export async function getRecommendations(profile = {}, skillGap = {}) {
 
   // Contextual reasoning based on profile & gap
   const roleName = profile.role || profile.designation || 'Statistical Officer'
-  const experience = profile.experience || '1-3 years'
+  const experience = profile.experience || '1–2 years'
   const prevIGOT = profile.previousIGOT || 'Not yet attended'
   const prevNSSTA = profile.previousNSSTA || 'Not yet attended'
 
