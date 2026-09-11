@@ -57,4 +57,6 @@ npm run lint    # Oxlint checks
 - The sign-in form is a local UI step; there is no account or session persistence.
 - Uploaded documents are read in the browser as text. There is no dedicated PDF parser, so binary PDF text extraction is not guaranteed.
 - The API key is expected by the local API process, not by the frontend.
+## Project Status
 
+Skillstat AI project setup completed.
