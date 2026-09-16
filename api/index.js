@@ -342,14 +342,10 @@ export default async function handler(request, response) {
       }
 
       await upsertUser(user)
-      const hasEmailJs = Boolean(getEnv('EMAILJS_SERVICE_ID') || getEnv('EMAILJS_TEMPLATE_ID') || getEnv('EMAILJS_PUBLIC_KEY'))
-      const hasProvider = hasEmailJs || Boolean(getEnv('RESEND_API_KEY'))
-      const isDev = !hasProvider
 
       sendJson(response, 200, {
         requiresVerification: true,
         email,
-        devCode: isDev ? otpCode : undefined,
       })
       return
     }
@@ -440,10 +436,7 @@ export default async function handler(request, response) {
       }
 
       await upsertUser(user)
-      const hasEmailJs = Boolean(getEnv('EMAILJS_SERVICE_ID') || getEnv('EMAILJS_TEMPLATE_ID') || getEnv('EMAILJS_PUBLIC_KEY'))
-      const hasProvider = hasEmailJs || Boolean(getEnv('RESEND_API_KEY'))
-      const isDev = !hasProvider
-      sendJson(response, 200, { sent: true, devCode: isDev ? otpCode : undefined })
+      sendJson(response, 200, { sent: true })
       return
     }
 

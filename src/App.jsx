@@ -4,6 +4,7 @@ import { extractTextFromFile, cleanExtractedText, validateDocumentText, extractC
 import { validateAndCleanQuiz } from './utils/questionValidator'
 import { getRecommendations } from './services/recommendationService'
 import ChatBot from './components/ChatBot'
+import AdminPortal from './components/admin/AdminPortal'
 
 const getUserInitial = (name) => String(name || '').trim().charAt(0).toUpperCase() || 'U'
 
@@ -3228,7 +3229,6 @@ function App() {
   const [verificationSuccess, setVerificationSuccess] = useState('')
   const [isVerifying, setIsVerifying] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
-  const [devVerificationCode, setDevVerificationCode] = useState('')
 
   useEffect(() => {
     if (resendCooldown <= 0) return
@@ -4306,7 +4306,6 @@ function App() {
                   setOtpDigits(['', '', '', '', '', ''])
                   setVerificationError('')
                   setVerificationSuccess('')
-                  setDevVerificationCode(data.devCode || '')
                   setResendCooldown(30)
                   setStep('verify-email')
                 } else if (data.token) {
@@ -4436,9 +4435,8 @@ function App() {
         method: 'POST',
         body: JSON.stringify({ email: verifyEmail }),
       })
-        .then((data) => {
+        .then(() => {
           setResendCooldown(30)
-          if (data.devCode) setDevVerificationCode(data.devCode)
           setVerificationSuccess('A new verification code has been dispatched to your email.')
         })
         .catch((err) => {
@@ -4477,24 +4475,6 @@ function App() {
             We sent a 6-digit verification code to<br />
             <strong className="verify-target-email">{verifyEmail}</strong>
           </p>
-
-          {devVerificationCode && (
-            <div className="dev-code-banner">
-              <span className="dev-pill">DEV MODE</span>
-              <span className="dev-text">Test OTP: <strong>{devVerificationCode}</strong></span>
-              <button
-                type="button"
-                className="dev-fill-button"
-                onClick={() => {
-                  const digits = devVerificationCode.slice(0, 6).split('')
-                  setOtpDigits(digits)
-                  setVerificationError('')
-                }}
-              >
-                Auto-fill
-              </button>
-            </div>
-          )}
 
           <form onSubmit={handleVerifySubmit} className="verify-form">
             <div className="otp-digit-grid">
@@ -5343,6 +5323,15 @@ function App() {
             <span>{navText[language]?.[5] || navText.en[5]}</span>
           </button>
 
+          <button
+            type="button"
+            className={`header-nav-item ${dashboardView === 'admin' ? 'active' : ''}`}
+            onClick={() => setDashboardView('admin')}
+          >
+            <span className="nav-icon">🛡️</span>
+            <span>Admin Portal</span>
+          </button>
+
         </nav>
 
         <div className="nav-right">
@@ -5377,6 +5366,10 @@ function App() {
                   setDashboardView('promotions')
                   setIsProfileMenuOpen(false)
                 }}>🎖️ {navText[language]?.[5] || navText.en[5]}</button>
+                <button type="button" role="menuitem" onClick={() => {
+                  setDashboardView('admin')
+                  setIsProfileMenuOpen(false)
+                }}>🛡️ Admin Portal</button>
                 <button type="button" role="menuitem" onClick={() => setIsSettingsOpen((open) => !open)}>{t.settings}</button>
                 {isSettingsOpen && (
                   <div className="theme-settings" role="group" aria-label={t.settings}>
@@ -5388,15 +5381,17 @@ function App() {
               </div>
             )}
           </div>
-
-          <button className="nav-btn-secondary" onClick={() => setStep('profile')}>
-            ← {tx('editProfile')}
-          </button>
         </div>
       </header>
 
       {/* Main Body */}
       <main className="dashboard-body">
+        {dashboardView === 'admin' && (
+          <AdminPortal
+            onReturnToLearner={() => setDashboardView('dashboard')}
+            adminUser={profile}
+          />
+        )}
         {dashboardView === 'profile' && (
           <section className="dashboard-panel official-profile-view">
             <div className="panel-head">

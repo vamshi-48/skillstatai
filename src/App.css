@@ -5617,13 +5617,13 @@ body {
   justify-content: space-between;
   align-items: center;
   gap: 24px;
-  background: linear-gradient(130deg, #0e2b1f 0%, #154734 50%, #1b6348 100%);
-  border: 1px solid rgba(84, 201, 143, 0.25);
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--line, #e2e8f0);
   border-radius: 20px;
   padding: 24px 28px;
   margin-top: 20px;
-  box-shadow: 0 16px 36px rgba(10, 48, 33, 0.18);
-  color: #f1fbf5;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
+  color: var(--ink, #0f172a);
   position: relative;
   overflow: hidden;
 }
@@ -5633,10 +5633,10 @@ body {
   position: absolute;
   right: -50px;
   top: -50px;
-  width: 220px;
-  height: 220px;
+  width: 200px;
+  height: 200px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(84, 201, 143, 0.15) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.07) 0%, transparent 70%);
   pointer-events: none;
 }
 
@@ -5664,14 +5664,14 @@ body {
   letter-spacing: 0.5px;
   padding: 4px 10px;
   border-radius: 100px;
-  background: rgba(255, 255, 255, 0.15);
-  color: #e2f8ec;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
 }
 
 .promo-pill-cadre {
   font-size: 12px;
-  color: #a3e9c4;
+  color: #059669;
   font-weight: 600;
 }
 
@@ -5679,23 +5679,22 @@ body {
   margin: 0;
   font-size: 20px;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--ink, #0f172a);
 }
 
 .promo-target-role-text {
-  color: #54c98f;
-  text-shadow: 0 0 20px rgba(84, 201, 143, 0.4);
+  color: #059669;
 }
 
 .promo-target-sub {
   margin: 0;
   font-size: 13.5px;
-  color: #c9e8d6;
+  color: var(--muted, #64748b);
   line-height: 1.5;
 }
 
 .promo-target-sub strong {
-  color: #ffffff;
+  color: var(--ink, #0f172a);
 }
 
 .promo-preview-summary-pills {
@@ -5707,11 +5706,11 @@ body {
 
 .promo-tag-item {
   font-size: 11.5px;
-  background: rgba(0, 0, 0, 0.2);
+  background: #f8fafc;
   padding: 3px 9px;
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #e2f3e8;
+  border: 1px solid #e2e8f0;
+  color: #334155;
 }
 
 .promo-preview-right {
@@ -5727,26 +5726,26 @@ body {
   width: 76px;
   height: 76px;
   border-radius: 50%;
-  border: 4px solid #54c98f;
-  background: rgba(14, 43, 31, 0.7);
+  border: 4px solid #10b981;
+  background: #ecfdf5;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 20px rgba(84, 201, 143, 0.3);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
 }
 
 .promo-gauge-pct {
   font-size: 19px;
   font-weight: 800;
-  color: #ffffff;
+  color: #065f46;
   line-height: 1;
 }
 
 .promo-gauge-sub {
   font-size: 10px;
   text-transform: uppercase;
-  color: #a3e9c4;
+  color: #059669;
   letter-spacing: 0.5px;
   margin-top: 2px;
 }
@@ -6532,8 +6531,54 @@ body {
 
 /* Dark Theme Adaptations */
 .theme-dark .dashboard-promo-preview-banner {
-  background: linear-gradient(130deg, #091711 0%, #10291e 50%, #163628 100%);
-  border-color: rgba(84, 201, 143, 0.3);
+  background: var(--surface, #1e293b);
+  border-color: var(--line, #334155);
+  color: #f8fafc;
+}
+
+.theme-dark .dashboard-promo-preview-banner .promo-target-heading {
+  color: #f8fafc;
+}
+
+.theme-dark .dashboard-promo-preview-banner .promo-target-role-text {
+  color: #34d399;
+}
+
+.theme-dark .dashboard-promo-preview-banner .promo-target-sub {
+  color: #94a3b8;
+}
+
+.theme-dark .dashboard-promo-preview-banner .promo-target-sub strong {
+  color: #f8fafc;
+}
+
+.theme-dark .dashboard-promo-preview-banner .promo-pill-label {
+  background: rgba(16, 185, 129, 0.15);
+  color: #6ee7b7;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.theme-dark .dashboard-promo-preview-banner .promo-pill-cadre {
+  color: #34d399;
+}
+
+.theme-dark .dashboard-promo-preview-banner .promo-tag-item {
+  background: rgba(15, 23, 42, 0.6);
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+.theme-dark .dashboard-promo-preview-banner .promo-readiness-circle {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: #10b981;
+}
+
+.theme-dark .dashboard-promo-preview-banner .promo-gauge-pct {
+  color: #34d399;
+}
+
+.theme-dark .dashboard-promo-preview-banner .promo-gauge-sub {
+  color: #6ee7b7;
 }
 
 .theme-dark .promo-header-card,
