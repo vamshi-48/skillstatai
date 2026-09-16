@@ -162,13 +162,7 @@ const officialRoleDetails = {
   },
 }
 
-const initialCompetencyGaps = [
-  { skill: 'AI/ML', current: 45, required: 80, priority: 'Critical', domain: 'Technical Competencies' },
-  { skill: 'Cloud Computing', current: 32, required: 65, priority: 'Critical', domain: 'Technical Competencies' },
-  { skill: 'GIS', current: 42, required: 70, priority: 'Moderate', domain: 'Technical Competencies' },
-  { skill: 'Data Quality Frameworks', current: 64, required: 85, priority: 'Moderate', domain: 'Statistical Competencies' },
-  { skill: 'SQL', current: 82, required: 85, priority: 'Low', domain: 'Technical Competencies' },
-]
+const initialCompetencyGaps = []
 
 const codingLanguages = ['C', 'C#', 'C++', 'Java', 'JavaScript', 'TypeScript', 'Python', 'Ruby', 'Kotlin', 'SQL', 'HTML', 'CSS', 'Node.js', 'React', 'Coding', 'C programming']
 const supportedLanguages = [
@@ -3273,7 +3267,7 @@ function App() {
 
   // Official Skill Gaps & Combined Recommendation Engine State
   const [competencyGaps, setCompetencyGaps] = useState(initialCompetencyGaps)
-  const [selectedSkillForRec, setSelectedSkillForRec] = useState(initialCompetencyGaps[0])
+  const [selectedSkillForRec, setSelectedSkillForRec] = useState(null)
   const [recommendationData, setRecommendationData] = useState(null)
   const [recommendationsBySkill, setRecommendationsBySkill] = useState({})
   const [isRecLoading, setIsRecLoading] = useState(false)
@@ -4017,28 +4011,28 @@ function App() {
 
           {/* Action Buttons */}
           <div className="landing-actions-group">
-            <button
-              type="button"
-              className="landing-primary-btn"
-              onClick={() => {
-                if (sessionToken) {
-                  setStep('dashboard')
-                } else {
-                  setProfile((prev) => ({
-                    ...prev,
-                    name: prev.name || 'Sathvika Sharma',
-                    role: prev.role || 'Statistical Officer',
-                    designation: prev.designation || 'Statistical Officer',
-                    department: prev.department || "India's Official Statistical System",
-                    organization: prev.organization || 'National Statistical Office (NSO)',
-                  }))
-                  setStep('dashboard')
-                }
-              }}
-            >
-              <span>Launch Platform</span>
-              <span className="btn-arrow">→</span>
-            </button>
+            {sessionToken ? (
+              <button
+                type="button"
+                className="landing-primary-btn"
+                onClick={() => setStep('dashboard')}
+              >
+                <span>{t.openDashboard || 'Go to Dashboard'}</span>
+                <span className="btn-arrow">→</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="landing-primary-btn"
+                onClick={() => {
+                  setSignupError('')
+                  setStep('signup')
+                }}
+              >
+                <span>Create Account</span>
+                <span className="btn-arrow">→</span>
+              </button>
+            )}
 
             <button
               type="button"
@@ -4046,17 +4040,6 @@ function App() {
               onClick={() => setAuthModal('login')}
             >
               <span>{t.signIn || 'Sign In'}</span>
-            </button>
-
-            <button
-              type="button"
-              className="landing-secondary-btn"
-              onClick={() => {
-                setSignupError('')
-                setStep('signup')
-              }}
-            >
-              <span>Create Account</span>
             </button>
 
             <button
@@ -4345,7 +4328,7 @@ function App() {
           >
             <label>
               Full name
-              <input name="name" type="text" placeholder="e.g. Sathvika Sharma" autoComplete="name" required />
+              <input name="name" type="text" placeholder="Your full name" autoComplete="name" required />
             </label>
             <label>
               Work email
@@ -4613,7 +4596,7 @@ function App() {
             </div>
             <div className="profile-form-grid">
               <label className="profile-field">{tx('fullName')}
-                <input value={profile.name} placeholder="e.g. Sathvika Sharma" onChange={(e) => updateProfile('name', e.target.value)} />
+                <input value={profile.name} placeholder="Your full name" onChange={(e) => updateProfile('name', e.target.value)} />
               </label>
               <label className="profile-field">{tx('employeeId')}
                 <input value={profile.employeeId} placeholder="e.g. EMP-24018" onChange={(e) => updateProfile('employeeId', e.target.value)} />
