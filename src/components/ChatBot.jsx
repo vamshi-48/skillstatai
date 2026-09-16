@@ -9,13 +9,15 @@ export default function ChatBot({
   quizzesCompleted = 0,
   onNavigate,
   startQuiz,
+  initialHistory = [],
+  onHistoryChange,
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
   const messagesEndRef = useRef(null)
 
-  const roleName = profile.designation || profile.role || 'Government Professional'
+  const roleName = (profile.role && profile.role.trim()) || (profile.designation && profile.designation.trim()) || 'Government Professional'
   const deptName = profile.department || 'Official Statistics'
   const userName = profile.name ? profile.name.split(' ')[0] : 'Colleague'
 
@@ -32,7 +34,11 @@ export default function ChatBot({
     ],
   }
 
-  const [messages, setMessages] = useState([initialMessage])
+  const [messages, setMessages] = useState(() => [...initialHistory, initialMessage])
+
+  useEffect(() => {
+    onHistoryChange?.(messages)
+  }, [messages, onHistoryChange])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -187,9 +193,36 @@ export default function ChatBot({
     }
   }
 
+  const requestGeminiResponse = async (userText) => {
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: userText,
+        context: {
+          name: userName,
+          role: roleName,
+          department: deptName,
+          skills: selectedSkillList,
+          skillGapData,
+          overallScore,
+          quizzesCompleted,
+        },
+        history: messages.slice(-8).map((message) => ({
+          role: message.sender === 'user' ? 'user' : 'model',
+          text: message.text,
+        })),
+      }),
+    })
+    if (!response.ok) throw new Error('Gemini chatbot unavailable')
+    const data = await response.json()
+    if (!data.text) throw new Error('Gemini returned no response')
+    return data.text
+  }
+
   const msgIdCounter = useRef(10)
 
-  const handleSend = (textToSend = input) => {
+  const handleSend = async (textToSend = input) => {
     const trimmed = textToSend.trim()
     if (!trimmed) return
 
@@ -205,19 +238,30 @@ export default function ChatBot({
     setInput('')
     setIsTyping(true)
 
-    setTimeout(() => {
+    try {
+      const responseText = await requestGeminiResponse(trimmed)
       msgIdCounter.current += 1
-      const response = generateBotResponse(trimmed)
       const botMessage = {
         id: msgIdCounter.current,
         sender: 'bot',
-        text: response.text,
+        text: responseText,
         time: 'Just now',
-        actions: response.actions || [],
+        actions: [],
       }
       setMessages((prev) => [...prev, botMessage])
+    } catch {
+      const fallback = generateBotResponse(trimmed)
+      msgIdCounter.current += 1
+      setMessages((prev) => [...prev, {
+        id: msgIdCounter.current,
+        sender: 'bot',
+        text: fallback.text,
+        time: 'Just now',
+        actions: fallback.actions || [],
+      }])
+    } finally {
       setIsTyping(false)
-    }, 450)
+    }
   }
 
   const handleClear = () => {

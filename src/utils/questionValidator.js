@@ -150,6 +150,7 @@ export function validateAndCleanQuiz(questions, fallbackTopic = 'Document Concep
   if (!Array.isArray(questions)) return []
 
   const validQuestions = []
+  const seenPrompts = new Set()
   for (let i = 0; i < questions.length; i++) {
     const q = questions[i]
     if (q?.type === 'code' && isQuestionValid(q)) {
@@ -162,18 +163,28 @@ export function validateAndCleanQuiz(questions, fallbackTopic = 'Document Concep
         }
       }).filter(Boolean)
       if (checks.length >= 2) {
-        validQuestions.push({ ...q, checks, sourceBadge: q.sourceBadge || `Coding • ${q.language}` })
+        const promptKey = q.prompt.trim().toLowerCase().replace(/\s+/g, ' ')
+        if (!seenPrompts.has(promptKey)) {
+          seenPrompts.add(promptKey)
+          validQuestions.push({ ...q, checks, sourceBadge: q.sourceBadge || `Coding • ${q.language}` })
+        }
       }
       continue
     }
     if (isQuestionValid(q)) {
-      validQuestions.push({
-        ...q,
-        sourceBadge: q.sourceBadge || `Notes • Concept ${i + 1}`,
-      })
+      const promptKey = q.prompt.trim().toLowerCase().replace(/\s+/g, ' ')
+      if (!seenPrompts.has(promptKey)) {
+        seenPrompts.add(promptKey)
+        validQuestions.push({
+          ...q,
+          sourceBadge: q.sourceBadge || `Notes • Concept ${i + 1}`,
+        })
+      }
     } else {
       const sanitized = sanitizeQuestion(q, `${fallbackTopic} ${i + 1}`)
-      if (sanitized && isQuestionValid(sanitized)) {
+      const promptKey = sanitized?.prompt.trim().toLowerCase().replace(/\s+/g, ' ')
+      if (sanitized && isQuestionValid(sanitized) && !seenPrompts.has(promptKey)) {
+        seenPrompts.add(promptKey)
         validQuestions.push(sanitized)
       }
     }

@@ -5,6 +5,54 @@ import { validateAndCleanQuiz } from './utils/questionValidator'
 import { getRecommendations } from './services/recommendationService'
 import ChatBot from './components/ChatBot'
 
+const getUserInitial = (name) => String(name || '').trim().charAt(0).toUpperCase() || 'U'
+
+async function apiRequest(url, options = {}) {
+  const token = localStorage.getItem('skillstat_session')
+  let response
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options.headers || {}),
+      },
+    })
+  } catch {
+    throw new Error('Backend server is not running. Start the app with npm run dev.')
+  }
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(payload.error || 'Request failed')
+  return payload
+}
+
+function serializeQuestions(questions) {
+  return questions.map((question) => ({
+    ...question,
+    checks: question.type === 'code'
+      ? (question.checks || []).map((check) => String(check))
+      : question.checks,
+  }))
+}
+
+function restoreQuestions(questions) {
+  return questions.map((question) => ({
+    ...question,
+    checks: question.type === 'code'
+      ? (question.checks || []).map((check) => {
+        if (check instanceof RegExp) return check
+        const match = String(check).match(/^\/(.*)\/([a-z]*)$/i)
+        try {
+          return new RegExp(match ? match[1] : String(check), match?.[2] || 'i')
+        } catch {
+          return null
+        }
+      }).filter(Boolean)
+      : question.checks,
+  }))
+}
+
 const roles = [
   'Accountant', 'Accounts Payable Specialist', 'Accounts Receivable Specialist', 'Actuary', 'Administrative Assistant', 'Architect', 'Art Director', 'Auditor',
   'Brand Manager', 'Business Analyst', 'Business Development Manager', 'Buyer', 'Chemist', 'Chief Executive Officer', 'Chief Financial Officer', 'Chief Information Officer',
@@ -79,9 +127,9 @@ const fallbackRoleSkills = [
 ]
 
 const officialRoles = [
-  'Statistical Officer', 'Senior Statistical Officer', 'Statistical Investigator', 'Data Analyst',
-  'Data Scientist', 'Research Officer', 'Survey Officer', 'Economist', 'GIS Analyst',
-  'Digital / IT Officer', 'Data Management Officer',
+  'Statistical Officer', 'Senior Statistical Officer', 'Statistical Investigator',
+  'Data Analyst', 'Data Scientist', 'Research Officer', 'Survey Officer', 'Economist',
+  'GIS Analyst', 'Data Management Officer', 'Official Statistics Analyst',
 ]
 
 const _competencyDomains = {
@@ -131,29 +179,174 @@ const supportedLanguages = [
 const isCodingSkill = (skill) => codingLanguages.includes(skill)
 
 const governmentDepartments = [
-  { name: 'Ministry of Statistics and Programme Implementation', designations: ['Statistical Officer', 'Senior Statistical Officer', 'Statistical Investigator', 'Data Analyst', 'Research Officer'] },
-  { name: 'Ministry of Electronics and Information Technology', designations: ['Digital / IT Officer', 'Data Management Officer', 'Cybersecurity Analyst', 'Software Engineer', 'Systems Administrator'] },
-  { name: 'Ministry of Health and Family Welfare', designations: ['Medical Officer', 'Public Health Officer', 'Health Programme Manager', 'Health Data Analyst', 'Research Officer'] },
-  { name: 'Ministry of Education', designations: ['Teacher', 'Education Officer', 'Research Officer', 'Training Specialist', 'Data Analyst', 'Programme Manager'] },
-  { name: 'Ministry of Finance', designations: ['Finance Officer', 'Accounts Officer', 'Economic Officer', 'Budget Analyst', 'Audit Officer'] },
-  { name: 'Ministry of Home Affairs', designations: ['Administrative Officer', 'Security Officer', 'Research Officer', 'Data Analyst', 'Section Officer'] },
-  { name: 'Ministry of Rural Development', designations: ['Development Officer', 'Programme Officer', 'Project Manager', 'Social Development Officer', 'Data Analyst'] },
-  { name: 'Ministry of Agriculture and Farmers Welfare', designations: ['Agriculture Officer', 'Agricultural Statistician', 'Research Officer', 'Field Officer', 'Data Analyst'] },
-  { name: 'Ministry of Labour and Employment', designations: ['Labour Officer', 'Employment Officer', 'Labour Statistician', 'Welfare Officer', 'Research Officer'] },
-  { name: 'Ministry of Environment, Forest and Climate Change', designations: ['Environmental Officer', 'Forest Officer', 'Climate Data Analyst', 'Research Officer', 'GIS Analyst'] },
-  { name: 'Ministry of Road Transport and Highways', designations: ['Transport Officer', 'Highways Engineer', 'Project Manager', 'Civil Engineer', 'Data Analyst'] },
-  { name: 'Ministry of Housing and Urban Affairs', designations: ['Urban Planner', 'Town Planning Officer', 'Civil Engineer', 'Project Manager', 'GIS Analyst'] },
-  { name: 'Ministry of Commerce and Industry', designations: ['Commercial Officer', 'Industry Officer', 'Economic Officer', 'Trade Analyst', 'Research Officer'] },
-  { name: 'Ministry of External Affairs', designations: ['Foreign Service Officer', 'Administrative Officer', 'Policy Analyst', 'Research Officer', 'Protocol Officer'] },
-  { name: 'Ministry of Women and Child Development', designations: ['Child Development Officer', 'Programme Officer', 'Social Worker', 'Research Officer', 'Data Analyst'] },
-  { name: 'Ministry of Social Justice and Empowerment', designations: ['Social Welfare Officer', 'Programme Officer', 'Rehabilitation Officer', 'Research Officer', 'Data Analyst'] },
-  { name: 'Department of Personnel and Training', designations: ['Administrative Officer', 'Human Resources Officer', 'Training Specialist', 'Section Officer', 'Policy Analyst'] },
-  { name: 'Department of Telecommunications', designations: ['Telecom Engineer', 'Network Administrator', 'Digital / IT Officer', 'Policy Analyst', 'Data Analyst'] },
-  { name: 'Department of Revenue', designations: ['Income Tax Officer', 'Customs Officer', 'Tax Specialist', 'Finance Officer', 'Audit Officer'] },
-  { name: 'National Statistical Office', designations: ['Statistical Officer', 'Senior Statistical Officer', 'Statistical Investigator', 'Data Analyst', 'Data Scientist'] },
+  { name: 'National Statistical Office (NSO)', designations: ['Statistical Officer', 'Senior Statistical Officer', 'Statistical Investigator', 'Data Analyst', 'Data Scientist', 'Research Officer'] },
+  { name: 'Ministry of Statistics & Programme Implementation (MoSPI)', designations: ['Statistical Officer', 'Senior Statistical Officer', 'Programme Statistics Officer', 'Data Analyst', 'Research Officer'] },
+  { name: 'State Directorates of Economics & Statistics', designations: ['State Statistical Officer', 'District Statistical Officer', 'Statistical Investigator', 'Economist', 'Data Analyst'] },
+  { name: 'Agriculture & Farmers Welfare Statistics', designations: ['Agricultural Statistics Officer', 'Agricultural Economist', 'Survey Officer', 'Data Analyst', 'Research Officer'] },
+  { name: 'Labour & Employment Statistics', designations: ['Labour Statistics Officer', 'Employment Statistics Officer', 'Survey Officer', 'Statistical Investigator', 'Data Analyst'] },
+  { name: 'Health & Family Welfare Statistics', designations: ['Doctor', 'Senior Medical Officer', 'Health Statistics Officer', 'Health Data Analyst', 'Health Survey Officer', 'Biostatistics Officer', 'Healthcare Administrator', 'Research Officer'] },
+  { name: 'Industrial & Manufacturing Statistics', designations: ['Industrial Statistics Officer', 'Manufacturing Data Analyst', 'Economic Statistics Officer', 'Survey Officer', 'Research Officer'] },
+  { name: 'Price & Consumer Statistics', designations: ['Price Statistics Officer', 'Consumer Price Analyst', 'Market Statistics Officer', 'Survey Officer', 'Economist'] },
+  { name: 'Social & Demographic Statistics', designations: ['Social Statistics Officer', 'Demographic Statistics Officer', 'Census Officer', 'Survey Officer', 'Research Officer'] },
+  { name: 'Environment & Climate Statistics', designations: ['Environmental Statistics Officer', 'Climate Data Analyst', 'GIS Analyst', 'Survey Officer', 'Research Officer'] },
 ]
 
 const getDepartmentDetails = (departmentName) => governmentDepartments.find((department) => department.name === departmentName)
+
+const DEPARTMENT_ROLE_MAP = {
+  'National Statistical Office (NSO)': [
+    'Statistical Officer',
+    'Senior Statistical Officer',
+    'Statistical Investigator',
+    'Data Analyst',
+    'Data Scientist',
+    'Research Officer',
+    'Survey Operations Officer',
+    'Census Officer',
+  ],
+  'Ministry of Statistics & Programme Implementation (MoSPI)': [
+    'Statistical Officer',
+    'Senior Statistical Officer',
+    'Programme Statistics Officer',
+    'Data Analyst',
+    'Research Officer',
+    'Statistical Programme Lead',
+    'Official Statistics Analyst',
+  ],
+  'State Directorates of Economics & Statistics': [
+    'State Statistical Officer',
+    'District Statistical Officer',
+    'Statistical Investigator',
+    'Economist',
+    'Data Analyst',
+    'Sample Survey Officer',
+  ],
+  'Agriculture & Farmers Welfare Statistics': [
+    'Agricultural Statistics Officer',
+    'Agricultural Economist',
+    'Crop Survey Statistician',
+    'Survey Officer',
+    'Agricultural Data Analyst',
+    'Research Officer',
+  ],
+  'Labour & Employment Statistics': [
+    'Labour Statistics Officer',
+    'Employment Statistics Officer',
+    'Workforce Survey Statistician',
+    'Labour Statistics Analyst',
+    'Survey Officer',
+    'Statistical Investigator',
+    'Data Analyst',
+  ],
+  'Health & Family Welfare Statistics': [
+    'Doctor',
+    'Senior Medical Officer',
+    'Health Statistics Officer',
+    'Health Data Analyst',
+    'Health Survey Officer',
+    'Biostatistics Officer',
+    'Healthcare Administrator',
+    'Medical Researcher',
+    'Clinical Research Associate',
+  ],
+  'Industrial & Manufacturing Statistics': [
+    'Industrial Statistics Officer',
+    'Manufacturing Data Analyst',
+    'Economic Statistics Officer',
+    'Survey Officer',
+    'Research Officer',
+    'Industrial Economist',
+  ],
+  'Price & Consumer Statistics': [
+    'Price Statistics Officer',
+    'Consumer Price Analyst',
+    'Market Statistics Officer',
+    'Price Statistics Economist',
+    'Survey Officer',
+    'Inflation & Price Index Analyst',
+  ],
+  'Social & Demographic Statistics': [
+    'Social Statistics Officer',
+    'Demographic Statistics Officer',
+    'Census Officer',
+    'Survey Officer',
+    'Research Officer',
+    'Demographic Data Analyst',
+  ],
+  'Environment & Climate Statistics': [
+    'Environmental Statistics Officer',
+    'Climate Data Analyst',
+    'GIS Analyst',
+    'Geospatial Statistics Analyst',
+    'Survey Officer',
+    'Research Officer',
+  ],
+}
+
+function getRolesForDepartment(departmentName, userRole = '', userDesignation = '') {
+  const normDept = (departmentName || '').trim().toLowerCase()
+  let matchedRoles = []
+
+  for (const [deptKey, list] of Object.entries(DEPARTMENT_ROLE_MAP)) {
+    if (deptKey.toLowerCase() === normDept || (normDept && deptKey.toLowerCase().includes(normDept)) || (normDept && normDept.includes(deptKey.toLowerCase()))) {
+      matchedRoles = [...list]
+      break
+    }
+  }
+
+  // If not exact key, match by keywords
+  if (matchedRoles.length === 0 && normDept) {
+    if (normDept.includes('health') || normDept.includes('medic') || normDept.includes('hospital')) {
+      matchedRoles = [...DEPARTMENT_ROLE_MAP['Health & Family Welfare Statistics']]
+    } else if (normDept.includes('agri') || normDept.includes('farm')) {
+      matchedRoles = [...DEPARTMENT_ROLE_MAP['Agriculture & Farmers Welfare Statistics']]
+    } else if (normDept.includes('labour') || normDept.includes('employ')) {
+      matchedRoles = [...DEPARTMENT_ROLE_MAP['Labour & Employment Statistics']]
+    } else if (normDept.includes('price') || normDept.includes('consumer')) {
+      matchedRoles = [...DEPARTMENT_ROLE_MAP['Price & Consumer Statistics']]
+    } else if (normDept.includes('environ') || normDept.includes('climate')) {
+      matchedRoles = [...DEPARTMENT_ROLE_MAP['Environment & Climate Statistics']]
+    } else if (normDept.includes('state') || normDept.includes('directorate')) {
+      matchedRoles = [...DEPARTMENT_ROLE_MAP['State Directorates of Economics & Statistics']]
+    } else if (normDept.includes('mospi') || normDept.includes('programme implementation')) {
+      matchedRoles = [...DEPARTMENT_ROLE_MAP['Ministry of Statistics & Programme Implementation (MoSPI)']]
+    } else if (normDept.includes('nso') || normDept.includes('statistical office')) {
+      matchedRoles = [...DEPARTMENT_ROLE_MAP['National Statistical Office (NSO)']]
+    }
+  }
+
+  // If still not matched, check governmentDepartments designations
+  if (matchedRoles.length === 0) {
+    const deptObj = governmentDepartments.find((d) => d.name.toLowerCase() === normDept)
+    if (deptObj?.designations?.length) {
+      matchedRoles = [...deptObj.designations]
+    }
+  }
+
+  // Fallback: If no department or unknown, use default statistical cadres
+  if (matchedRoles.length === 0) {
+    matchedRoles = [
+      'Statistical Officer',
+      'Senior Statistical Officer',
+      'Statistical Investigator',
+      'Data Analyst',
+      'Research Officer',
+    ]
+  }
+
+  // Guarantee that user's active role and designation are included in the list
+  const userRoleClean = (userRole || '').trim()
+  const userDesigClean = (userDesignation || '').trim()
+
+  if (userRoleClean && !matchedRoles.some((r) => r.toLowerCase() === userRoleClean.toLowerCase())) {
+    matchedRoles.unshift(userRoleClean)
+  }
+  if (userDesigClean && !matchedRoles.some((r) => r.toLowerCase() === userDesigClean.toLowerCase())) {
+    matchedRoles.unshift(userDesigClean)
+  }
+
+  return Array.from(new Set(matchedRoles))
+}
 
 const designationRoleMap = {
   teacher: ['Physics Teacher', 'Mathematics Teacher', 'Chemistry Teacher', 'Biology Teacher', 'Computer Science Teacher', 'English Teacher', 'Social Science Teacher', 'Primary School Teacher'],
@@ -161,23 +354,42 @@ const designationRoleMap = {
   'senior statistical officer': ['Statistical Programme Lead', 'Survey Methodology Lead', 'Data Quality Lead', 'Official Statistics Analyst'],
   'statistical investigator': ['Field Survey Investigator', 'Census Investigator', 'Sample Survey Investigator', 'Data Validation Investigator'],
   'data analyst': ['Policy Data Analyst', 'Public Finance Data Analyst', 'Health Data Analyst', 'Education Data Analyst', 'Monitoring & Evaluation Analyst'],
-  'data scientist': ['Machine Learning Scientist', 'Public Policy Data Scientist', 'Predictive Analytics Scientist', 'Natural Language Processing Scientist'],
+  'data scientist': ['Statistical Data Scientist', 'Official Statistics ML Scientist', 'Survey Modelling Scientist', 'Predictive Statistics Scientist'],
   'research officer': ['Policy Research Officer', 'Education Research Officer', 'Health Research Officer', 'Economic Research Officer', 'Social Research Officer'],
-  'digital / it officer': ['Application Support Officer', 'Government Systems Analyst', 'Cybersecurity Officer', 'Cloud Infrastructure Officer', 'Digital Services Officer'],
+  'survey officer': ['Survey Methodology Officer', 'Sample Survey Officer', 'Field Operations Officer', 'Survey Quality Officer'],
+  economist: ['Economic Statistics Officer', 'National Accounts Economist', 'Price Statistics Economist', 'Policy Statistics Economist'],
+  'gis analyst': ['Geospatial Statistics Analyst', 'Census GIS Analyst', 'Spatial Data Analyst', 'Statistical Mapping Analyst'],
   'data management officer': ['Data Governance Officer', 'Master Data Officer', 'Data Quality Officer', 'Database Administrator', 'Metadata Officer'],
-  'finance officer': ['Public Budget Officer', 'Financial Planning Officer', 'Grants Finance Officer', 'Public Expenditure Analyst'],
-  'accounts officer': ['Accounts Payable Officer', 'Accounts Receivable Officer', 'Government Ledger Officer', 'Payroll Accounts Officer'],
-  'economic officer': ['Macroeconomic Analyst', 'Trade Economics Analyst', 'Development Economics Analyst', 'Economic Policy Officer'],
-  'budget analyst': ['Programme Budget Analyst', 'Public Expenditure Analyst', 'Budget Planning Officer', 'Performance Budget Analyst'],
-  'audit officer': ['Internal Audit Officer', 'Compliance Audit Officer', 'Performance Audit Officer', 'Financial Audit Officer'],
-  'medical officer': ['Primary Care Medical Officer', 'Community Health Medical Officer', 'Emergency Medical Officer', 'Public Health Medical Officer'],
-  'health data analyst': ['Health Informatics Analyst', 'Clinical Data Analyst', 'Public Health Data Analyst', 'Health Programme Analyst'],
-  'programme manager': ['Education Programme Manager', 'Health Programme Manager', 'Rural Development Programme Manager', 'Digital Programme Manager'],
-  'project manager': ['Infrastructure Project Manager', 'IT Project Manager', 'Public Works Project Manager', 'Programme Delivery Manager'],
-  'policy analyst': ['Education Policy Analyst', 'Health Policy Analyst', 'Technology Policy Analyst', 'Social Policy Analyst'],
+  'official statistics analyst': ['Official Data Analyst', 'Statistical Quality Analyst', 'Statistical Reporting Analyst', 'Evidence and Indicators Analyst'],
 }
 
-const getRolesForDesignation = (designation) => designationRoleMap[(designation || '').trim().toLowerCase()] || []
+const getRolesForDesignation = (designation) => {
+  const normalized = (designation || '').trim().toLowerCase()
+  const exactRoles = designationRoleMap[normalized]
+  if (exactRoles?.length) return exactRoles
+  if (normalized.includes('health') || normalized.includes('biostat')) return ['Health Statistics Analyst', 'Health Data Analyst', 'Biostatistics Analyst']
+  if (normalized.includes('labour') || normalized.includes('employment')) return ['Labour Statistics Analyst', 'Employment Data Analyst', 'Workforce Survey Statistician']
+  if (normalized.includes('price') || normalized.includes('consumer')) return ['Consumer Price Analyst', 'Price Statistics Analyst', 'Market Statistics Economist']
+  if (normalized.includes('agricultur')) return ['Agricultural Statistics Analyst', 'Crop Survey Statistician', 'Agricultural Data Analyst']
+  if (normalized.includes('industrial') || normalized.includes('manufactur')) return ['Industrial Statistics Analyst', 'Manufacturing Data Analyst', 'Economic Statistics Analyst']
+  if (normalized.includes('social') || normalized.includes('demograph') || normalized.includes('census')) return ['Social Statistics Analyst', 'Demographic Data Analyst', 'Census Statistics Officer']
+  if (normalized.includes('environment') || normalized.includes('climate')) return ['Environmental Statistics Analyst', 'Climate Data Analyst', 'Geospatial Statistics Analyst']
+  if (normalized.includes('data analyst')) return ['Official Data Analyst', 'Statistical Quality Analyst', 'Statistical Reporting Analyst']
+  if (normalized.includes('data scientist')) return ['Statistical Data Scientist', 'Official Statistics ML Scientist', 'Survey Modelling Scientist']
+  if (normalized.includes('survey')) return ['Survey Methodology Officer', 'Sample Survey Officer', 'Survey Quality Officer']
+  if (normalized.includes('economist')) return ['Economic Statistics Officer', 'National Accounts Economist', 'Policy Statistics Economist']
+  if (normalized.includes('gis')) return ['Geospatial Statistics Analyst', 'Census GIS Analyst', 'Statistical Mapping Analyst']
+  if (normalized.includes('research')) return ['Official Statistics Researcher', 'Statistical Methods Researcher', 'Evidence and Indicators Analyst']
+  if (normalized.includes('agricultur')) return ['Agricultural Statistics Analyst', 'Crop Survey Statistician', 'Agricultural Data Analyst']
+  if (normalized.includes('labour') || normalized.includes('employment')) return ['Labour Statistics Analyst', 'Employment Data Analyst', 'Workforce Survey Statistician']
+  if (normalized.includes('health') || normalized.includes('biostat')) return ['Health Statistics Analyst', 'Biostatistics Analyst', 'Health Survey Statistician']
+  if (normalized.includes('industrial') || normalized.includes('manufactur')) return ['Industrial Statistics Analyst', 'Manufacturing Data Analyst', 'Economic Statistics Analyst']
+  if (normalized.includes('price') || normalized.includes('consumer')) return ['Consumer Price Analyst', 'Price Statistics Analyst', 'Market Statistics Economist']
+  if (normalized.includes('social') || normalized.includes('demograph') || normalized.includes('census')) return ['Social Statistics Analyst', 'Demographic Data Analyst', 'Census Statistics Officer']
+  if (normalized.includes('environment') || normalized.includes('climate')) return ['Environmental Statistics Analyst', 'Climate Data Analyst', 'Geospatial Statistics Analyst']
+  if (normalized.includes('officer')) return ['Official Statistics Analyst', 'Statistical Quality Analyst', 'Statistical Reporting Analyst']
+  return []
+}
 
 function _getRelatedSkills(role) {
   if (!role) return fallbackRoleSkills
@@ -197,6 +409,13 @@ function getRecommendedRoles(profile) {
   const designationRoles = getRolesForDesignation(designation)
   if (designationRoles.length > 0) {
     return designationRoles
+  }
+
+  if (department) {
+    const deptRoles = getRolesForDepartment(department, profile?.role, profile?.designation)
+    if (deptRoles.length > 0) {
+      return deptRoles
+    }
   }
 
   if (!combinedSearch) {
@@ -300,8 +519,1182 @@ function getRecommendedRoles(profile) {
   return officialRoles.slice(0, 6)
 }
 
+const rolePromotionCatalog = {
+  'Statistical Officer': {
+    targetRole: 'Senior Statistical Officer (SSO)',
+    higherTarget: 'Assistant Director (Statistics) / Lead Statistician',
+    cadre: 'Official Statistics Cadre · Group A Gazetted Track',
+    benchmarkScore: 75,
+    gradeIncrement: 'Pay Level 7 → Pay Level 8 (Senior Scale, +22% Emoluments)',
+    responsibilities: [
+      'Lead and sign off on departmental survey methodologies and official releases',
+      'Authorize National Quality Assurance Framework (NQAF) validation audits',
+      'Supervise Statistical Investigators and junior analysts across zonal units',
+      'Represent MoSPI/State Directorate at national TPAC technical conferences',
+    ],
+    promotionCriteria: [
+      'Attain minimum 75% overall competency evaluation benchmark',
+      'Clear core statistical domains: Survey Design, Data Quality, and National Accounts',
+      'Complete at least 2 verified iGOT/NSSTA advanced training modules',
+    ],
+    courses: [
+      {
+        id: 'promo-stat-01',
+        title: 'Advanced Sampling & Survey Estimation Protocols',
+        provider: 'iGOT Karmayogi / Mission Karmayogi',
+        duration: '12 Hours',
+        difficulty: 'Advanced',
+        format: 'Self-Paced Online',
+        competency: 'Survey Design',
+        skill: 'Survey Design',
+        promotionImpact: '+25% Readiness Boost',
+        impactScore: 25,
+        outcomes: [
+          'Master multi-stage stratified and cluster sampling designs for large-scale field inquiries',
+          'Calculate complex variance estimates, design effects (deff), and weighted aggregates',
+          'Implement non-sampling error reduction protocols under NQAF guidelines',
+        ],
+        certification: 'iGOT Advanced Survey Methodology Credential',
+      },
+      {
+        id: 'promo-stat-02',
+        title: 'National Quality Assurance Framework (NQAF) & Data Audit',
+        provider: 'NSSTA / TPAC MoSPI',
+        duration: '5 Days Lab',
+        difficulty: 'Executive',
+        format: 'In-Person Lab & Simulator',
+        competency: 'Data Quality Frameworks',
+        skill: 'Data Quality Frameworks',
+        promotionImpact: '+30% Readiness Boost',
+        impactScore: 30,
+        outcomes: [
+          'Formulate statistical audit checklists and automated duplicate detection rules',
+          'Perform regression and donor imputation with full metadata audit logs',
+          'Evaluate statistical disclosure control (SDC) methods for public microdata',
+        ],
+        certification: 'NSSTA Executive Quality Auditor Certification',
+      },
+      {
+        id: 'promo-stat-03',
+        title: 'Python for Automated Statistical Pipelines & Anomaly Detection',
+        provider: 'MeitY / iGOT Karmayogi',
+        duration: '16 Hours',
+        difficulty: 'Intermediate',
+        format: 'Hands-on Labs',
+        competency: 'AI/ML & Python',
+        skill: 'Python',
+        promotionImpact: '+20% Readiness Boost',
+        impactScore: 20,
+        outcomes: [
+          'Build end-to-end automated cleaning and validation pipelines using Pandas & NumPy',
+          'Train outlier and anomaly detection algorithms on massive administrative registers',
+          'Deploy reproducible statistical reports with Jupyter and Git versioning',
+        ],
+        certification: 'Digital India Advanced Data Science Badge',
+      },
+      {
+        id: 'promo-stat-04',
+        title: 'Strategic Public Leadership & Administrative Decision Making',
+        provider: 'Centre for Good Governance / iGOT',
+        duration: '8 Hours',
+        difficulty: 'Executive',
+        format: 'Interactive Case Studies',
+        competency: 'Leadership',
+        skill: 'Leadership',
+        promotionImpact: '+15% Readiness Boost',
+        impactScore: 15,
+        outcomes: [
+          'Evidence-based policy brief formulation for ministerial secretariats',
+          'Staff performance appraisal (APAR) scoring and grievance arbitration',
+          'Inter-departmental consensus building for decentralized statistical data',
+        ],
+        certification: 'Mission Karmayogi Public Leadership Award',
+      },
+    ],
+  },
+  'Senior Statistical Officer': {
+    targetRole: 'Assistant Director / Joint Director (Statistics)',
+    higherTarget: 'Director of Official Statistics / Economic Advisor',
+    cadre: 'Senior Civil Statistics Directorate · Higher Administrative Grade',
+    benchmarkScore: 82,
+    gradeIncrement: 'Pay Level 8 → Pay Level 10/11 (Directorate Level, +28% Emoluments)',
+    responsibilities: [
+      'Oversee state and national statistical divisions and flagship economic census operations',
+      'Lead high-level technical consultations with international agencies (UN-Stats, World Bank)',
+      'Direct macro-economic forecasting, GVA/GDP deflator compilation, and SDG tracking',
+      'Serve as Nodal Officer for National Data Sharing & Accessibility Policy (NDSAP)',
+    ],
+    promotionCriteria: [
+      'Score 82%+ on comprehensive statistical leadership assessment',
+      'Demonstrated mastery in Macro-economic modeling & Digital Public Infrastructure',
+      'Publication or technical review of official statistical monographs',
+    ],
+    courses: [
+      {
+        id: 'promo-sso-01',
+        title: 'Macroeconomic National Accounts & Supply-Use Tables (SUT)',
+        provider: 'NSSTA - TPAC Advisory MoSPI',
+        duration: '5 Days Workshop',
+        difficulty: 'Advanced Masterclass',
+        format: 'Executive Seminar',
+        competency: 'National Accounts',
+        skill: 'National Accounts',
+        promotionImpact: '+35% Readiness Boost',
+        impactScore: 35,
+        outcomes: [
+          'Balance dynamic Supply-Use Tables and compute sectoral Input-Output coefficients',
+          'Measure digital economy transactions and informal sector GVA contributions',
+          'Align state economic registers with the System of National Accounts (SNA 2008/2025)',
+        ],
+        certification: 'National Accounts Expert Fellow (NSSTA)',
+      },
+      {
+        id: 'promo-sso-02',
+        title: 'SDG Indicator Monitoring, Big Data & Geo-spatial Linkage',
+        provider: 'United Nations Statistics Division / iGOT',
+        duration: '14 Hours',
+        difficulty: 'Advanced',
+        format: 'Self-Paced with Capstone',
+        competency: 'SDG Indicators & GIS',
+        skill: 'GIS',
+        promotionImpact: '+25% Readiness Boost',
+        impactScore: 25,
+        outcomes: [
+          'Overlay satellite imagery and geospatial layers with census demographic grids',
+          'Calculate global tier I, II, and III SDG indicators with high spatial resolution',
+          'Construct interactive dashboard monitoring for state and district planning boards',
+        ],
+        certification: 'UN-Stats & MoSPI Sustainable Development Fellow',
+      },
+      {
+        id: 'promo-sso-03',
+        title: 'Executive Policy Governance, Procurement & Financial Management',
+        provider: 'National Institute of Financial Management / iGOT',
+        duration: '10 Hours',
+        difficulty: 'Executive',
+        format: 'Case Study Simulation',
+        competency: 'Governance & Finance',
+        skill: 'Ethics',
+        promotionImpact: '+20% Readiness Boost',
+        impactScore: 20,
+        outcomes: [
+          'Execute GeM procurement protocols and manage multi-crore departmental survey budgets',
+          'Draft legislative responses and cabinet notes on official statistical indicators',
+          'Lead risk governance and data sovereignty audits across cloud repositories',
+        ],
+        certification: 'Senior Civil Governance Diploma',
+      },
+    ],
+  },
+  'Data Analyst': {
+    targetRole: 'Senior Data Analyst / Lead Data Scientist',
+    higherTarget: 'Principal Analytics Lead / Director of Intelligence',
+    cadre: 'Advanced Analytics & Data Science Cadre',
+    benchmarkScore: 78,
+    gradeIncrement: 'Tier 1 Analyst → Tier 2 Senior Lead (+25-35% Compensation Band)',
+    responsibilities: [
+      'Architect automated analytics pipelines and self-healing data warehouses',
+      'Build and productionize machine learning models for anomaly detection and forecasting',
+      'Translate raw data telemetry into executive strategic dashboards and KPIs',
+      'Mentor junior analysts on code quality, testing, and modern data practices',
+    ],
+    promotionCriteria: [
+      'Achieve 78%+ score in Technical & Analytical assessment',
+      'Demonstrated end-to-end delivery of predictive intelligence or reporting system',
+      'Proficiency in SQL, Python, and scalable Cloud visualization',
+    ],
+    courses: [
+      {
+        id: 'promo-da-01',
+        title: 'Applied Machine Learning & Statistical Forecasting in Python',
+        provider: 'MeitY / iGOT Karmayogi',
+        duration: '18 Hours',
+        difficulty: 'Advanced',
+        format: 'Hands-on Projects',
+        competency: 'Machine Learning',
+        skill: 'Python',
+        promotionImpact: '+30% Readiness Boost',
+        impactScore: 30,
+        outcomes: [
+          'Train time-series forecasting models (ARIMA, Prophet, XGBoost) on trend data',
+          'Deploy automated model evaluation, feature engineering, and cross-validation',
+          'Construct REST API microservices for real-time model inference',
+        ],
+        certification: 'Certified Machine Learning Specialist',
+      },
+      {
+        id: 'promo-da-02',
+        title: 'Cloud Data Warehousing & Advanced Distributed SQL Optimization',
+        provider: 'Digital India / Industry Consortium',
+        duration: '12 Hours',
+        difficulty: 'Advanced',
+        format: 'Interactive Sandbox',
+        competency: 'Database Architecture',
+        skill: 'SQL',
+        promotionImpact: '+25% Readiness Boost',
+        impactScore: 25,
+        outcomes: [
+          'Optimize complex analytical queries using window functions and indexing strategies',
+          'Design Star & Snowflake dimensional schemas for billion-row datasets',
+          'Enforce column-level data encryption and role-based access security',
+        ],
+        certification: 'Cloud Data Architecture Professional',
+      },
+      {
+        id: 'promo-da-03',
+        title: 'Data Quality Auditing & Automated Validation Frameworks',
+        provider: 'NSSTA / iGOT',
+        duration: '8 Hours',
+        difficulty: 'Intermediate',
+        format: 'Self-Paced',
+        competency: 'Data Governance',
+        skill: 'Data Quality Frameworks',
+        promotionImpact: '+20% Readiness Boost',
+        impactScore: 20,
+        outcomes: [
+          'Implement automated unit tests for data pipelines with Great Expectations',
+          'Construct real-time data freshness, drift, and schema violation alerts',
+          'Publish standardized data dictionaries and open data catalog schemas',
+        ],
+        certification: 'Data Governance & Quality Auditor',
+      },
+    ],
+  },
+  'Statistical Investigator': {
+    targetRole: 'Statistical Officer (Gazetted)',
+    higherTarget: 'Senior Statistical Officer / Survey Operations Lead',
+    cadre: 'Official Survey & Field Operations Cadre',
+    benchmarkScore: 70,
+    gradeIncrement: 'Pay Level 6 → Pay Level 7 (Gazetted Officer Cadre, +20% Emoluments)',
+    responsibilities: [
+      'Transition from field inspection to analytical survey design and indicator drafting',
+      'Manage district and zonal survey teams and review sample frame coverage',
+      'Validate primary survey responses using CAPI error checks and imputation logic',
+      'Submit preliminary statistical releases for national consumer and enterprise surveys',
+    ],
+    promotionCriteria: [
+      'Attain 70%+ score on core survey and statistical quality benchmarks',
+      'Minimum 3 years field experience with stellar data fidelity record',
+      'Completion of official CAPI & sampling design certifications',
+    ],
+    courses: [
+      {
+        id: 'promo-si-01',
+        title: 'Survey Methodology, Sampling Design & CAPI Systems',
+        provider: 'NSSTA - TPAC MoSPI',
+        duration: '4 Days Intensive Lab',
+        difficulty: 'Intermediate',
+        format: 'Field Simulator',
+        competency: 'Sampling & Surveys',
+        skill: 'Sampling',
+        promotionImpact: '+35% Readiness Boost',
+        impactScore: 35,
+        outcomes: [
+          'Design digital questionnaires with complex skip-patterns and range constraints',
+          'Implement dual-frame sampling and spatial address validation using GPS',
+          'Manage field enumerator quality control and real-time synchronization',
+        ],
+        certification: 'NSSTA Official Survey Methodology Lead',
+      },
+      {
+        id: 'promo-si-02',
+        title: 'Official Data Quality Validation & Error Detection',
+        provider: 'iGOT Karmayogi',
+        duration: '10 Hours',
+        difficulty: 'Foundational',
+        format: 'Self-Paced',
+        competency: 'Data Quality Frameworks',
+        skill: 'Data Quality Frameworks',
+        promotionImpact: '+25% Readiness Boost',
+        impactScore: 25,
+        outcomes: [
+          'Identify systematic response bias and interviewer fabrication artifacts',
+          'Perform cold-deck and hot-deck imputation on incomplete survey schedules',
+          'Prepare verification dossiers for national survey sample balances',
+        ],
+        certification: 'Data Quality Assurance Credential',
+      },
+      {
+        id: 'promo-si-03',
+        title: 'Introductory Statistical Analysis with Python and Excel',
+        provider: 'iGOT Karmayogi',
+        duration: '12 Hours',
+        difficulty: 'Foundational',
+        format: 'Hands-on Exercises',
+        competency: 'Analytical Tools',
+        skill: 'Data Visualization',
+        promotionImpact: '+20% Readiness Boost',
+        impactScore: 20,
+        outcomes: [
+          'Create automated summary statistical tables, histograms, and box plots',
+          'Compute central tendencies, index numbers, and inflation indicators',
+          'Draft executive summaries from raw tabular data',
+        ],
+        certification: 'Mission Karmayogi Statistical Computing Badge',
+      },
+    ],
+  },
+  'Health Data Analyst': {
+    targetRole: 'Senior Health Statistics Officer / Biostatistics Lead',
+    higherTarget: 'Director of Epidemiology & Health Informatics',
+    cadre: 'Health Informatics & Epidemiological Statistics Cadre',
+    benchmarkScore: 78,
+    gradeIncrement: 'Pay Level 7 → Pay Level 8/9 (Senior Informatics Grade, +24% Emoluments)',
+    responsibilities: [
+      'Lead national and state health survey analysis (NFHS, HMIS registries)',
+      'Model disease transmission rates, immunization coverage, and healthcare utilization',
+      'Enforce digital health data privacy (ABDM architecture standards)',
+      'Draft policy recommendations for Ministry of Health & Family Welfare',
+    ],
+    promotionCriteria: [
+      'Attain 78%+ score on health epidemiology and biostatistics benchmarks',
+      'Verified competency in Health Indicators, Privacy-Preserving Analytics, and R/Python',
+      'Successful completion of 2+ clinical health data accreditation programs',
+    ],
+    courses: [
+      {
+        id: 'promo-health-01',
+        title: 'Biostatistics, Epidemiological Modeling & R Programming',
+        provider: 'iGOT Karmayogi / AIIMS / ICMR',
+        duration: '16 Hours',
+        difficulty: 'Advanced',
+        format: 'Practical Analytics Lab',
+        competency: 'Health Statistics',
+        skill: 'Biostatistics',
+        promotionImpact: '+35% Readiness Boost',
+        impactScore: 35,
+        outcomes: [
+          'Fit survival models, hazard ratios, and multivariate logistic regressions in R',
+          'Calculate maternal and infant mortality indicators with demographic smoothing',
+          'Design outbreak surveillance alert algorithms on HMIS hospital datasets',
+        ],
+        certification: 'Accredited Biostatistical Epidemiologist',
+      },
+      {
+        id: 'promo-health-02',
+        title: 'Healthcare Data Privacy, ABDM Standards & FHIR Architecture',
+        provider: 'National Health Authority / MeitY',
+        duration: '10 Hours',
+        difficulty: 'Intermediate',
+        format: 'Digital Sandbox',
+        competency: 'Digital Health Governance',
+        skill: 'Data Privacy',
+        promotionImpact: '+25% Readiness Boost',
+        impactScore: 25,
+        outcomes: [
+          'Implement Ayushman Bharat Digital Mission (ABDM) electronic health records standards',
+          'Apply differential privacy and k-anonymity algorithms to public health datasets',
+          'Enforce strict regulatory compliance under the Digital Personal Data Protection Act',
+        ],
+        certification: 'Digital Health Data Governance Specialist',
+      },
+    ],
+  },
+  'Software Engineer': {
+    targetRole: 'Senior Software Engineer / Tech Lead',
+    higherTarget: 'Principal Solutions Architect / Engineering Manager',
+    cadre: 'Engineering & Technology Leadership Cadre',
+    benchmarkScore: 80,
+    gradeIncrement: 'Engineer Tier → Senior Engineer / Tech Lead (+30% Salary Band)',
+    responsibilities: [
+      'Own end-to-end architecture and scalability for core platform services',
+      'Conduct rigorous code reviews, establish architectural RFCs, and reduce technical debt',
+      'Lead incident response, zero-downtime deployments, and reliability SLAs',
+      'Mentor and upskill junior engineers on clean code and systems design',
+    ],
+    promotionCriteria: [
+      '80%+ score in system architecture, coding and problem-solving evaluations',
+      'Demonstrated ownership of high-impact production microservice or framework',
+      'Completion of advanced cloud architecture and security modules',
+    ],
+    courses: [
+      {
+        id: 'promo-swe-01',
+        title: 'Distributed Systems Architecture & High-Concurrency Microservices',
+        provider: 'Industry Engineering Academy',
+        duration: '16 Hours',
+        difficulty: 'Advanced',
+        format: 'Code Labs & System Design',
+        competency: 'System Architecture',
+        skill: 'System architecture',
+        promotionImpact: '+35% Readiness Boost',
+        impactScore: 35,
+        outcomes: [
+          'Design event-driven architectures with Kafka, Redis, and message brokers',
+          'Implement distributed transactions, idempotency, and circuit-breaker patterns',
+          'Optimize database connection pooling, caching strategies, and horizontal scaling',
+        ],
+        certification: 'Certified Distributed Systems Architect',
+      },
+      {
+        id: 'promo-swe-02',
+        title: 'Cloud Infrastructure, CI/CD Pipelines & DevSecOps Mastery',
+        provider: 'Cloud Native Foundation',
+        duration: '12 Hours',
+        difficulty: 'Intermediate-Advanced',
+        format: 'Cloud Sandbox',
+        competency: 'Cloud & DevOps',
+        skill: 'Cloud computing',
+        promotionImpact: '+25% Readiness Boost',
+        impactScore: 25,
+        outcomes: [
+          'Provision infrastructure as code using Terraform and Docker containers',
+          'Configure automated multi-stage CI/CD pipelines with automated security audits',
+          'Implement observability metrics, structured logging, and distributed tracing',
+        ],
+        certification: 'Cloud Native DevOps Professional',
+      },
+      {
+        id: 'promo-swe-03',
+        title: 'Technical Leadership, Mentorship & Agile System Delivery',
+        provider: 'Tech Leadership Institute',
+        duration: '8 Hours',
+        difficulty: 'Executive',
+        format: 'Interactive Case Studies',
+        competency: 'Leadership',
+        skill: 'Problem solving',
+        promotionImpact: '+20% Readiness Boost',
+        impactScore: 20,
+        outcomes: [
+          'Facilitate effective architecture reviews and sprint estimations',
+          'Manage cross-functional technical dependencies and stakeholder communications',
+          'Build psychological safety, inclusive pair-programming, and engineering culture',
+        ],
+        certification: 'Engineering Leadership Credential',
+      },
+    ],
+  },
+  'Doctor': {
+    targetRole: 'Senior Medical Officer (SMO) / Specialist Consultant (Grade I)',
+    higherTarget: 'Chief Medical Officer (CMO) / Medical Superintendent / Director of Health Services',
+    cadre: 'Central Health Services (CHS) · Specialist Medical Officers Cadre',
+    benchmarkScore: 75,
+    gradeIncrement: 'Pay Level 10 (₹56,100 - ₹1,77,500) → Pay Level 11/12 (Senior Medical Scale + 20% NPA)',
+    responsibilities: [
+      'Supervise clinical outpatient and inpatient care, emergency casualty triage, and departmental specialty protocols',
+      'Lead hospital clinical audit committees, mortality reviews, and patient safety compliance standards',
+      'Oversee junior medical officers, resident doctors, and clinical nursing departments across health facilities',
+      'Authorize public health disease surveillance reports and liaise with National Health Mission (NHM) directorates',
+    ],
+    promotionCriteria: [
+      'Attain 75%+ score on clinical governance, patient care standards, and healthcare administration assessments',
+      'Completion of accredited modules in Clinical Audit, Patient Safety, and Public Health Epidemiology',
+      'Satisfactory departmental performance dossier (APAR) with zero clinical negligence infractions',
+    ],
+    courses: [
+      {
+        id: 'promo-doc-01',
+        title: 'Advanced Clinical Governance, Patient Safety & Quality Protocols',
+        provider: 'iGOT Karmayogi / NHSRC MoHFW',
+        duration: '14 Hours',
+        difficulty: 'Advanced',
+        format: 'Self-Paced Clinical Modules',
+        competency: 'Clinical Governance',
+        skill: 'Patient care',
+        promotionImpact: '+30% Readiness Boost',
+        impactScore: 30,
+        outcomes: [
+          'Formulate and enforce hospital infection control, sentinel event reporting, and root-cause analysis protocols',
+          'Implement National Quality Assurance Standards (NQAS) and NABH hospital accreditation checklists',
+          'Conduct structured clinical audits to optimize patient diagnostic pathways and reduce preventable complications',
+        ],
+        certification: 'Certified Clinical Governance & Healthcare Quality Specialist',
+      },
+      {
+        id: 'promo-doc-02',
+        title: 'Epidemiological Surveillance, Biostatistics & Public Health Informatics',
+        provider: 'National Institute of Health & Family Welfare (NIHFW)',
+        duration: '16 Hours',
+        difficulty: 'Advanced',
+        format: 'Interactive Case Studies & Sandbox',
+        competency: 'Public Health Informatics',
+        skill: 'Data analysis',
+        promotionImpact: '+25% Readiness Boost',
+        impactScore: 25,
+        outcomes: [
+          'Analyze integrated disease surveillance (IDSP) registries and outbreak prediction mathematical models',
+          'Apply biostatistical hypothesis testing, relative risk, and odds ratio calculations to clinical registries',
+          'Utilize digital health infrastructure (ABDM / Ayushman Bharat) for population health management',
+        ],
+        certification: 'Executive Credential in Public Health Informatics & Biostatistics',
+      },
+      {
+        id: 'promo-doc-03',
+        title: 'Hospital Administration, Medical Leadership & Crisis Response Management',
+        provider: 'AIIMS Academy / Mission Karmayogi',
+        duration: '10 Hours',
+        difficulty: 'Executive',
+        format: 'Clinical Simulations',
+        competency: 'Healthcare Management',
+        skill: 'Leadership',
+        promotionImpact: '+20% Readiness Boost',
+        impactScore: 20,
+        outcomes: [
+          'Oversee pharmaceutical inventory management, cold-chain logistics, and hospital resource budgeting',
+          'Coordinate disaster and epidemic response plans, casualty triage mobilization, and emergency surge capacity',
+          'Lead multidisciplinary clinical teams, resolve patient care grievances, and uphold bioethical standards',
+        ],
+        certification: 'Hospital Administration & Medical Leadership Certificate',
+      },
+    ],
+  },
+  'Senior Medical Officer': {
+    targetRole: 'Chief Medical Officer (CMO) / Medical Superintendent',
+    higherTarget: 'Director of Health Services / State Mission Director (NHM)',
+    cadre: 'Central Health Services (CHS) · Senior Administrative & Executive Cadre',
+    benchmarkScore: 80,
+    gradeIncrement: 'Pay Level 11/12 → Pay Level 13 (Superintendent Scale, +25% Emoluments)',
+    responsibilities: [
+      'Direct overall clinical, surgical, and hospital administrative operations for zonal healthcare institutions',
+      'Formulate state and national public health program implementation roadmaps (Ayushman Bharat, NHM)',
+      'Chair bioethics committees, institutional review boards, and forensic medical boards',
+      'Allocate hospital capital budgets, evaluate health technology assessments, and direct manpower deployment',
+    ],
+    promotionCriteria: [
+      '80%+ score on hospital administrative leadership, healthcare finance, and statutory health law assessments',
+      'Demonstrated successful execution of hospital accreditation or zonal health outreach programs',
+      'Completion of senior executive health leadership and public health policy credentials',
+    ],
+    courses: [
+      {
+        id: 'promo-smo-01',
+        title: 'Health Systems Leadership, Health Policy & Resource Economics',
+        provider: 'NIHFW / Centre for Good Governance',
+        duration: '16 Hours',
+        difficulty: 'Executive',
+        format: 'Case-Based Policy Labs',
+        competency: 'Health Policy',
+        skill: 'Leadership',
+        promotionImpact: '+35% Readiness Boost',
+        impactScore: 35,
+        outcomes: [
+          'Formulate comprehensive healthcare resource allocation models under state health budgets',
+          'Evaluate universal health coverage metrics, cost-effectiveness analyses, and health insurance reforms',
+          'Design inter-departmental contingency response frameworks for regional public health crises',
+        ],
+        certification: 'Executive Health Systems Leadership Award',
+      },
+      {
+        id: 'promo-smo-02',
+        title: 'Advanced Hospital Disaster Management & Epidemic Preparedness',
+        provider: 'National Disaster Management Authority (NDMA) / iGOT',
+        duration: '12 Hours',
+        difficulty: 'Advanced',
+        format: 'Simulation Drills',
+        competency: 'Disaster Management',
+        skill: 'Problem solving',
+        promotionImpact: '+25% Readiness Boost',
+        impactScore: 25,
+        outcomes: [
+          'Design mass casualty incident (MCI) triage plans and hospital surge capacity expansion models',
+          'Coordinate quarantine protocols, biosafety containment, and emergency medical logistics',
+          'Integrate multi-agency emergency communications with district magistrates and civil defense units',
+        ],
+        certification: 'Hospital Disaster & Emergency Preparedness Specialist',
+      },
+      {
+        id: 'promo-smo-03',
+        title: 'National Health Mission Governance & Digital Health Architecture',
+        provider: 'National Health Authority (NHA) / MeitY',
+        duration: '10 Hours',
+        difficulty: 'Executive',
+        format: 'Interactive Digital Sandbox',
+        competency: 'Digital Health Architecture',
+        skill: 'System architecture',
+        promotionImpact: '+20% Readiness Boost',
+        impactScore: 20,
+        outcomes: [
+          'Architect interoperable electronic health record (EHR) systems conforming to ABDM standards',
+          'Enforce health data privacy, statutory bio-medical waste compliance, and medico-legal safeguards',
+          'Leverage predictive epidemiology dashboards for targeted immunization and disease prevention',
+        ],
+        certification: 'National Digital Health Leadership Fellow',
+      },
+    ],
+  },
+  'Healthcare Administrator': {
+    targetRole: 'Hospital Operations Director / Principal Healthcare Administrator',
+    higherTarget: 'Chief Operating Officer (Healthcare) / Director of Hospital Services',
+    cadre: 'Healthcare Operations & Hospital Administration Cadre',
+    benchmarkScore: 75,
+    gradeIncrement: 'Managerial Scale → Senior Executive Director (+25% Emolument Scale)',
+    responsibilities: [
+      'Direct full-scope hospital facility management, clinical support services, and patient experience workflows',
+      'Manage healthcare budget allocation, pharmaceutical supply chain contracts, and equipment lifecycle audits',
+      'Ensure strict regulatory compliance with statutory hospital licensing, bio-safety, and fire safety norms',
+      'Optimize patient admission, bed turnover rates, and insurance billing clearance turnarounds',
+    ],
+    promotionCriteria: [
+      '75%+ score on healthcare operations, hospital finance, and regulatory compliance evaluations',
+      'Proven track record of improving operational throughput or achieving national hospital accreditation',
+      'Completion of verified healthcare quality and administrative modules',
+    ],
+    courses: [
+      {
+        id: 'promo-ha-01',
+        title: 'Hospital Supply Chain, Inventory & Medical Equipment Procurement',
+        provider: 'iGOT Karmayogi / NHSRC',
+        duration: '12 Hours',
+        difficulty: 'Advanced',
+        format: 'Applied Case Studies',
+        competency: 'Hospital Operations',
+        skill: 'Operations management',
+        promotionImpact: '+30% Readiness Boost',
+        impactScore: 30,
+        outcomes: [
+          'Optimize biomedical equipment uptime through preventative maintenance contracts and SLA monitoring',
+          'Implement JIT inventory controls and cold-chain monitoring for critical drugs and vaccines',
+          'Conduct vendor contract reviews adhering to General Financial Rules (GFR) procurement guidelines',
+        ],
+        certification: 'Certified Hospital Operations & Supply Chain Executive',
+      },
+      {
+        id: 'promo-ha-02',
+        title: 'Healthcare Accreditation (NABH / NQAS) & Quality Systems Management',
+        provider: 'Quality Council of India (QCI) / NHSRC',
+        duration: '14 Hours',
+        difficulty: 'Advanced',
+        format: 'Audit Framework Sandbox',
+        competency: 'Quality Assurance',
+        skill: 'Quality assurance',
+        promotionImpact: '+25% Readiness Boost',
+        impactScore: 25,
+        outcomes: [
+          'Draft standard operating procedures (SOPs) conforming to NABH standards across clinical departments',
+          'Conduct periodic internal audits, safety mock drills, and clinical documentation compliance checks',
+          'Manage patient satisfaction index surveys and incident redressal mechanisms',
+        ],
+        certification: 'Healthcare Quality & NABH Implementation Specialist',
+      },
+      {
+        id: 'promo-ha-03',
+        title: 'Healthcare Financial Management & Insurance Analytics',
+        provider: 'National Health Authority (NHA) / iGOT',
+        duration: '10 Hours',
+        difficulty: 'Executive',
+        format: 'Financial Modeling Labs',
+        competency: 'Healthcare Finance',
+        skill: 'Financial analysis',
+        promotionImpact: '+20% Readiness Boost',
+        impactScore: 20,
+        outcomes: [
+          'Analyze hospital revenue cycle management, tariff packages, and Ayushman Bharat claim settlements',
+          'Model department-level operating costs, bed profitability, and capital expenditure amortization',
+          'Enforce anti-fraud checks and audit compliance in third-party insurance billing',
+        ],
+        certification: 'Certified Healthcare Financial Administrator',
+      },
+    ],
+  },
+  'Biostatistics Officer': {
+    targetRole: 'Senior Biostatistician / Principal Biostatistical Officer',
+    higherTarget: 'Director (Biostatistics & Clinical Trial Analytics) / Joint Director (Health Statistics)',
+    cadre: 'Biostatistics & Health Research Cadre · Group A Scientific Track',
+    benchmarkScore: 78,
+    gradeIncrement: 'Pay Level 7/8 → Pay Level 10/11 (Senior Scientist Scale, +25% Emoluments)',
+    responsibilities: [
+      'Lead statistical analysis plans (SAP) and sample size power calculations for clinical and health studies',
+      'Validate survival analysis, Cox proportional hazards models, and epidemiological odds ratios',
+      'Review and sign off on public health registry releases and statistical disease models',
+      'Coordinate with clinical investigators and drug regulatory committees on protocol validity',
+    ],
+    promotionCriteria: [
+      '78%+ assessment score in clinical biostatistics, statistical computing, and epidemiology',
+      'Ownership of at least two validated statistical analysis protocols for health surveys or clinical studies',
+      'Completion of advanced R/Python clinical data science certifications',
+    ],
+    courses: [
+      {
+        id: 'promo-bio-01',
+        title: 'Advanced Biostatistics: Survival Analysis & Longitudinal Modeling in R/Python',
+        provider: 'Indian Council of Medical Research (ICMR) / NIHFW',
+        duration: '16 Hours',
+        difficulty: 'Advanced',
+        format: 'Hands-on Statistical Labs',
+        competency: 'Biostatistical Analysis',
+        skill: 'Statistical analysis',
+        promotionImpact: '+35% Readiness Boost',
+        impactScore: 35,
+        outcomes: [
+          'Implement Kaplan-Meier survival curves, log-rank tests, and Cox regression models on clinical datasets',
+          'Model longitudinal patient outcomes using generalized estimating equations (GEE) and mixed-effects models',
+          'Perform propensity score matching to control for confounding in observational health registries',
+        ],
+        certification: 'ICMR Advanced Biostatistical Modeling Credential',
+      },
+      {
+        id: 'promo-bio-02',
+        title: 'Clinical Trial Design, Sample Size Determination & Adaptive Protocols',
+        provider: 'Clinical Development Services Agency / iGOT',
+        duration: '14 Hours',
+        difficulty: 'Advanced',
+        format: 'Case Simulations',
+        competency: 'Clinical Trial Design',
+        skill: 'Research',
+        promotionImpact: '+25% Readiness Boost',
+        impactScore: 25,
+        outcomes: [
+          'Compute statistical power and sample size under complex randomized cluster and non-inferiority trials',
+          'Design adaptive clinical trial protocols with pre-specified interim efficacy and futility stopping rules',
+          'Enforce Good Clinical Practice (GCP) guidelines and regulatory statistical submission requirements',
+        ],
+        certification: 'Certified Clinical Trial Statistician',
+      },
+      {
+        id: 'promo-bio-03',
+        title: 'Health Data Quality, Missing Data Imputation & Registry Governance',
+        provider: 'Ministry of Health & Family Welfare / iGOT',
+        duration: '10 Hours',
+        difficulty: 'Intermediate',
+        format: 'Data Sandbox',
+        competency: 'Data Quality Frameworks',
+        skill: 'Data cleaning',
+        promotionImpact: '+20% Readiness Boost',
+        impactScore: 20,
+        outcomes: [
+          'Apply multiple imputation by chained equations (MICE) for non-random missingness in health registries',
+          'Perform automated data quality auditing against WHO health data standards and metadata benchmarks',
+          'Formulate statistical disclosure control (SDC) protocols for sharing de-identified public health microdata',
+        ],
+        certification: 'Health Registry Data Governance Specialist',
+      },
+    ],
+  },
+  'Agricultural Statistics Officer': {
+    targetRole: 'Senior Agricultural Statistician / Director of Agricultural Accounts',
+    higherTarget: 'Adviser (Agriculture & Food Statistics) / Directorate of Economics & Statistics (DES)',
+    cadre: 'Agricultural Economics & Statistics Cadre · Group A Track',
+    benchmarkScore: 75,
+    gradeIncrement: 'Pay Level 7 → Pay Level 8/10 (Senior Scale, +22% Emoluments)',
+    responsibilities: [
+      'Sign off on Advance Estimates of crop production, crop-cutting experiment (CCE) sample designs, and yield indices',
+      'Validate satellite remote sensing and GIS spatial analytics for agricultural acreage estimation',
+      'Supervise agricultural census enumeration and digital agriculture registry integration across districts',
+      'Provide technical guidance for minimum support price (MSP) calculation and agricultural cost accounts',
+    ],
+    promotionCriteria: [
+      '75%+ score on agricultural survey design, spatial crop modeling, and agrarian econometrics',
+      'Completion of accredited modules in Remote Sensing Crop Yield Estimation and Agricultural Surveys',
+      'Documented APAR clearance with verified field survey oversight credits',
+    ],
+    courses: [
+      {
+        id: 'promo-agri-01',
+        title: 'Crop Yield Estimation, Remote Sensing & GIS Spatial Analytics',
+        provider: 'ICAR - Indian Agricultural Statistics Research Institute (IASRI)',
+        duration: '16 Hours',
+        difficulty: 'Advanced',
+        format: 'Spatial Lab & Code Sandbox',
+        competency: 'Spatial Agricultural Analytics',
+        skill: 'GIS',
+        promotionImpact: '+35% Readiness Boost',
+        impactScore: 35,
+        outcomes: [
+          'Process multispectral satellite imagery (NDVI/EVI) to classify crop acreage and monitor crop health',
+          'Design multi-stage stratified sampling frameworks for crop-cutting experiments (CCEs)',
+          'Integrate weather indices, soil sensor data, and yield simulation models for advance crop forecasts',
+        ],
+        certification: 'ICAR Certified Spatial Agricultural Statistician',
+      },
+      {
+        id: 'promo-agri-02',
+        title: 'Agricultural Survey Quality Assurance & Food Security Indicators',
+        provider: 'FAO / iGOT Karmayogi Bharat',
+        duration: '12 Hours',
+        difficulty: 'Intermediate',
+        format: 'Interactive Case Studies',
+        competency: 'Agricultural Survey Design',
+        skill: 'Survey Design',
+        promotionImpact: '+25% Readiness Boost',
+        impactScore: 25,
+        outcomes: [
+          'Formulate data quality audit checklists for land-use statistics and agricultural census registers',
+          'Calculate agricultural terms of trade, farm harvest prices, and food balance sheet indicators',
+          'Apply non-sampling error reduction protocols to field-level agricultural surveys',
+        ],
+        certification: 'Agricultural Survey Methodology & Food Security Fellow',
+      },
+      {
+        id: 'promo-agri-03',
+        title: 'Digital Agriculture Platforms, Agritech Registries & Census Automation',
+        provider: 'Ministry of Agriculture & Farmers Welfare / MeitY',
+        duration: '10 Hours',
+        difficulty: 'Executive',
+        format: 'Digital Sandbox',
+        competency: 'Digital Agritech Transformation',
+        skill: 'Digital Transformation',
+        promotionImpact: '+20% Readiness Boost',
+        impactScore: 20,
+        outcomes: [
+          'Integrate farmer identification registries (AgriStack) with digital land records and PM-KISAN databases',
+          'Deploy smartphone-based CCE mobile apps with automated geotagging and real-time validation',
+          'Design executive monitoring dashboards for agricultural disaster relief and crop insurance claims',
+        ],
+        certification: 'Digital Agriculture Systems Specialist',
+      },
+    ],
+  },
+  'Teacher': {
+    targetRole: 'Senior PGT / Academic Department Head / Curriculum Specialist',
+    higherTarget: 'Vice Principal / Principal / District Education Officer (DEO)',
+    cadre: 'National & State Education Cadre · Group A Academic Track',
+    benchmarkScore: 75,
+    gradeIncrement: 'Pay Level 8 → Pay Level 10/11 (+25% Salary Band & Administrative Allowance)',
+    responsibilities: [
+      'Lead departmental pedagogical innovation, competency-based lesson planning, and NEP 2020 curriculum alignment',
+      'Mentor probationary faculty members, conduct peer teaching evaluations, and optimize student learning outcomes',
+      'Coordinate school accreditation reviews, board examination assessments, and parent-teacher councils',
+      'Oversee academic laboratory resources, digital smart classrooms, and co-curricular enrichment programs',
+    ],
+    promotionCriteria: [
+      '75%+ score on modern pedagogy, educational assessment frameworks, and institutional administration',
+      'Completion of accredited modules in Competency-Based Education, NEP 2020, and Educational Leadership',
+      'Proven student academic improvement metrics and satisfactory institutional performance appraisal',
+    ],
+    courses: [
+      {
+        id: 'promo-edu-01',
+        title: 'Competency-Based Education, Formative Assessment & NEP 2020 Framework',
+        provider: 'NCERT / DIKSHA / iGOT Karmayogi',
+        duration: '14 Hours',
+        difficulty: 'Advanced',
+        format: 'Pedagogical Case Labs',
+        competency: 'Pedagogical Innovation',
+        skill: 'Instructional design',
+        promotionImpact: '+35% Readiness Boost',
+        impactScore: 35,
+        outcomes: [
+          'Design learning outcomes-aligned lesson modules moving beyond rote memorization to analytical inquiry',
+          'Formulate holistic progress cards (HPC), rubric-based assessment tasks, and formative feedback loops',
+          'Implement inclusive classroom differentiation strategies for diverse learning paces and special needs',
+        ],
+        certification: 'National Certified Master Teacher in Competency Pedagogy',
+      },
+      {
+        id: 'promo-edu-02',
+        title: 'Educational Leadership, School Administration & Institutional Governance',
+        provider: 'National Institute of Educational Planning & Administration (NIEPA)',
+        duration: '12 Hours',
+        difficulty: 'Executive',
+        format: 'Interactive Case Studies',
+        competency: 'Educational Leadership',
+        skill: 'Leadership',
+        promotionImpact: '+25% Readiness Boost',
+        impactScore: 25,
+        outcomes: [
+          'Direct institutional development plans, academic timetables, and resource optimization schedules',
+          'Conduct transparent teacher peer reviews, continuous professional development (CPD), and mentorship',
+          'Navigate conflict resolution, student counseling frameworks, and community stakeholder consensus',
+        ],
+        certification: 'Executive Certificate in School Leadership & Governance',
+      },
+      {
+        id: 'promo-edu-03',
+        title: 'Digital Pedagogy, Smart Classrooms & Educational Analytics',
+        provider: 'MeitY / Swayam / Central Institute of Educational Technology',
+        duration: '10 Hours',
+        difficulty: 'Intermediate',
+        format: 'Interactive EdTech Sandbox',
+        competency: 'EdTech & Digital Learning',
+        skill: 'Digital Transformation',
+        promotionImpact: '+20% Readiness Boost',
+        impactScore: 20,
+        outcomes: [
+          'Deploy interactive digital simulations, virtual lab experiments, and learning management systems (LMS)',
+          'Analyze classroom learning analytics to identify early student retention and conceptual gap risks',
+          'Enforce student cyber safety, digital copyright compliance, and open educational resources (OER) usage',
+        ],
+        certification: 'Digital Classroom Pedagogy Specialist',
+      },
+    ],
+  },
+  'Data Scientist': {
+    targetRole: 'Lead Data Scientist / AI Systems Architect',
+    higherTarget: 'Chief Data Officer (CDO) / Head of Artificial Intelligence & Analytics',
+    cadre: 'Advanced Analytics & Artificial Intelligence Cadre · Principal Track',
+    benchmarkScore: 80,
+    gradeIncrement: 'Scientist Tier → Lead Principal Scientist (+30% Salary Band & Executive Equity)',
+    responsibilities: [
+      'Architect production-grade machine learning models, retrieval-augmented LLM architectures, and real-time inference clusters',
+      'Formulate organizational AI ethics guidelines, algorithmic bias mitigation, and data privacy safeguards',
+      'Direct cross-functional ML engineering teams, oversee model registry lifecycle, and maintain model drift monitoring SLAs',
+      'Partner with business executive leadership to define high-impact AI strategy, roadmap investments, and ROI KPIs',
+    ],
+    promotionCriteria: [
+      '80%+ score on system architecture, machine learning engineering, and algorithmic optimization assessments',
+      'Demonstrated ownership of high-impact production predictive or generative AI service',
+      'Completion of advanced distributed MLOps and Responsible AI credentials',
+    ],
+    courses: [
+      {
+        id: 'promo-ds-01',
+        title: 'Production MLOps, Distributed Model Training & LLM Infrastructure',
+        provider: 'AI Engineering Institute / Cloud Native Academy',
+        duration: '18 Hours',
+        difficulty: 'Advanced',
+        format: 'Hands-on Code & Cluster Labs',
+        competency: 'MLOps & Distributed AI',
+        skill: 'Machine learning',
+        promotionImpact: '+35% Readiness Boost',
+        impactScore: 35,
+        outcomes: [
+          'Design automated continuous training (CT) and deployment pipelines with MLflow, Kubeflow, and Triton server',
+          'Deploy distributed model training across multi-GPU nodes with parameter-efficient fine-tuning (PEFT/LoRA)',
+          'Implement automated data drift, concept drift, and adversarial vulnerability detection monitors',
+        ],
+        certification: 'Certified Principal Machine Learning Architect',
+      },
+      {
+        id: 'promo-ds-02',
+        title: 'Responsible AI, Algorithmic Auditing & Explainable AI Governance',
+        provider: 'Data Ethics Board / Mission Karmayogi',
+        duration: '12 Hours',
+        difficulty: 'Advanced',
+        format: 'Governance Sandbox & Case Labs',
+        competency: 'AI Governance & Ethics',
+        skill: 'AI/ML',
+        promotionImpact: '+25% Readiness Boost',
+        impactScore: 25,
+        outcomes: [
+          'Audit black-box models using SHAP, Integrated Gradients, and counterfactual explanation frameworks',
+          'Quantify and remediate disparate impact, demographic parity gaps, and protected attribute bias',
+          'Formulate institutional AI governance charters complying with EU AI Act and National Data Governance Policy',
+        ],
+        certification: 'Responsible AI & Algorithmic Governance Fellow',
+      },
+      {
+        id: 'promo-ds-03',
+        title: 'Strategic Data Leadership, Product Analytics & Executive Influence',
+        provider: 'Tech Leadership Institute',
+        duration: '10 Hours',
+        difficulty: 'Executive',
+        format: 'Executive Case Simulations',
+        competency: 'Data Leadership',
+        skill: 'Leadership',
+        promotionImpact: '+20% Readiness Boost',
+        impactScore: 20,
+        outcomes: [
+          'Translate business problems into mathematically tractable machine learning specifications with clear ROI',
+          'Lead technical design reviews (RFCs), mentor junior data scientists, and foster research publication standards',
+          'Deliver compelling executive briefings and build cross-disciplinary alignment with product and legal teams',
+        ],
+        certification: 'Executive Data Science Leadership Award',
+      },
+    ],
+  },
+}
+
+function enhancePathway(data, currentScore, currentRole) {
+  const benchmark = data.benchmarkScore || 75
+  const readinessPct = Math.min(100, Math.round((currentScore / benchmark) * 100))
+  const isEligible = currentScore >= benchmark
+  const remainingGap = Math.max(0, benchmark - currentScore)
+
+  return {
+    ...data,
+    currentRole,
+    currentScore,
+    benchmarkScore: benchmark,
+    readinessPct,
+    isEligible,
+    remainingGap,
+  }
+}
+
+function getPromotionPathway(roleName, currentScore = 0) {
+  const currentRole = (roleName || '').trim() || 'Statistical Officer'
+
+  // 1. Exact match in catalog
+  if (rolePromotionCatalog[currentRole]) {
+    return enhancePathway(rolePromotionCatalog[currentRole], currentScore, currentRole)
+  }
+
+  // 2. Case-insensitive key match
+  const lower = currentRole.toLowerCase()
+  for (const [key, data] of Object.entries(rolePromotionCatalog)) {
+    if (lower === key.toLowerCase()) {
+      return enhancePathway(data, currentScore, currentRole)
+    }
+  }
+
+  // 3. Specialized domain and cadre matches
+  if (lower.includes('doctor') || lower.includes('physician') || lower.includes('surgeon') || lower.includes('medical officer') || lower.includes('resident doctor') || lower.includes('clinic')) {
+    return enhancePathway(rolePromotionCatalog['Doctor'], currentScore, currentRole)
+  }
+  if (lower.includes('senior medical') || lower.includes('cmo') || lower.includes('superintendent')) {
+    return enhancePathway(rolePromotionCatalog['Senior Medical Officer'], currentScore, currentRole)
+  }
+  if (lower.includes('health administrator') || lower.includes('hospital admin') || lower.includes('clinical research')) {
+    return enhancePathway(rolePromotionCatalog['Healthcare Administrator'], currentScore, currentRole)
+  }
+  if (lower.includes('biostat') || lower.includes('vital statistics')) {
+    return enhancePathway(rolePromotionCatalog['Biostatistics Officer'], currentScore, currentRole)
+  }
+  if (lower.includes('health') && (lower.includes('analyst') || lower.includes('statist') || lower.includes('survey'))) {
+    return enhancePathway(rolePromotionCatalog['Health Data Analyst'], currentScore, currentRole)
+  }
+  if (lower.includes('crop') || lower.includes('farm') || lower.includes('agri')) {
+    return enhancePathway(rolePromotionCatalog['Agricultural Statistics Officer'], currentScore, currentRole)
+  }
+  if (lower.includes('teacher') || lower.includes('educat') || lower.includes('professor') || lower.includes('lecturer') || lower.includes('instructor') || lower.includes('faculty')) {
+    return enhancePathway(rolePromotionCatalog['Teacher'], currentScore, currentRole)
+  }
+  if (lower.includes('data scientist') || lower.includes('machine learning') || lower.includes('ai engineer') || lower.includes('deep learning')) {
+    return enhancePathway(rolePromotionCatalog['Data Scientist'], currentScore, currentRole)
+  }
+  if (lower.includes('investigator') || lower.includes('field survey') || lower.includes('field officer')) {
+    return enhancePathway(rolePromotionCatalog['Statistical Investigator'], currentScore, currentRole)
+  }
+  if (lower.includes('senior statistical') || lower.includes('sso') || lower.includes('statistical lead')) {
+    return enhancePathway(rolePromotionCatalog['Senior Statistical Officer'], currentScore, currentRole)
+  }
+  if (lower.includes('data analyst') || lower.includes('business analyst') || lower.includes('analytics') || lower.includes('bi analyst')) {
+    return enhancePathway(rolePromotionCatalog['Data Analyst'], currentScore, currentRole)
+  }
+  if (lower.includes('develop') || lower.includes('engineer') || lower.includes('architect') || lower.includes('programmer') || lower.includes('software') || lower.includes('devops')) {
+    return enhancePathway(rolePromotionCatalog['Software Engineer'], currentScore, currentRole)
+  }
+  if (lower.includes('statist') || lower.includes('survey') || lower.includes('econom') || lower.includes('census') || lower.includes('nso') || lower.includes('mospi')) {
+    return enhancePathway(rolePromotionCatalog['Statistical Officer'], currentScore, currentRole)
+  }
+
+  // 4. Intelligent generic professional progression generator
+  const targetRole = `Senior ${currentRole}`
+  const higherTarget = `Director / Principal Lead of ${currentRole}`
+  let domainCadre = 'Professional Advancement Cadre · Senior Specialist Track'
+  let salaryBump = 'Next Career Tier Promotion (+20-28% Emolument & Responsibility Scale)'
+  
+  if (lower.includes('finance') || lower.includes('account') || lower.includes('audit') || lower.includes('tax')) {
+    domainCadre = 'Financial & Economic Cadre · Fiscal Governance Track'
+    salaryBump = 'Senior Finance Band / Pay Level Upgrade (+25% Emoluments)'
+  } else if (lower.includes('legal') || lower.includes('law') || lower.includes('compliance')) {
+    domainCadre = 'Legal, Regulatory & Compliance Cadre · Senior Council Track'
+    salaryBump = 'Senior Legal Counsel Band (+25% Emoluments)'
+  } else if (lower.includes('human') || lower.includes('hr') || lower.includes('recruit') || lower.includes('people')) {
+    domainCadre = 'Human Capital & Personnel Governance Cadre'
+    salaryBump = 'Senior HR Directorate Scale (+22% Emoluments)'
+  }
+
+  const genericData = {
+    targetRole,
+    higherTarget,
+    cadre: domainCadre,
+    benchmarkScore: 75,
+    gradeIncrement: salaryBump,
+    responsibilities: [
+      `Lead strategic operations, quality protocols and standard setting for ${currentRole} workflows`,
+      'Review and sign off on high-impact deliverables, governance audits and compliance standards',
+      'Mentor intermediate team members and represent the department at organizational reviews',
+      'Optimize cross-functional project execution, budget utilization, and operational KPIs',
+    ],
+    promotionCriteria: [
+      'Attain 75%+ score on comprehensive role competency evaluations',
+      'Demonstrated mastery in domain analytical tools and leadership practices',
+      'Complete at least 2 verified professional capability training programs',
+    ],
+    courses: [
+      {
+        id: 'promo-gen-01',
+        title: `Advanced Competency Mastery & Professional Standards in ${currentRole}`,
+        provider: 'iGOT Karmayogi / National Academy',
+        duration: '12 Hours',
+        difficulty: 'Advanced',
+        format: 'Self-Paced with Practical Lab',
+        competency: 'Core Domain Excellence',
+        skill: 'Problem solving',
+        promotionImpact: '+30% Readiness Boost',
+        impactScore: 30,
+        outcomes: [
+          `Master advanced domain problem-solving methodologies tailored specifically for ${currentRole}`,
+          'Implement quality assurance checkpoints, documentation audits, and workflow optimization',
+          'Analyze complex scenario edge-cases and apply evidence-based decision models',
+        ],
+        certification: `Executive Specialist Certificate in ${currentRole}`,
+      },
+      {
+        id: 'promo-gen-02',
+        title: 'Digital Tools, Data Literacy & Process Automation',
+        provider: 'MeitY / Digital India',
+        duration: '10 Hours',
+        difficulty: 'Intermediate',
+        format: 'Interactive Sandbox',
+        competency: 'Digital Transformation',
+        skill: 'Analytical thinking',
+        promotionImpact: '+25% Readiness Boost',
+        impactScore: 25,
+        outcomes: [
+          'Automate routine reporting, data ingestion, and status tracking using modern software tools',
+          'Design executive KPI dashboards and operational metrics visualizations',
+          'Enforce information security, access permissions, and data protection best practices',
+        ],
+        certification: 'Digital Workplace Productivity Credential',
+      },
+      {
+        id: 'promo-gen-03',
+        title: 'Strategic Leadership, Project Delivery & Stakeholder Communication',
+        provider: 'Mission Karmayogi / Centre for Good Governance',
+        duration: '8 Hours',
+        difficulty: 'Executive',
+        format: 'Interactive Case Simulations',
+        competency: 'Leadership & Management',
+        skill: 'Leadership',
+        promotionImpact: '+20% Readiness Boost',
+        impactScore: 20,
+        outcomes: [
+          'Lead cross-disciplinary project teams and navigate stakeholder consensus',
+          'Draft executive briefings, resource allocation proposals, and risk mitigation plans',
+          'Conduct transparent capability evaluations and continuous team mentorship',
+        ],
+        certification: 'Professional Leadership & Management Award',
+      },
+    ],
+  }
+  return enhancePathway(genericData, currentScore, currentRole)
+}
+
+
 function getRoleSkillCategories(role, designation) {
   const target = `${role || ''} ${designation || ''}`.toLowerCase()
+
+  if (target.includes('health data analyst') || target.includes('health statistics')) {
+    return [
+      ['Health Statistics', ['Health Data Analysis', 'Health Survey Design', 'Biostatistics', 'Epidemiology', 'Health Indicators', 'Vital Statistics']],
+      ['Health Data Tools', ['Python', 'R Programming', 'SQL', 'Data Visualization', 'Data Cleaning & Validation', 'Statistical Modelling']],
+      ['Health Data Quality', ['Data Quality Frameworks', 'Privacy-Preserving Statistics', 'Metadata Standards', 'Quality Assurance', 'Research Reporting', 'Ethics & Integrity']],
+    ]
+  }
+
+  if (target.includes('labour statistics') || target.includes('employment statistics')) {
+    return [
+      ['Labour Statistics', ['Labour Force Surveys', 'Employment Statistics', 'Wage Statistics', 'Workforce Indicators', 'Survey Design', 'Sampling Techniques']],
+      ['Analysis & Reporting', ['Statistical Analysis', 'SQL', 'Python', 'Data Visualization', 'Data Quality Frameworks', 'Report Writing']],
+      ['Official Statistics Practice', ['Metadata Standards', 'Quality Assurance', 'Open Data Standards', 'Documentation', 'Ethics & Integrity']],
+    ]
+  }
+
+  if (target.includes('price statistics') || target.includes('consumer price')) {
+    return [
+      ['Price & Consumer Statistics', ['Consumer Price Index', 'Price Collection', 'Price Statistics', 'Market Basket Analysis', 'Inflation Measurement', 'Sampling Techniques']],
+      ['Economic Analysis Tools', ['Statistical Analysis', 'SQL', 'Python', 'R Programming', 'Data Visualization', 'Time Series Analysis']],
+      ['Data Quality & Reporting', ['Data Quality Frameworks', 'Metadata Standards', 'Quality Assurance', 'Report Writing', 'Official Data Dissemination']],
+    ]
+  }
+
+  if (target.includes('agricultural statistics') || target.includes('agricultural economist')) {
+    return [
+      ['Agricultural Statistics', ['Agricultural Surveys', 'Crop Statistics', 'Yield Estimation', 'Sampling Techniques', 'Rural Statistics', 'Food Security Indicators']],
+      ['Analysis & Field Data', ['Statistical Analysis', 'GIS Spatial Analysis', 'Python', 'SQL', 'Data Visualization', 'Field Data Quality']],
+      ['Official Statistics Practice', ['Metadata Standards', 'Quality Assurance', 'Report Writing', 'Open Data Standards', 'Ethics & Integrity']],
+    ]
+  }
+
+  if (target.includes('environmental statistics') || target.includes('climate data')) {
+    return [
+      ['Environment & Climate Statistics', ['Environmental Indicators', 'Climate Statistics', 'Emissions Data', 'Sustainable Development Indicators', 'Survey Design', 'GIS Spatial Analysis']],
+      ['Analytical Tools', ['Python', 'R Programming', 'SQL', 'Data Visualization', 'Time Series Analysis', 'Spatial Data Analysis']],
+      ['Data Quality & Governance', ['Data Quality Frameworks', 'Metadata Standards', 'Open Data Standards', 'Quality Assurance', 'Report Writing', 'Ethics & Integrity']],
+    ]
+  }
 
   if (target.includes('teacher')) {
     if (target.includes('physics')) {
@@ -348,12 +1741,20 @@ function getRoleSkillCategories(role, designation) {
     ]
   }
 
-  if (target.includes('statist') || target.includes('economist') || target.includes('survey') || target.includes('investigator') || target.includes('census')) {
+  if (target.includes('statist') || target.includes('economist') || target.includes('survey') || target.includes('investigator') || target.includes('census') || target.includes('agricultur') || target.includes('labour') || target.includes('health') || target.includes('industrial') || target.includes('manufactur') || target.includes('price') || target.includes('consumer') || target.includes('social') || target.includes('demograph') || target.includes('environment') || target.includes('climate') || target.includes('biostat')) {
     return [
       ['Statistical Competencies', ['Survey Design', 'Sampling Techniques', 'National Accounts', 'Price Statistics', 'Labour Statistics', 'Agricultural Statistics', 'Industrial Statistics', 'SDG Indicators', 'Data Quality Frameworks', 'Metadata Standards']],
       ['Technical & Analytical Tools', ['Python', 'R Programming', 'SQL', 'Stata', 'SPSS', 'SAS', 'Data Visualization', 'GIS Spatial Analysis', 'AI/ML for Official Statistics']],
       ['Digital Governance', ['Cybersecurity', 'Data Privacy', 'Digital Public Infrastructure', 'Open Data Standards', 'Government Cloud']],
       ['Managerial & Behavioural', ['Leadership', 'Analytical Thinking', 'Report Writing', 'Public Policy Analysis', 'Decision Making', 'Ethics & Integrity']],
+    ]
+  }
+
+  if (target.includes('data governance') || target.includes('data quality') || target.includes('metadata') || target.includes('official data') || target.includes('indicators')) {
+    return [
+      ['Official Data Management', ['Data Governance', 'Metadata Standards', 'Data Quality Frameworks', 'Data Classification', 'Data Lineage', 'Master Data Management']],
+      ['Statistical Production Tools', ['SQL', 'Python', 'R Programming', 'Data Cleaning & Validation', 'Data Integration', 'Data Visualization']],
+      ['Official Statistics Practice', ['Open Data Standards', 'Statistical Disclosure Control', 'Indicator Frameworks', 'Documentation', 'Quality Assurance', 'Ethics & Integrity']],
     ]
   }
 
@@ -639,7 +2040,7 @@ const extendedText = {
 const uiText = {
   en: {
     initializing: 'Initializing Skillstat AI Experience...', intelligentEvaluation: 'INTELLIGENT SKILL EVALUATION',
-    securePlatform: 'Secure Government Platform', privacy: 'Your profile data is stored locally for this demonstration. Privacy notice',
+    securePlatform: 'Secure Official Statistics Platform', privacy: 'Your profile data is securely stored for your Skillstat account. Privacy notice',
     connectingSso: 'Connecting to Government SSO...', continueSso: 'Continue with Government SSO', remember: 'Remember me', forgot: 'Forgot password?',
     setupProfile: 'Set up your professional profile', profileHint: 'Use your official work details to personalize competency benchmarks and learning recommendations.',
     officialProfile: 'OFFICIAL PROFILE', fullName: 'Full Name', employeeId: 'Employee ID', department: 'Department', organization: 'Organization', designation: 'Designation', currentAssignment: 'Current Assignment', location: 'Location',
@@ -661,22 +2062,67 @@ const uiText = {
 }
 
 const navText = {
-  en: ['Dashboard', 'Recommendations', 'Weekend Challenge', 'AI Quiz', 'Profile Overview'],
-  hi: ['डैशबोर्ड', 'सिफारिशें', 'वीकेंड चैलेंज', 'AI क्विज़', 'प्रोफाइल विवरण'],
-  ta: ['டாஷ்போர்டு', 'பரிந்துரைகள்', 'வார இறுதி சவால்', 'AI வினாடி வினா', 'சுயவிவர மேலோட்டம்'],
-  te: ['డాష్‌బోర్డ్', 'సిఫార్సులు', 'వీకెండ్ ఛాలెంజ్', 'AI క్విజ్', 'ప్రొఫైల్ అవలోకనం'],
-  bn: ['ড্যাশবোর্ড', 'সুপারিশ', 'সাপ্তাহিক চ্যালেঞ্জ', 'AI কুইজ', 'প্রোফাইল'],
-  mr: ['डॅशबोर्ड', 'शिफारसी', 'वीकेंड चॅलेंज', 'AI क्विझ', 'प्रोफाइल'],
-  gu: ['ડેશબોર્ડ', 'ભલામણો', 'વીકએન્ડ ચેલેન્જ', 'AI ક્વિઝ', 'પ્રોફાઇલ'],
-  kn: ['ಡ್ಯಾಶ್‌ಬೋರ್ಡ್', 'ಶಿಫಾರಸುಗಳು', 'ವಾರಾಂತ್ಯ ಸವಾಲು', 'AI ಕ್ವಿಜ್', 'ಪ್ರೊಫೈಲ್'],
-  ml: ['ഡാഷ്ബോർഡ്', 'ശുപാർശകൾ', 'വാരാന്ത്യ ചലഞ്ച്', 'AI ക്വിസ്', 'പ്രൊഫൈൽ'],
+  en: ['Dashboard', 'Recommendations', 'Weekend Challenge', 'AI Quiz', 'Upload Documents', 'Career & Promotions'],
+  hi: ['डैशबोर्ड', 'सिफारिशें', 'वीकेंड चैलेंज', 'AI क्विज़', 'प्रोफाइल विवरण', 'कैरियर और पदोन्नति'],
+  ta: ['டாஷ்போர்டு', 'பரிந்துரைகள்', 'வார இறுதி சவால்', 'AI வினாடி வினா', 'சுயவிவர மேலோட்டம்', 'பணி & பதவி உயர்வு'],
+  te: ['డాష్‌బోర్డ్', 'సిఫార్సులు', 'వీకెండ్ ఛాలెంజ్', 'AI క్విజ్', 'ప్రొఫైల్ అవలోకనం', 'కెరీర్ & ప్రమోషన్లు'],
+  bn: ['ড্যাশবোর্ড', 'সুপারিশ', 'সাপ্তাহিক চ্যালেঞ্জ', 'AI কুইজ', 'প্রোফাইল', 'ক্যারিয়ার ও পদোন্নতি'],
+  mr: ['डॅशबोर्ड', 'शिफारसी', 'वीकेंड चॅलेंज', 'AI क्विझ', 'प्रोफाइल', 'कारकीर्द आणि पदोन्नती'],
+  gu: ['ડેશબોર્ડ', 'ભલામણો', 'વીકએન્ડ ચેલેન્જ', 'AI ક્વિઝ', 'પ્રોફાઇલ', 'કારકિર્દી અને પ્રમોશન'],
+  kn: ['ಡ್ಯಾಶ್‌ಬೋರ್ಡ್', 'ಶಿಫಾರಸುಗಳು', 'ವಾರಾಂತ್ಯ ಸವಾಲು', 'AI ಕ್ವಿಜ್', 'ಪ್ರೊಫೈಲ್', 'ವೃತ್ತಿಜೀವನ ಮತ್ತು ಬಡ್ತಿ'],
+  ml: ['ഡാഷ്ബോർഡ്', 'ശുപാർശകൾ', 'വാരാന്ത്യ ചലഞ്ച്', 'AI ക്വിസ്', 'പ്രൊഫൈൽ', 'കരിയറും പ്രമോഷനും'],
 }
 
 function Brand() {
   return (
     <div className="brand">
-      <span className="brand-mark">S</span>
+      <img src="/logo.png" alt="Skillstat AI Official Logo" className="brand-logo-img" />
       <strong>Skillstat AI</strong>
+    </div>
+  )
+}
+
+function RotatingCoil({ logoSrc = '/logo.png' }) {
+  return (
+    <div className="coil-container">
+      <div className="coil-ripple coil-ripple-1" />
+      <div className="coil-ripple coil-ripple-2" />
+
+      <svg className="coil-svg" viewBox="0 0 500 500">
+        <defs>
+          <path
+            id="textPathCoil"
+            d="M 250, 250 m -190, 0 a 190,190 0 1,1 380,0 a 190,190 0 1,1 -380,0"
+          />
+        </defs>
+
+        {/* Orbit track ring */}
+        <circle cx="250" cy="250" r="190" className="coil-track-line" />
+
+        {/* Outer decorative ring with accent dots separated from text path */}
+        <circle cx="250" cy="250" r="218" className="coil-outer-track" />
+        <circle cx="250" cy="32" r="3" className="coil-dot" />
+        <circle cx="250" cy="468" r="3" className="coil-dot" />
+        <circle cx="32" cy="250" r="3" className="coil-dot" />
+        <circle cx="468" cy="250" r="3" className="coil-dot" />
+
+        {/* Rotating Circular Text: EMPLOYEE TRAINING MARKETPLACE (Guaranteed Zero Overlap) */}
+        <g className="coil-text-group">
+          <text className="coil-text" textLength="1175" lengthAdjust="spacing">
+            <textPath href="#textPathCoil" startOffset="0%">
+              • EMPLOYEE TRAINING MARKETPLACE • EMPLOYEE TRAINING MARKETPLACE&#160;
+            </textPath>
+          </text>
+        </g>
+      </svg>
+
+      <div className="coil-center-content">
+        <div className="coil-logo-box">
+          <img src={logoSrc} alt="Skillstat AI Official Logo" className="coil-center-logo" />
+        </div>
+        <h1 className="coil-brand-title">Skillstat AI</h1>
+        <p className="coil-brand-sub">INDIA'S OFFICIAL SKILL MARKETPLACE</p>
+      </div>
     </div>
   )
 }
@@ -812,8 +2258,17 @@ function validateCode(code, challenge) {
   const checks = challenge.checks || []
   if (!checks.length) return { state: 'valid', message: 'Code submitted for evaluation.' }
   const passed = checks.filter((check) => check.test(code)).length
-  if (passed >= 2) return { state: 'valid', message: `${passed} checks passed. Solution acceptable.` }
-  return { state: 'working', message: `${passed} of ${checks.length} checks passed. Pass at least 2 checks to continue.` }
+  if (passed >= 2) return { state: 'valid', message: `${passed} of ${checks.length} implementation checks passed. Solution acceptable.` }
+  return { state: 'working', message: `${passed} of ${checks.length} implementation checks passed. Pass at least 2 checks to continue.` }
+}
+
+function ensureCodeChecks(checks = []) {
+  const normalized = [...checks]
+  const implementationCheck = /\b(return|throw|=>|if|for|while|const|let|var|def|SELECT|class|<form)\b/i
+  const structureCheck = /[{}()[\];]/
+  if (!normalized.some((check) => String(check) === String(implementationCheck))) normalized.push(implementationCheck)
+  if (!normalized.some((check) => String(check) === String(structureCheck))) normalized.push(structureCheck)
+  return normalized.slice(0, 4)
 }
 
 const codingCodeChallenges = {
@@ -889,9 +2344,24 @@ const additionalCodingChallenges = {
   'C programming': { prompt: 'Implement a C function that returns the first non-repeating character in a string.', starter: 'char first_unique_char(const char *text) {\n  /* Your solution */\n}', checks: [/first_unique_char/, /return/] },
 }
 
+function getQuestionDifficulty(index, total = 10) {
+  const ratio = (index + 1) / Math.max(1, total)
+  if (ratio <= 0.3) {
+    return { level: 1, name: 'Foundational', label: 'Level 1: Foundational', badgeClass: 'diff-foundational', icon: '🟢' }
+  }
+  if (ratio <= 0.6) {
+    return { level: 2, name: 'Intermediate', label: 'Level 2: Intermediate', badgeClass: 'diff-intermediate', icon: '🟡' }
+  }
+  if (ratio <= 0.85) {
+    return { level: 3, name: 'Advanced', label: 'Level 3: Advanced', badgeClass: 'diff-advanced', icon: '🟠' }
+  }
+  return { level: 4, name: 'Expert', label: 'Level 4: Expert Challenge', badgeClass: 'diff-expert', icon: '🔴' }
+}
+
 function buildScenarioQuestions(profile, t, userSkills, quizMode = 'standard', notesContent = '', targetSkill = '') {
   const skills = targetSkill ? [targetSkill] : (userSkills.length ? userSkills : ['Problem solving', 'Communication'])
   const exp = profile.experience || '1–2 years'
+  const _targetRole = profile.role || profile.designation || 'the selected target role'
 
   // If quiz from notes / uploaded document
   if (quizMode === 'notes' && notesContent.trim()) {
@@ -903,97 +2373,259 @@ function buildScenarioQuestions(profile, t, userSkills, quizMode = 'standard', n
     const concepts = extractConceptsFromText(cleanNotes, 5)
     const questions = []
     const count = 10
-    const questionTemplates = [
-      (title) => `Which action best applies the principle of ${title} in a real government workflow?`,
-      (title) => `What is the main risk to control when implementing ${title}?`,
-      (title) => `How should an officer validate work related to ${title} before publishing results?`,
-      (title) => `Which evidence would demonstrate effective practice of ${title}?`,
-      (title) => `A team is applying ${title}. Which decision best protects quality and accountability?`,
-    ]
-    const optionTemplates = [
-      ['Apply the principle with documented checks, evidence, and review before approval', 'Skip the principle because the workflow is already familiar', 'Use an unverified shortcut and remove the audit trail', 'Wait for an error before deciding how the principle applies'],
-      ['Define the risk, assign an owner, and monitor controls throughout delivery', 'Treat the risk as irrelevant unless a complaint is received', 'Transfer the risk to another team without recording it', 'Remove the related data so the risk cannot be measured'],
-      ['Compare the work with the source guidance, validate the evidence, and record exceptions', 'Approve the work from memory without checking the source', 'Change the results until they match an expected outcome', 'Publish immediately and document issues only if challenged'],
-      ['A reproducible result, clear documentation, and an independent quality check', 'A verbal claim that the process was followed correctly', 'A final number with no source or calculation trail', 'A faster result produced without peer review'],
-      ['Balance the source guidance, measurable evidence, stakeholder impact, and accountability', 'Choose the fastest option without assessing consequences', 'Delegate the decision without giving review criteria', 'Ignore conflicting evidence and proceed on assumption'],
-    ]
+
+    const tieredNoteSpecs = {
+      1: [ // Level 1: Foundational
+        {
+          promptFn: (title) => `[Foundational] What is the core architectural purpose and primary function of ${title}?`,
+          optionsFn: (title) => [
+            `Establish standard initialization, adhere to baseline conventions, and verify data contracts for ${title}.`,
+            `Proceed with unverified parameter bindings and bypass baseline type checking.`,
+            `Assume default runtime state without inspecting environment prerequisites.`,
+            `Instantiate global mutable variables without encapsulation or lifecycle management.`,
+          ],
+        },
+        {
+          promptFn: (title) => `[Foundational] Which standard definition or syntax rule directly governs the initial configuration of ${title}?`,
+          optionsFn: (title) => [
+            `Adhere to authoritative definitions, enforce structural contracts, and validate configuration schemas for ${title}.`,
+            `Alter configuration parameters arbitrarily to bypass schema validation errors.`,
+            `Rely strictly on unverified third-party scripts without source verification.`,
+            `Disable structural linting and runtime schema assertions to save initialization time.`,
+          ],
+        },
+        {
+          promptFn: (title) => `[Foundational] When establishing a baseline workflow with ${title}, which prerequisite condition must be verified?`,
+          optionsFn: (title) => [
+            `Validate environment readiness, verify dependency compatibility, and confirm access permissions for ${title}.`,
+            `Skip environment checks and deploy directly into active runtime execution.`,
+            `Suppress compiler warnings and omit schema dependency verification.`,
+            `Hardcode staging endpoints into production builds without environment abstraction.`,
+          ],
+        },
+      ],
+      2: [ // Level 2: Intermediate
+        {
+          promptFn: (title) => `[Intermediate] How should data binding, state synchronization, and parameter validation be handled in ${title}?`,
+          optionsFn: (title) => [
+            `Implement thread-safe state synchronization, enforce defensive boundary checks, and validate inputs for ${title}.`,
+            `Execute asynchronous state mutations directly on UI threads without synchronization locks.`,
+            `Rely solely on broad try-catch blocks while swallowing underlying component exceptions.`,
+            `Share unpersisted mutable buffers across concurrent thread pools without locks.`,
+          ],
+        },
+        {
+          promptFn: (title) => `[Intermediate] When ${title} interacts with asynchronous lifecycles or background threads, which protocol guarantees state consistency?`,
+          optionsFn: (title) => [
+            `Enforce modular dependency injection, define clear interface contracts, and isolate asynchronous side effects for ${title}.`,
+            `Tightly couple components to concrete external implementations without abstraction.`,
+            `Bypass validation middleware when processing nested payload transformations.`,
+            `Ignore lifecycle teardown hooks when unmounting dependent services.`,
+          ],
+        },
+        {
+          promptFn: (title) => `[Intermediate] What is the recommended operational practice for isolating dependencies and modularizing ${title} in production code?`,
+          optionsFn: (title) => [
+            `Structure modular boundaries with dependency inversion and comprehensive integration testing for ${title}.`,
+            `Duplicate core logic across multiple classes without shared utility abstraction.`,
+            `Export private internal state variables for direct global manipulation.`,
+            `Remove test assertions once unit tests pass in local development.`,
+          ],
+        },
+      ],
+      3: [ // Level 3: Advanced
+        {
+          promptFn: (title) => `[Advanced] Under peak throughput or heavy memory pressure, an edge-case degradation occurs in ${title}. Which defensive mitigation isolates the bottleneck?`,
+          optionsFn: (title) => [
+            `Deploy bounded worker buffers with backpressure mitigation, idempotent caching, and explicit memory teardown for ${title}.`,
+            `Scale thread concurrency unboundedly without measuring heap allocation thresholds.`,
+            `Disable garbage collection hooks and retain persistent object references across component unmounts.`,
+            `Suppress diagnostic logging and drop failing packets without dead-letter audit records.`,
+          ],
+        },
+        {
+          promptFn: (title) => `[Advanced] When optimizing resource utilization and lifecycle disposal in ${title}, which architectural pattern prevents memory leaks?`,
+          optionsFn: (title) => [
+            `Implement non-blocking reactive pipelines with exponential backoff and circuit-breaking error boundaries for ${title}.`,
+            `Retry failed network calls in tight loops without delay or jitter.`,
+            `Buffer unbounded streaming payloads in memory during downstream service slowdowns.`,
+            `Delegate resource cleanup to user intervention after out-of-memory crashes occur.`,
+          ],
+        },
+      ],
+      4: [ // Level 4: Expert Challenge
+        {
+          promptFn: (title) => `[Expert Challenge] In a high-consequence failure scenario where ${title} encounters state corruption or out-of-order execution, what recovery protocol guarantees auditability and zero data loss?`,
+          optionsFn: (title) => [
+            `Enforce transactional rollback boundaries, write-ahead event journaling, and automated circuit-breaking failover for ${title}.`,
+            `Force uncoordinated process restarts without checkpointing in-flight state mutations.`,
+            `Bypass transactional integrity checks to artificially accelerate throughput during failover.`,
+            `Hardcode recovery parameters and truncate corrupted audit ledgers to restore service.`,
+          ],
+        },
+        {
+          promptFn: (title) => `[Expert Challenge] What architectural decoupling strategy should be enforced when refactoring ${title} for distributed scale, strict security boundaries, and zero-downtime resilience?`,
+          optionsFn: (title) => [
+            `Decouple domain logic via event-driven messaging, enforce cryptographic audit trails, and validate multi-region disaster recovery for ${title}.`,
+            `Consolidate all microservices into a single unmonitored monolithic process.`,
+            `Disable end-to-end telemetry and encryption to temporarily reduce network latency.`,
+            `Allow unauthenticated administrative overrides during live production incidents.`,
+          ],
+        },
+      ],
+    }
 
     for (let i = 0; i < count; i++) {
+      const diff = getQuestionDifficulty(i, count)
       const concept = concepts[i % concepts.length]
       const conceptTitle = concept?.title || `Concept ${i + 1}`
-      const conceptContext = concept?.context ? ` The source material explains: ${concept.context.slice(0, 180)}.` : ''
-      const questionPrompt = `${questionTemplates[i % questionTemplates.length](conceptTitle)}${conceptContext}`
+      const conceptContext = concept?.context ? ` Context: ${concept.context.slice(0, 160)}.` : ''
 
-      questions.push({
+      const tierSpecs = tieredNoteSpecs[diff.level] || tieredNoteSpecs[1]
+      const spec = tierSpecs[i % tierSpecs.length]
+
+      const questionPrompt = `${spec.promptFn(conceptTitle)}${conceptContext}`
+      const rawOptions = spec.optionsFn(conceptTitle)
+
+      questions.push(shuffleQuestionOptions({
         type: 'choice',
         skill: conceptTitle,
         label: `Notes Concept ${i + 1}`,
-        sourceBadge: `Notes • Concept ${i + 1}`,
-        prompt: questionPrompt,
-        options: optionTemplates[i % optionTemplates.length],
+        sourceBadge: `Notes • ${conceptTitle}`,
+        difficulty: diff.name,
+        difficultyLevel: diff.level,
+        difficultyLabel: diff.label,
+        difficultyBadgeClass: diff.badgeClass,
+        prompt: `Question ${i + 1}: ${questionPrompt}`,
+        options: rawOptions,
         correctIndex: 0,
-      })
+      }, i))
     }
     return validateAndCleanQuiz(questions, 'Notes Concept')
   }
 
   // Weekend company-wide challenge questions
   if (quizMode === 'weekend') {
-    const weekendScenarios = [
-      {
-        prompt: `[Weekend Sprint] In a high-stakes cross-functional initiative between ${profile.role} and product teams, a sudden bottleneck delays delivery by 48 hours. What is the optimal executive action?`,
-        options: [
-          'Run a rapid critical-path root cause triage, align stakeholders on trade-off triage, and communicate revised SLAs proactively',
-          'Conceal the delay and attempt unvetted shortcuts without testing',
-          'Reassign entire department responsibilities without notice',
-          'Halt all communications and wait until Monday morning',
-        ],
-        correct: 0,
-      },
-      {
-        prompt: `[Weekend Sprint] When optimizing company-wide operational efficiency in ${skills[0] || 'your role'}, which leading metric demonstrates sustainable value?`,
-        options: [
-          'High throughput accuracy with reduced rework cycles and documented SOP compliance',
-          'Maximum raw activity volume regardless of error and defect rates',
-          'Eliminating all peer reviews and compliance checkpoints',
-          'Relying solely on retrospective customer complaints',
-        ],
-        correct: 0,
-      },
-      {
-        prompt: `[Weekend Sprint] An unexpected system or data discrepancy is uncovered during the quarterly close. As a ${profile.role}, how should you isolate the discrepancy?`,
-        options: [
-          'Perform a structured reconciliation against primary audit logs and isolate variance boundaries',
-          'Overhaul unrelated ledger entries without isolating the discrepancy',
-          'Assume the system discrepancy is an acceptable rounding error without verifying',
-          'Delete historical records to force balance calculations',
-        ],
-        correct: 0,
-      },
-      {
-        prompt: `[Weekend Sprint] Under strict deadline pressure, two viable solutions exist for a ${skills[1] || 'core skill'} challenge. How should you evaluate them?`,
-        options: [
-          'Evaluate feasibility, maintenance overhead, scalability risk, and stakeholder ROI through an objective decision matrix',
-          'Pick the easiest option without assessing long-term technical debt',
-          'Delegate the choice randomly to avoid accountability',
-          'Attempt both solutions simultaneously without adequate resource allocation',
-        ],
-        correct: 0,
-      },
-    ]
+    const weekendTieredScenarios = {
+      1: [ // Foundational Sprint (Q1 - Q3)
+        {
+          prompt: `[Foundational Sprint] When establishing baseline operational standards in ${skills[0] || 'your role'}, which practice ensures sustainable delivery and verifiable quality?`,
+          options: [
+            'Maintain documented standard operating procedures (SOPs), enforce peer review checkpoints, and log execution metrics',
+            'Rely exclusively on informal tribal knowledge without documenting baseline workflows',
+            'Bypass compliance audits to artificially maximize immediate task output',
+            'Eliminate error-tracking logs to reduce operational reporting overhead',
+          ],
+        },
+        {
+          prompt: `[Foundational Sprint] When collaborating across cross-functional teams with product and engineering leads, what is the best protocol for SLA alignment?`,
+          options: [
+            'Establish shared transparent milestones, mutual dependency tracking, and proactive status cadence',
+            'Commit to conflicting timelines without validating team capacity or resource dependencies',
+            'Withhold delivery roadmaps until final deliverables are completed',
+            'Delegate cross-team communication entirely to junior coordinators without guidance',
+          ],
+        },
+        {
+          prompt: `[Foundational Sprint] When onboarding a new data asset or analytical model in ${skills[1] || 'your domain'}, which validation step is mandatory?`,
+          options: [
+            'Verify data provenance, run schema integrity assertions, and document source constraints',
+            'Ingest raw unstructured data directly into production systems without validation',
+            'Assume legacy schema compatibility without inspecting field mapping distributions',
+            'Disable input sanitization to accelerate pipeline processing throughput',
+          ],
+        },
+      ],
+      2: [ // Intermediate Triage (Q4 - Q6)
+        {
+          prompt: `[Intermediate Triage] In a critical initiative between ${profile.role || 'your department'} and key stakeholders, a dependency delay creates a 48-hour delivery blocker. What is the optimal executive action?`,
+          options: [
+            'Run critical-path root cause triage, align stakeholders on trade-off priorities, and communicate revised SLAs proactively',
+            'Conceal the delay and attempt unvetted shortcuts without testing',
+            'Reassign entire department responsibilities without notice or transition plan',
+            'Halt all communications and wait until the next weekly review meeting',
+          ],
+        },
+        {
+          prompt: `[Intermediate Triage] When measuring operational efficiency in ${skills[0] || 'your role'}, which leading metric demonstrates sustainable improvement?`,
+          options: [
+            'High throughput accuracy with reduced rework cycles, documented compliance, and defect containment',
+            'Maximum raw activity volume regardless of error and defect rates',
+            'Eliminating all peer reviews and compliance checkpoints to shorten cycle time',
+            'Relying solely on retrospective user complaints after public release',
+          ],
+        },
+        {
+          prompt: `[Intermediate Triage] An unexpected data variance is detected during monthly reporting in ${skills[1] || 'your area'}. How should you isolate the discrepancy?`,
+          options: [
+            'Perform structured reconciliation against primary audit logs and isolate variance boundaries',
+            'Overhaul unrelated ledger entries without isolating the root cause discrepancy',
+            'Assume the variance is an acceptable rounding error without verifying underlying records',
+            'Delete historical logs to force matching balance calculations',
+          ],
+        },
+      ],
+      3: [ // Advanced Strategic Risk (Q7 - Q8)
+        {
+          prompt: `[Advanced Strategic Risk] Under strict quarterly deadline pressure, two competing approaches exist for an enterprise ${skills[0] || 'core skill'} challenge. How should leadership evaluate them?`,
+          options: [
+            'Evaluate feasibility, maintenance overhead, scalability risk, and stakeholder ROI through an objective decision matrix',
+            'Pick the cheapest option without assessing long-term technical debt and security exposure',
+            'Delegate the choice randomly to avoid individual accountability',
+            'Attempt both implementations simultaneously without adequate resource allocation',
+          ],
+        },
+        {
+          prompt: `[Advanced Strategic Risk] A sudden 400% surge in processing load exposes high latency in ${skills[1] || 'your core services'}. Which mitigation protects system reliability?`,
+          options: [
+            'Implement dynamic rate-limiting, activate read-replicas, and prioritize mission-critical transactions via circuit-breakers',
+            'Disable defensive logging and telemetry to save server CPU cycles',
+            'Restart all database clusters concurrently during peak traffic hours',
+            'Drop all incoming queue messages without notifying users or logging dead-letters',
+          ],
+        },
+      ],
+      4: [ // Expert Crisis Leadership (Q9 - Q10)
+        {
+          prompt: `[Expert Crisis Leadership] During an enterprise production outage involving ${skills[0] || 'critical services'}, conflicting diagnostic telemetry is reported. How should incident command respond?`,
+          options: [
+            'Designate a single incident commander, establish isolated forensic triage lanes, and execute proven failback runbooks',
+            'Apply speculative hotfixes directly in production while multiple engineers execute uncoordinated changes',
+            'Silence external customer communications to prevent negative publicity during the outage',
+            'Blame upstream infrastructure providers publicly without verifying internal root cause telemetry',
+          ],
+        },
+        {
+          prompt: `[Expert Crisis Leadership] When presenting an architectural modernization roadmap to senior executive leadership for ${skills[0] || 'your department'}, which strategy secures governance approval?`,
+          options: [
+            'Quantify risk-adjusted ROI, model phased zero-downtime migration milestones, and establish clear rollback gates',
+            'Demand immediate complete system rewrite without transitional coexistence or legacy backward compatibility',
+            'Hide potential modernization risks and downplay budget contingency requirements',
+            'Focus exclusively on technical preferences while ignoring business objectives and regulatory compliance',
+          ],
+        },
+      ],
+    }
 
     const questions = []
     for (let i = 0; i < 10; i++) {
+      const diff = getQuestionDifficulty(i, 10)
+      const tierList = weekendTieredScenarios[diff.level] || weekendTieredScenarios[1]
+      const template = tierList[i % tierList.length]
       const curSkill = skills[i % skills.length]
-      const template = weekendScenarios[i % weekendScenarios.length]
-      questions.push({
+
+      questions.push(shuffleQuestionOptions({
         type: 'choice',
         skill: curSkill,
         label: `Weekend Challenge Q${i + 1}`,
-        prompt: template.prompt,
-        options: template.options,
+        difficulty: diff.name,
+        difficultyLevel: diff.level,
+        difficultyLabel: diff.label,
+        difficultyBadgeClass: diff.badgeClass,
+        prompt: `Scenario ${i + 1}: ${template.prompt}`,
+        options: [...template.options],
         correctIndex: 0,
-      })
+      }, i))
     }
     return questions
   }
@@ -1067,65 +2699,114 @@ function buildScenarioQuestions(profile, t, userSkills, quizMode = 'standard', n
   }
 
   const generatedQuestions = []
-  const questionCount = 15
-  const codingSkills = skills.filter(isCodingSkill)
-  const nonCodingSkills = skills.filter((skill) => !isCodingSkill(skill))
-  const codingQuestionIndexes = new Set([2, 5, 8, 11, 14])
+  const questionCount = skills.length * 10
+  const questionPlan = skills.flatMap((skill) => Array.from({ length: 10 }, () => skill))
+  for (let i = questionPlan.length - 1; i > 0; i--) {
+    const randomIndex = Math.floor(Math.random() * (i + 1))
+    ;[questionPlan[i], questionPlan[randomIndex]] = [questionPlan[randomIndex], questionPlan[i]]
+  }
+  const skillQuestionCounts = {}
 
   for (let i = 0; i < questionCount; i++) {
-    const isCodingQuestion = codingSkills.length > 0 && codingQuestionIndexes.has(i)
-    const currentSkill = isCodingQuestion
-      ? codingSkills[Math.floor(i / 3) % codingSkills.length]
-      : (nonCodingSkills.length > 0 ? nonCodingSkills[i % nonCodingSkills.length] : 'Problem solving')
+    const currentSkill = questionPlan[i]
+    const isCodingQuestion = isCodingSkill(currentSkill)
+    const skillQuestionIndex = skillQuestionCounts[currentSkill] || 0
+    skillQuestionCounts[currentSkill] = skillQuestionIndex + 1
 
     if (isCodingQuestion) {
       const lang = currentSkill
       const challenges = codingCodeChallenges[lang] || [additionalCodingChallenges[lang]]
-      const challenge = challenges[i % challenges.length]
+      const challenge = challenges[skillQuestionIndex % challenges.length]
       generatedQuestions.push({
         type: 'code',
         skill: currentSkill,
         label: `${t.question} ${i + 1}`,
         experienceLevel: exp,
-        prompt: challenge.prompt,
+        prompt: `Challenge ${skillQuestionIndex + 1}: ${challenge.prompt} Include a production-ready edge-case check for scenario ${skillQuestionIndex + 1}.`,
         language: challenge.language || lang,
         starter: challenge.starter,
-        checks: challenge.checks,
+        checks: ensureCodeChecks(challenge.checks),
       })
     } else {
+      const diff = getQuestionDifficulty(skillQuestionIndex, 10)
       const bankItems = scenarioBank[currentSkill]
-      let item = bankItems ? bankItems[i % bankItems.length] : null
+      const itemIndex = bankItems ? skillQuestionIndex : -1
+      let item = bankItems && itemIndex < bankItems.length ? bankItems[itemIndex] : null
 
       if (!item) {
-        const promptTemplate = [
-          `In a high-stakes ${profile.role} scenario involving ${currentSkill}, what is the best practice to balance speed and accuracy?`,
-          `When standardizing a workflow around ${currentSkill} across a team with ${exp} experience, which step prevents execution errors?`,
-          `An edge-case risk is detected in your ${currentSkill} workflow. How should you validate your corrective action?`,
-          `Which key performance indicator (KPI) best demonstrates high-caliber mastery of ${currentSkill} in this role?`,
-          `A cross-functional conflict arises regarding the implementation of ${currentSkill}. What is the ideal collaborative approach?`,
-        ][i % 5]
+        const tieredPrompts = {
+          1: [ // Foundational
+            `[Foundational] What is the core baseline principle and syntax standard governing ${currentSkill}?`,
+            `[Foundational] When standardizing ${currentSkill} across a team with ${exp} experience, which step prevents baseline execution errors?`,
+            `[Foundational] Which baseline definition accurately captures the operational scope of ${currentSkill}?`,
+          ],
+          2: [ // Intermediate
+            `[Intermediate] How should a team validate a new ${currentSkill} workflow and integrate it into active production?`,
+            `[Intermediate] Which KPI and monitoring control best demonstrates reliable daily application of ${currentSkill}?`,
+            `[Intermediate] When cross-functional requirements conflict around ${currentSkill}, what is the ideal collaborative reconciliation process?`,
+          ],
+          3: [ // Advanced
+            `[Advanced] An edge-case risk or performance bottleneck is detected in ${currentSkill}. How should corrective action be isolated and validated?`,
+            `[Advanced] When a high-scale dependency in ${currentSkill} degrades, which defensive mitigation pattern preserves data integrity?`,
+          ],
+          4: [ // Expert Challenge
+            `[Expert Challenge] A critical system handover or high-stakes audit exposes vulnerability in ${currentSkill}. Which governance artifact and remediation protocol must lead the response?`,
+            `[Expert Challenge] When executive leadership demands a rapid trade-off under strict regulatory compliance in ${currentSkill}, how should the architectural decision be structured?`,
+          ],
+        }
+
+        const tieredOptions = {
+          1: [
+            `Establish structured validation checkpoints, verify documented evidence, and apply baseline ${currentSkill} principles`,
+            `Proceed without peer review or documentation to save immediate initialization time`,
+            `Rely strictly on intuition without verifying operational standards or metrics`,
+            `Delegate the entire responsibility without guidance, training, or quality standards`,
+          ],
+          2: [
+            `Create a versioned workflow, test representative edge-cases, and monitor real-time telemetry for ${currentSkill}`,
+            `Deploy modifications directly to production without staging validation because changes appear minor`,
+            `Remove ongoing monitoring alerts to artificially reduce operational workload`,
+            `Accept intermittent execution failures as normal operational noise without root cause investigation`,
+          ],
+          3: [
+            `Deploy bounded triage buffers with backpressure isolation, defensive assertions, and audit logging for ${currentSkill}`,
+            `Expand operational concurrency unboundedly without measuring capacity thresholds`,
+            `Suppress error telemetry to prevent alerts from escalating to senior management`,
+            `Ignore conflicting data signals and force processing completion without validation`,
+          ],
+          4: [
+            `Enforce transactional rollback boundaries, execute write-ahead event audit journaling, and align governance stakeholders on verified evidence for ${currentSkill}`,
+            `Force uncoordinated system restarts without checkpointing active state records`,
+            `Bypass compliance reviews to rush unvalidated fixes into mission-critical environments`,
+            `Truncate audit ledgers and delete conflicting records to force synthetic compliance`,
+          ],
+        }
+
+        const pList = tieredPrompts[diff.level] || tieredPrompts[1]
+        const promptTemplate = pList[skillQuestionIndex % pList.length]
+        const optList = tieredOptions[diff.level] || tieredOptions[1]
 
         item = {
           prompt: promptTemplate,
-          options: [
-            `Establish structured validation checkpoints and apply evidence-based ${currentSkill} principles`,
-            `Proceed without peer review or documentation to save immediate time`,
-            `Rely strictly on intuition without verifying operational metrics`,
-            `Delegate the entire responsibility without guidance or quality standards`,
-          ],
+          options: [...optList],
           correct: 0,
         }
       }
 
-      generatedQuestions.push({
+      const rawOptions = (item.options && item.options.length >= 4) ? [...item.options] : getDistinctChoiceOptions(currentSkill, skillQuestionIndex + 1)
+      generatedQuestions.push(shuffleQuestionOptions({
         type: 'choice',
         skill: currentSkill,
         label: `${t.question} ${i + 1}`,
+        difficulty: diff.name,
+        difficultyLevel: diff.level,
+        difficultyLabel: diff.label,
+        difficultyBadgeClass: diff.badgeClass,
         experienceLevel: exp,
-        prompt: item.prompt,
-        options: item.options,
+        prompt: `Question ${skillQuestionIndex + 1}: ${item.prompt}`,
+        options: rawOptions,
         correctIndex: item.correct ?? 0,
-      })
+      }, i))
     }
   }
 
@@ -1137,15 +2818,404 @@ function getSkillSpecificQuestions(profile, t, skillList) {
   return questions.filter((question) => skillList.includes(question.skill))
 }
 
-const initialCompanyLeaderboard = [
-  { id: 1, name: 'Ananya Patel', role: 'Staff Product Designer', score: 96, accuracy: '96%', rank: 1, badge: '🥇 Gold', avatar: 'AP' },
-  { id: 2, name: 'Vikram Joshi', role: 'Lead Data Scientist', score: 94, accuracy: '94%', rank: 2, badge: '🥈 Silver', avatar: 'VJ' },
-  { id: 3, name: 'Sneha Rao', role: 'Senior Software Engineer', score: 90, accuracy: '90%', rank: 3, badge: '🥉 Bronze', avatar: 'SR' },
-  { id: 4, name: 'Priya Sharma (You)', role: 'Software Engineer', score: 88, accuracy: '88%', rank: 4, badge: '⭐ Top 5%', avatar: 'PS', isUser: true },
-  { id: 5, name: 'Rahul Verma', role: 'DevOps Architect', score: 85, accuracy: '85%', rank: 5, badge: 'Top 10%', avatar: 'RV' },
-  { id: 6, name: 'Kavita Menon', role: 'Financial Controller', score: 82, accuracy: '82%', rank: 6, badge: 'Top 15%', avatar: 'KM' },
-  { id: 7, name: 'Arjun Das', role: 'Digital Marketing Lead', score: 79, accuracy: '79%', rank: 7, badge: 'Top 20%', avatar: 'AD' },
+const choiceOptionVariants = [
+  ['Establish a documented validation checkpoint, verify evidence, and record the decision', 'Skip review because the task appears routine', 'Use an unverified shortcut and remove the audit trail', 'Wait for an error before checking the work'],
+  ['Compare the source data with approved standards and investigate exceptions before publishing', 'Accept the first result without checking the source', 'Change the result until it matches an expected outcome', 'Publish immediately and document issues only if challenged'],
+  ['Define the risk owner, measurable control, review date, and escalation path', 'Treat the risk as irrelevant without a complaint', 'Transfer the risk without recording accountability', 'Remove the data so the risk cannot be measured'],
+  ['Use a reproducible method with clear assumptions, evidence, and independent review', 'Rely on memory instead of recording the method', 'Use a faster method with no quality check', 'Keep the calculation private so it cannot be questioned'],
+  ['Assess accuracy, bias, timeliness, and operational impact before deciding', 'Choose the cheapest option without measuring quality', 'Ask one person to decide without criteria', 'Ignore conflicting evidence and proceed'],
+  ['Create a versioned workflow, test representative cases, and monitor the result', 'Deploy the change without testing because it is small', 'Remove monitoring to reduce operational work', 'Accept failures as unavoidable'],
+  ['Communicate the finding with the source, limitation, confidence, and recommended action', 'Report only the positive result', 'Hide uncertainty to make the result simpler', 'Send raw data without interpretation'],
+  ['Reconcile against authoritative records, preserve the original values, and log corrections', 'Overwrite the original values without explanation', 'Delete conflicting records immediately', 'Average conflicting values without investigating'],
+  ['Apply the approved definition consistently and document any justified exception', 'Change the definition for each team', 'Use informal terminology without recording it', 'Ignore the definition when the deadline is close'],
+  ['Review stakeholder impact, privacy, quality, and compliance before release', 'Release first and ask for approval later', 'Share restricted data to speed up feedback', 'Avoid stakeholders to prevent disagreement'],
 ]
+
+function getDistinctChoiceOptions(skill, questionNumber) {
+  const options = choiceOptionVariants[(questionNumber - 1) % choiceOptionVariants.length]
+  return options.map((option, index) => index === 0
+    ? `${option} for ${skill}.`
+    : option)
+}
+
+function shuffleQuestionOptions(question, questionNumber = 0) {
+  if (!question || question.type === 'code' || !Array.isArray(question.options) || question.options.length <= 1) {
+    return question
+  }
+
+  const rawCorrect = typeof question.correctIndex === 'number'
+    ? question.correctIndex
+    : typeof question.correct === 'number'
+    ? question.correct
+    : 0
+
+  const safeCorrect = (rawCorrect >= 0 && rawCorrect < question.options.length) ? rawCorrect : 0
+  const items = question.options.map((opt, idx) => ({ text: opt, isCorrect: idx === safeCorrect }))
+
+  // Fisher-Yates shuffle
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[items[i], items[j]] = [items[j], items[i]]
+  }
+
+  let newCorrect = items.findIndex((it) => it.isCorrect)
+
+  // Avoid having Option A (index 0) be the correct answer on every question.
+  // Rotate / swap across non-zero slots (B = 1, C = 2, D = 3) if it landed on 0:
+  const nonZeroPositions = [1, 2, 3]
+  if (newCorrect === 0) {
+    const swapTarget = nonZeroPositions[questionNumber % nonZeroPositions.length]
+    if (swapTarget < items.length) {
+      ;[items[0], items[swapTarget]] = [items[swapTarget], items[0]]
+      newCorrect = swapTarget
+    }
+  }
+
+  return {
+    ...question,
+    options: items.map((it) => it.text),
+    correctIndex: newCorrect,
+    answerIndex: newCorrect,
+  }
+}
+
+function ensureQuestionOptionsAreDistinct(questions) {
+  const seen = new Set()
+  return questions.map((question, index) => {
+    if (question.type === 'code' || !Array.isArray(question.options)) return question
+    const signature = question.options.map((option) => String(option).trim().toLowerCase()).join('|')
+    if (!seen.has(signature)) {
+      seen.add(signature)
+      return question
+    }
+    const suffix = ` Scenario ${index + 1}`
+    const options = question.options.map((option) => `${option}${suffix}`)
+    seen.add(options.map((option) => option.toLowerCase()).join('|'))
+    return { ...question, options }
+  })
+}
+
+function ensureQuestionPromptsAreDistinct(questions) {
+  const seen = new Set()
+  return questions.map((question, index) => {
+    const basePrompt = String(question.prompt || '').trim().replace(/\s+/g, ' ')
+    const promptKey = basePrompt.toLowerCase()
+    if (!seen.has(promptKey)) {
+      seen.add(promptKey)
+      return question
+    }
+    const prompt = `${basePrompt} Consider scenario ${index + 1} with a different dataset, constraint, or stakeholder outcome.`
+    seen.add(prompt.toLowerCase())
+    return { ...question, prompt }
+  })
+}
+
+function createAdaptiveQuestion(profile, t, skill, questionNumber, targetLevel = 3) {
+  const diff = targetLevel === 4
+    ? { level: 4, name: 'Expert', label: 'Level 4: Expert Challenge', badgeClass: 'diff-expert' }
+    : targetLevel === 3
+    ? { level: 3, name: 'Advanced', label: 'Level 3: Advanced', badgeClass: 'diff-advanced' }
+    : targetLevel === 2
+    ? { level: 2, name: 'Intermediate', label: 'Level 2: Intermediate', badgeClass: 'diff-intermediate' }
+    : { level: 1, name: 'Foundational', label: 'Level 1: Foundational', badgeClass: 'diff-foundational' }
+
+  const templates = {
+    4: [
+      `[Expert Challenge] In a mission-critical failure scenario involving ${skill}, which recovery protocol guarantees zero data loss and compliance?`,
+      `[Expert Challenge] When re-architecting ${skill} for multi-region enterprise scale, which architectural decoupling pattern must be enforced?`,
+    ],
+    3: [
+      `[Advanced] A high-concurrency race condition or memory degradation is detected in ${skill}. Which defensive mitigation isolates the bottleneck?`,
+      `[Advanced] When throughput spikes by 300% in ${skill}, which mitigation isolates resource bottlenecks and maintains SLA reliability?`,
+    ],
+    2: [
+      `[Intermediate] How should a team validate a new ${skill} workflow and handle parameter boundaries before deploying it to production?`,
+      `[Intermediate] Which KPI and monitoring control best demonstrates reliable daily application of ${skill}?`,
+    ],
+    1: [
+      `[Foundational] What is the core baseline principle and syntax standard governing effective execution of ${skill}?`,
+      `[Foundational] When establishing an initial baseline workflow in ${skill}, which prerequisite check is mandatory?`,
+    ],
+  }
+
+  const optionsByLevel = {
+    4: [
+      `Enforce transactional rollback boundaries, write-ahead event journaling, and automated circuit-breaking failover for ${skill}.`,
+      `Force uncoordinated process restarts without checkpointing in-flight state mutations.`,
+      `Bypass transactional integrity checks to artificially accelerate throughput during failover.`,
+      `Hardcode recovery parameters and truncate corrupted audit ledgers to restore service.`,
+    ],
+    3: [
+      `Deploy bounded worker buffers with backpressure mitigation, idempotent caching, and explicit memory teardown for ${skill}.`,
+      `Scale thread concurrency unboundedly without measuring heap allocation thresholds.`,
+      `Disable garbage collection hooks and retain persistent object references across component unmounts.`,
+      `Suppress diagnostic logging and drop failing packets without dead-letter audit records.`,
+    ],
+    2: [
+      `Implement thread-safe state synchronization, enforce defensive boundary checks, and validate inputs for ${skill}.`,
+      `Execute asynchronous state mutations directly on UI threads without synchronization locks.`,
+      `Rely solely on broad try-catch blocks while swallowing underlying component exceptions.`,
+      `Share unpersisted mutable buffers across concurrent thread pools without locks.`,
+    ],
+    1: [
+      `Establish standard initialization, adhere to baseline conventions, and verify data contracts for ${skill}.`,
+      `Proceed with unverified parameter bindings and bypass baseline type checking.`,
+      `Assume default runtime state without inspecting environment prerequisites.`,
+      `Instantiate global mutable variables without encapsulation or lifecycle management.`,
+    ],
+  }
+
+  const tList = templates[diff.level] || templates[3]
+  const prompt = `${t.question} ${questionNumber}: ${tList[(questionNumber - 1) % tList.length]}`
+  const rawOptions = optionsByLevel[diff.level] || optionsByLevel[3]
+
+  return shuffleQuestionOptions({
+    type: 'choice',
+    skill,
+    label: `${t.question} ${questionNumber}`,
+    difficulty: diff.name,
+    difficultyLevel: diff.level,
+    difficultyLabel: diff.label,
+    difficultyBadgeClass: diff.badgeClass,
+    experienceLevel: profile.experience || '1–2 years',
+    prompt,
+    options: rawOptions,
+    correctIndex: 0,
+  }, questionNumber)
+}
+
+function isSkillRelatedToRole(skill, role, designation) {
+  const normalizedSkill = skill.trim().toLowerCase()
+  if (!normalizedSkill) return false
+
+  const catalogSkills = getRoleSkillCategories(role, designation)
+    .flatMap(([, skills]) => skills)
+    .map((item) => item.toLowerCase())
+  if (catalogSkills.includes(normalizedSkill)) return true
+
+  const target = `${role || ''} ${designation || ''}`.toLowerCase()
+  const matchingDomain = roleSkillDomains.find((domain) =>
+    domain.matches.some((keyword) => target.includes(keyword))
+  )
+  return Boolean(matchingDomain?.skills.some((item) => item.toLowerCase() === normalizedSkill))
+}
+
+function getCourseCurriculum(course) {
+  const courseId = course?.id || 'crs-default'
+  const title = course?.title || course?.name || 'Domain Competency'
+  const competency = course?.competency || 'Official Statistics'
+
+  return [
+    {
+      index: 1,
+      title: 'Core Principles & Departmental Guidelines',
+      desc: `Foundational statutory principles, institutional mandates, and administrative frameworks for ${title}.`,
+      topics: [
+        {
+          id: `${courseId}-m1-t1`,
+          index: 1,
+          title: 'Institutional Mandates, Legal Acts & System Architecture',
+          duration: '10 min',
+          format: 'Video',
+          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          description: `Comprehensive orientation on statutory rules, legislative frameworks, and institutional hierarchy governing ${competency} in public administration.`,
+        },
+        {
+          id: `${courseId}-m1-t2`,
+          index: 2,
+          title: 'National Standards, Classifications & Taxonomy Systems',
+          duration: '12 min',
+          format: 'Video',
+          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          description: `Detailed exploration of standardized nomenclature, metadata protocols, and harmonized categorization codes applied across official statistical registries.`,
+        },
+        {
+          id: `${courseId}-m1-t3`,
+          index: 3,
+          title: 'Administrative Sourcing & Inter-Agency Coordination Protocols',
+          duration: '8 min',
+          format: 'Video',
+          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          description: `Procedures for secure inter-departmental data exchanges, memoranda of understanding, and cross-cadre synchronization standards.`,
+        },
+        {
+          id: `${courseId}-m1-t4`,
+          index: 4,
+          title: 'Data Governance Norms, Anonymization & Confidentiality',
+          duration: '11 min',
+          format: 'Video',
+          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          description: `Statutory guidelines under DPDP Act and official statistics frameworks for respondent privacy, cryptographic masking, and disclosure risk control.`,
+        },
+        {
+          id: `${courseId}-m1-t5`,
+          index: 5,
+          title: 'Foundational Review & Operational Concept Check',
+          duration: '10 min',
+          format: 'Video',
+          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          description: `Formative evaluation covering governance mandates, procedural milestones, and institutional risk mitigation strategies.`,
+        },
+      ],
+    },
+    {
+      index: 2,
+      title: 'Applied Workflows & Empirical Data Pipelines',
+      desc: `Implementation methodologies, automated data transformations, and domain-specific pipelines.`,
+      topics: [
+        {
+          id: `${courseId}-m2-t1`,
+          index: 1,
+          title: 'Data Ingestion Architecture & Initial Register Validation',
+          duration: '12 min',
+          format: 'Video',
+          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          description: `Setup of automated ingestion scripts, schema validation checks, and integrity verification on raw administrative feeds.`,
+        },
+        {
+          id: `${courseId}-m2-t2`,
+          index: 2,
+          title: 'Standardized Cleaning Protocols & Algorithmic Filters',
+          duration: '14 min',
+          format: 'Video',
+          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          description: `Practical application of rule-based outlier detectors, duplicate suppression routines, and format normalization rules.`,
+        },
+        {
+          id: `${courseId}-m2-t3`,
+          index: 3,
+          title: 'Computational Transformations & Aggregation Standards',
+          duration: '15 min',
+          format: 'Video',
+          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          description: `Advanced derivation of composite indices, weighted domain aggregates, and time-series normalization techniques.`,
+        },
+        {
+          id: `${courseId}-m2-t4`,
+          index: 4,
+          title: 'Analytical Modeling & Domain-Specific Estimation Models',
+          duration: '13 min',
+          format: 'Video',
+          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          description: `Execution of econometric, spatial, or sampling estimation models directly tied to ${competency} workflows.`,
+        },
+        {
+          id: `${courseId}-m2-t5`,
+          index: 5,
+          title: 'Automated Output Generation & Pipeline Reproducibility',
+          duration: '10 min',
+          format: 'Video',
+          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          description: `Compilation of reproducible execution logs, output data cubes, and version-controlled analytical artifacts.`,
+        },
+      ],
+    },
+    {
+      index: 3,
+      title: 'Quality Verification & Error Imputation Standards',
+      desc: `Field-tested quality frameworks, statistical reconciliation, and compliance checklists.`,
+      topics: [
+        {
+          id: `${courseId}-m3-t1`,
+          index: 1,
+          title: 'National Quality Assurance Framework (NQAF) Standards',
+          duration: '11 min',
+          format: 'Video',
+          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          description: `Benchmarking procedures against national and international quality dimensions including accuracy, timeliness, and coherence.`,
+        },
+        {
+          id: `${courseId}-m3-t2`,
+          index: 2,
+          title: 'Statistical Error Detection, Imputation & Cold-Deck Methods',
+          duration: '14 min',
+          format: 'Video',
+          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          description: `Scientific methodologies for identifying non-sampling errors, hot/cold deck imputations, and variance adjustments.`,
+        },
+        {
+          id: `${courseId}-m3-t3`,
+          index: 3,
+          title: 'Audit Trails, Metadata Tracking & Provenance Records',
+          duration: '9 min',
+          format: 'Video',
+          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          description: `Establishment of immutable audit logs, transformation histories, and standardized metadata registers for public accountability.`,
+        },
+        {
+          id: `${courseId}-m3-t4`,
+          index: 4,
+          title: 'Cross-Departmental Discrepancy Reconciliation Checks',
+          duration: '12 min',
+          format: 'Video',
+          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          description: `Practical resolution workflows when reconciling central, state, and subordinate agency statistical variances.`,
+        },
+        {
+          id: `${courseId}-m3-t5`,
+          index: 5,
+          title: 'Quality Assurance Sign-Off & Verification Checklists',
+          duration: '10 min',
+          format: 'Video',
+          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          description: `Official sign-off protocols, pre-publication validation matrices, and senior officer clearance checklists.`,
+        },
+      ],
+    },
+    {
+      index: 4,
+      title: 'Competency Benchmark & Assessment Preparation',
+      desc: `Hands-on scenario evaluations, applied case studies, and certification readiness.`,
+      topics: [
+        {
+          id: `${courseId}-m4-t1`,
+          index: 1,
+          title: 'Applied Public Sector Case Study: Real-World Scenario',
+          duration: '15 min',
+          format: 'Video',
+          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          description: `Deep-dive case study replicating a major ministry dataset challenge with real-world complexities and operational constraints.`,
+        },
+        {
+          id: `${courseId}-m4-t2`,
+          index: 2,
+          title: 'Diagnostic Problem Solving & Edge Case Remediation',
+          duration: '12 min',
+          format: 'Video',
+          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          description: `Walkthrough of unexpected survey anomalies, system outages, and sudden policy indicator recalibrations.`,
+        },
+        {
+          id: `${courseId}-m4-t3`,
+          index: 3,
+          title: 'Policy Brief Synthesis & Executive Presentation Standards',
+          duration: '14 min',
+          format: 'Video',
+          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          description: `Translating complex technical indicators into high-impact executive summaries, dashboards, and decision memos for leadership.`,
+        },
+        {
+          id: `${courseId}-m4-t4`,
+          index: 4,
+          title: 'Pre-Assessment Practical Walkthrough & Sample Questions',
+          duration: '10 min',
+          format: 'Video',
+          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          description: `Detailed examination of benchmark assessment rubrics, scoring criteria, and simulated exam questions.`,
+        },
+        {
+          id: `${courseId}-m4-t5`,
+          index: 5,
+          title: 'Capstone Evaluation & Final Competency Certification',
+          duration: '15 min',
+          format: 'Video',
+          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          description: `Final synthesis capstone qualifying you for verified certification and official promotion screening eligibility.`,
+        },
+      ],
+    },
+  ]
+}
 
 function App() {
   const [language, setLanguage] = useState('en')
@@ -1155,19 +3225,38 @@ function App() {
   const [dashboardView, setDashboardView] = useState('dashboard')
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [ssoLoading, setSsoLoading] = useState(false)
+  const [isSsoRegistrationOpen, setIsSsoRegistrationOpen] = useState(false)
+  const [signupError, setSignupError] = useState('')
+  const [unverifiedEmail, setUnverifiedEmail] = useState('')
+  const [verifyEmail, setVerifyEmail] = useState('')
+  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', ''])
+  const [verificationError, setVerificationError] = useState('')
+  const [verificationSuccess, setVerificationSuccess] = useState('')
+  const [isVerifying, setIsVerifying] = useState(false)
+  const [resendCooldown, setResendCooldown] = useState(0)
+  const [devVerificationCode, setDevVerificationCode] = useState('')
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => Math.max(0, prev - 1))
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [resendCooldown])
   const [roleSearch, setRoleSearch] = useState('')
   const [departmentSearch, setDepartmentSearch] = useState('')
   const [isDepartmentMenuOpen, setIsDepartmentMenuOpen] = useState(false)
   const [profile, setProfile] = useState({
-    name: '', employeeId: '', department: '',
+    name: '', email: '', employeeId: '', department: '',
     organization: '', designation: '',
-    assignment: '', location: '', role: '', skills: '', experience: '',
+    assignment: '', currentAssignment: '', educationalQualifications: '', role: '', skills: '', experience: '',
     previousIGOT: '', previousNSSTA: '', externalTraining: '', certifications: '',
   })
   const [profileDraft, setProfileDraft] = useState({})
   const [isProfileEditing, setIsProfileEditing] = useState(false)
   const [customRole, setCustomRole] = useState('')
   const [customSkill, setCustomSkill] = useState('')
+  const [skillError, setSkillError] = useState('')
   const [selectedSkillList, setSelectedSkillList] = useState([])
   const [answer, setAnswer] = useState('')
   const [codeAnswer, setCodeAnswer] = useState('')
@@ -1178,6 +3267,9 @@ function App() {
   const [skillGapData, setSkillGapData] = useState({})
   const [quizzesCompleted, setQuizzesCompleted] = useState(0)
   const [overallScore, setOverallScore] = useState(0)
+  const [ssoDetails, setSsoDetails] = useState({
+    name: '', email: '', mobile: '', designation: '', department: '', officialIdProof: '', nodalApproval: false,
+  })
 
   // Official Skill Gaps & Combined Recommendation Engine State
   const [competencyGaps, setCompetencyGaps] = useState(initialCompetencyGaps)
@@ -1188,11 +3280,21 @@ function App() {
   const [currentQuizSkill, setCurrentQuizSkill] = useState('')
   const [gapFilter, setGapFilter] = useState('All')
 
-  // Weekend Challenge & Leaderboard State
-  const [weekendCompleted, setWeekendCompleted] = useState(false)
-  const [weekendScore, setWeekendScore] = useState(88)
-  const [userRank, setUserRank] = useState(4)
-  const [leaderboard, setLeaderboard] = useState(initialCompanyLeaderboard)
+  // Weekend Challenge & Leaderboard State (Clean Live State)
+  const [weekendCompleted, setWeekendCompleted] = useState(() => localStorage.getItem('skillstat_weekend_completed') === 'true')
+  const [weekendScore, setWeekendScore] = useState(() => Number(localStorage.getItem('skillstat_weekend_score')) || 0)
+  const [userRank, setUserRank] = useState(() => {
+    const saved = localStorage.getItem('skillstat_user_rank')
+    return saved ? Number(saved) : null
+  })
+  const [leaderboard, setLeaderboard] = useState(() => {
+    try {
+      const saved = localStorage.getItem('skillstat_leaderboard')
+      return saved ? JSON.parse(saved) : []
+    } catch {
+      return []
+    }
+  })
 
   // Notes & PDF Upload State (Robust Document Extraction)
   const [notesFileName, setNotesFileName] = useState('')
@@ -1202,17 +3304,229 @@ function App() {
   const [docExtractionSuccess, setDocExtractionSuccess] = useState('')
   const [docExtractedConcepts, setDocExtractedConcepts] = useState([])
   const [activeCourseModal, setActiveCourseModal] = useState(null)
+  const [activeLessonView, setActiveLessonView] = useState(null)
+  const [completedTopics, setCompletedTopics] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('skillstat_completed_topics') || '{}')
+    } catch {
+      return {}
+    }
+  })
+  const [expandedModule, setExpandedModule] = useState(0)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+
+  // Save completed topics to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('skillstat_completed_topics', JSON.stringify(completedTopics))
+    } catch {
+      // ignore
+    }
+  }, [completedTopics])
+
+  // Lock body scroll when course modal or video lesson view is open
+  useEffect(() => {
+    if (activeCourseModal || activeLessonView) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [activeCourseModal, activeLessonView])
+
+  const handleMarkCompleteAndContinue = () => {
+    if (!activeLessonView?.topic) return
+    const currentKey = activeLessonView.topic.id
+    setCompletedTopics((prev) => ({ ...prev, [currentKey]: true }))
+
+    const curriculum = getCourseCurriculum(activeLessonView.course)
+    const mIdx = activeLessonView.moduleIndex
+    const tIdx = activeLessonView.topicIndex
+
+    if (tIdx < 4) {
+      setActiveLessonView({
+        ...activeLessonView,
+        topicIndex: tIdx + 1,
+        topic: curriculum[mIdx].topics[tIdx + 1],
+      })
+    } else if (mIdx < 3) {
+      setActiveLessonView({
+        ...activeLessonView,
+        moduleIndex: mIdx + 1,
+        topicIndex: 0,
+        topic: curriculum[mIdx + 1].topics[0],
+      })
+      setExpandedModule(mIdx + 1)
+    } else {
+      setActiveLessonView(null)
+    }
+  }
+
+  const handlePreviousTopic = () => {
+    if (!activeLessonView?.topic) return
+    const curriculum = getCourseCurriculum(activeLessonView.course)
+    const mIdx = activeLessonView.moduleIndex
+    const tIdx = activeLessonView.topicIndex
+
+    if (tIdx > 0) {
+      setActiveLessonView({
+        ...activeLessonView,
+        topicIndex: tIdx - 1,
+        topic: curriculum[mIdx].topics[tIdx - 1],
+      })
+    } else if (mIdx > 0) {
+      setActiveLessonView({
+        ...activeLessonView,
+        moduleIndex: mIdx - 1,
+        topicIndex: 4,
+        topic: curriculum[mIdx - 1].topics[4],
+      })
+      setExpandedModule(mIdx - 1)
+    }
+  }
+
+  const handleSkipForNow = () => {
+    if (!activeLessonView?.topic) return
+    const curriculum = getCourseCurriculum(activeLessonView.course)
+    const mIdx = activeLessonView.moduleIndex
+    const tIdx = activeLessonView.topicIndex
+
+    if (tIdx < 4) {
+      setActiveLessonView({
+        ...activeLessonView,
+        topicIndex: tIdx + 1,
+        topic: curriculum[mIdx].topics[tIdx + 1],
+      })
+    } else if (mIdx < 3) {
+      setActiveLessonView({
+        ...activeLessonView,
+        moduleIndex: mIdx + 1,
+        topicIndex: 0,
+        topic: curriculum[mIdx + 1].topics[0],
+      })
+      setExpandedModule(mIdx + 1)
+    } else {
+      setActiveLessonView(null)
+    }
+  }
+
+  const handleUndoCompletion = () => {
+    if (!activeLessonView?.topic) return
+    const currentKey = activeLessonView.topic.id
+    setCompletedTopics((prev) => {
+      const updated = { ...prev }
+      delete updated[currentKey]
+      return updated
+    })
+  }
+
+  const [authModal, setAuthModal] = useState(null) // null | 'login' | 'signup' | 'sso'
+  const [minLandingElapsed, setMinLandingElapsed] = useState(false)
+  const minLandingElapsedRef = useRef(false)
+  const pendingDashboardRef = useRef(false)
+  const [sessionToken, setSessionToken] = useState(() => localStorage.getItem('skillstat_session') || '')
+  const [isStateLoaded, setIsStateLoaded] = useState(false)
+  const [chatHistory, setChatHistory] = useState([])
+  const onboardingSessionRef = useRef(localStorage.getItem('skillstat_onboarding') === '1')
 
   const t = text[language] || extendedText[language] || text.en
   const tx = (key) => uiText[language]?.[key] || uiText.en[key] || key
+
+  useEffect(() => {
+    if (!sessionToken) {
+      return
+    }
+    apiRequest('/api/state')
+      .then(({ state }) => {
+        if (state.profile) {
+          const migratedProfile = state.profile.department === "India's Official Statistical System"
+            ? { ...state.profile, department: 'National Statistical Office (NSO)' }
+            : state.profile
+          setProfile((current) => ({ ...current, ...migratedProfile }))
+        }
+        if (Array.isArray(state.selectedSkillList)) {
+          const hydratedProfile = state.profile || {}
+          const allowedSkills = new Set(getRoleSkillCategories(hydratedProfile.role, hydratedProfile.designation).flatMap(([, skills]) => skills))
+          setSelectedSkillList(state.selectedSkillList.filter((skill) => allowedSkills.has(skill)))
+        }
+        if (state.skillGapData) setSkillGapData(state.skillGapData)
+        if (Array.isArray(state.competencyGaps)) setCompetencyGaps(state.competencyGaps)
+        if (state.recommendationData) setRecommendationData(state.recommendationData)
+        if (state.recommendationsBySkill) setRecommendationsBySkill(state.recommendationsBySkill)
+        if (Number.isFinite(state.quizzesCompleted)) setQuizzesCompleted(state.quizzesCompleted)
+        if (Number.isFinite(state.overallScore)) setOverallScore(state.overallScore)
+        if (Array.isArray(state.questionResults)) setQuestionResults(state.questionResults)
+        if (Array.isArray(state.questions)) setQuestions(restoreQuestions(state.questions))
+        if (Array.isArray(state.chatHistory)) setChatHistory(state.chatHistory)
+        if (!onboardingSessionRef.current) {
+          if (minLandingElapsedRef.current) {
+            setStep('dashboard')
+          } else {
+            pendingDashboardRef.current = true
+          }
+        }
+      })
+      .catch(() => {
+        localStorage.removeItem('skillstat_session')
+        setSessionToken('')
+      })
+      .finally(() => setIsStateLoaded(true))
+  }, [sessionToken])
+
+  useEffect(() => {
+    if (!sessionToken || !isStateLoaded) return
+    const state = {
+      profile,
+      selectedSkillList,
+      skillGapData,
+      competencyGaps,
+      recommendationData,
+      recommendationsBySkill,
+      quizzesCompleted,
+      overallScore,
+      questionResults,
+      questions: serializeQuestions(questions),
+      chatHistory,
+    }
+    const saveTimer = setTimeout(() => {
+      apiRequest('/api/state', { method: 'POST', body: JSON.stringify(state) }).catch(() => {})
+    }, 350)
+    return () => clearTimeout(saveTimer)
+  }, [sessionToken, isStateLoaded, profile, selectedSkillList, skillGapData, competencyGaps, recommendationData, recommendationsBySkill, quizzesCompleted, overallScore, questionResults, questions, chatHistory])
 
   const updateProfile = (key, value) => {
     setProfile((prev) => ({ ...prev, [key]: value }))
   }
 
+  const clearSession = () => {
+    onboardingSessionRef.current = false
+    localStorage.removeItem('skillstat_onboarding')
+    apiRequest('/api/auth/logout', { method: 'POST' }).catch(() => {})
+    localStorage.removeItem('skillstat_session')
+    setSessionToken('')
+    setIsStateLoaded(false)
+    setProfile({
+      name: '', email: '', employeeId: '', department: '', organization: '', designation: '',
+      assignment: '', currentAssignment: '', educationalQualifications: '', role: '', skills: '', experience: '', previousIGOT: '',
+      previousNSSTA: '', externalTraining: '', certifications: '',
+    })
+    setSelectedSkillList([])
+    setQuizzesCompleted(0)
+    setOverallScore(0)
+    setQuestionResults([])
+    setQuestions([])
+    setIsProfileMenuOpen(false)
+    setStep('login')
+  }
+
   const selectDepartment = (departmentName) => {
     updateProfile('department', departmentName)
     updateProfile('designation', '')
+    updateProfile('role', '')
+    updateProfile('skills', '')
+    setSelectedSkillList([])
     setDepartmentSearch(departmentName)
     setIsDepartmentMenuOpen(false)
   }
@@ -1220,8 +3534,6 @@ function App() {
   const toggleSkill = (skill) => {
     const clean = skill.trim()
     if (!clean) return
-    const codingCount = selectedSkillList.filter(isCodingSkill).length
-    if (!selectedSkillList.includes(clean) && isCodingSkill(clean) && codingCount >= 4) return
     let updated
     if (selectedSkillList.includes(clean)) {
       updated = selectedSkillList.filter((s) => s !== clean)
@@ -1235,11 +3547,15 @@ function App() {
   const addCustomSkill = () => {
     const clean = customSkill.trim()
     if (!clean || selectedSkillList.includes(clean)) return
-    if (isCodingSkill(clean) && selectedSkillList.filter(isCodingSkill).length >= 4) return
+    if (!isSkillRelatedToRole(clean, profile.role, profile.designation)) {
+      setSkillError(`Your skill "${clean}" is not related to your selected role or designation.`)
+      return
+    }
     const updated = [...selectedSkillList, clean]
     setSelectedSkillList(updated)
     updateProfile('skills', updated.join(', '))
     setCustomSkill('')
+    setSkillError('')
   }
 
   const skillCategories = getRoleSkillCategories(profile.role, profile.designation)
@@ -1285,11 +3601,27 @@ function App() {
     return () => document.body.classList.remove('theme-dark')
   }, [isDarkMode])
 
+  // Enforce Minimum 5 Seconds Landing Page Time
   useEffect(() => {
-    if (step !== 'loading') return
-    const timer = setTimeout(() => setStep('login'), 1200)
+    const timer = setTimeout(() => {
+      minLandingElapsedRef.current = true
+      setMinLandingElapsed(true)
+    }, 5000)
     return () => clearTimeout(timer)
-  }, [step])
+  }, [])
+
+  useEffect(() => {
+    if (!minLandingElapsed) return
+    if (pendingDashboardRef.current) {
+      setStep('dashboard')
+    } else if (step === 'loading') {
+      if (sessionToken && !onboardingSessionRef.current) {
+        setStep('dashboard')
+      } else {
+        setStep('login')
+      }
+    }
+  }, [minLandingElapsed, sessionToken, step])
 
   // Handle PDF / Notes File Upload with Validation and Unicode Cleaning
   const handleFileUpload = async (e) => {
@@ -1326,17 +3658,21 @@ function App() {
   const startQuiz = (quizMode = 'standard', specificSkill = '') => {
     setActiveQuizType(quizMode)
     setCurrentQuizSkill(specificSkill)
+    if (!specificSkill && selectedSkillList.length === 0) {
+      setStep('skills')
+      return
+    }
     const skillList = specificSkill
       ? [specificSkill]
-      : selectedSkillList.length
-      ? selectedSkillList
-      : ['Problem solving', 'Communication']
+      : selectedSkillList
     const hasCoding = skillList.some((s) => codingLanguages.includes(s))
-    const chosenLang = hasCoding ? skillList.find(isCodingSkill) : ''
+    const chosenLang = hasCoding ? skillList.filter(isCodingSkill).join(', ') : ''
 
     if (quizMode === 'standard' && !specificSkill) {
-      const codingCount = skillList.filter(isCodingSkill).length
-      if (codingCount > 0 && (codingCount < 2 || codingCount > 4)) return
+      if (skillList.length === 0) {
+        setStep('skills')
+        return
+      }
     }
 
     if (quizMode === 'notes') {
@@ -1395,14 +3731,31 @@ function App() {
     })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error('AI fallback'))))
       .then((data) => {
-          if (Array.isArray(data.questions) && data.questions.length >= 5) {
+          const expectedQuestionCount = skillList.length * 10
+          if (Array.isArray(data.questions) && data.questions.length >= expectedQuestionCount) {
           const validated = validateAndCleanQuiz(data.questions, skillList[0])
+          const normalizedQuestions = validated.map((question) => (
+            question.type === 'code'
+              ? { ...question, checks: ensureCodeChecks(question.checks) }
+              : question
+          ))
+          const distinctQuestions = ensureQuestionPromptsAreDistinct(ensureQuestionOptionsAreDistinct(normalizedQuestions))
           const selectedSkillNames = new Set(skillList.map((skill) => skill.toLowerCase()))
-          const selectedQuestions = validated.filter((question) => selectedSkillNames.has(String(question.skill || '').toLowerCase()))
-          const coversEverySkill = skillList.every((skill) => selectedQuestions.some((question) => String(question.skill || '').toLowerCase() === skill.toLowerCase()))
-          const requiredCodingQuestions = hasCoding ? selectedQuestions.filter((question) => question.type === 'code').length >= 5 : true
-          if (selectedQuestions.length >= 5 && coversEverySkill && requiredCodingQuestions) {
-            setQuestions(selectedQuestions)
+          const selectedQuestions = distinctQuestions.filter((question) => selectedSkillNames.has(String(question.skill || '').toLowerCase()))
+          const questionCountBySkill = Object.fromEntries(skillList.map((skill) => [skill.toLowerCase(), 0]))
+          selectedQuestions.forEach((question) => {
+            const key = String(question.skill || '').toLowerCase()
+            if (key in questionCountBySkill) questionCountBySkill[key] += 1
+          })
+          const hasTenPerSkill = skillList.every((skill) => questionCountBySkill[skill.toLowerCase()] >= 10)
+          const requiredCodingQuestions = hasCoding ? selectedQuestions.filter((question) => question.type === 'code').length >= skillList.filter(isCodingSkill).length * 10 : true
+          if (hasTenPerSkill && requiredCodingQuestions) {
+            const mixedQuestions = selectedQuestions.slice(0, expectedQuestionCount)
+            for (let i = mixedQuestions.length - 1; i > 0; i--) {
+              const randomIndex = Math.floor(Math.random() * (i + 1))
+              ;[mixedQuestions[i], mixedQuestions[randomIndex]] = [mixedQuestions[randomIndex], mixedQuestions[i]]
+            }
+            setQuestions(mixedQuestions.map((q, idx) => shuffleQuestionOptions(q, idx)))
             return
           }
         }
@@ -1430,7 +3783,12 @@ function App() {
       const codeVal = validateCode(codeAnswer, currentQ)
       isCorrect = codeVal.state === 'valid'
     } else {
-      isCorrect = parseInt(answer, 10) === (currentQ.correctIndex ?? 0)
+      const expectedCorrect = typeof currentQ.correctIndex === 'number'
+        ? currentQ.correctIndex
+        : typeof currentQ.answerIndex === 'number'
+        ? currentQ.answerIndex
+        : 0
+      isCorrect = parseInt(answer, 10) === expectedCorrect
     }
 
     const currentResult = {
@@ -1443,6 +3801,31 @@ function App() {
     const updatedResults = [...questionResults, currentResult]
     setQuestionResults(updatedResults)
 
+    // In-place Progressive Difficulty Adaptation:
+    // If user answers correctly and there are upcoming questions,
+    // escalate the difficulty of the next question in-place without increasing total questions!
+    if (isCorrect && questionIndex + 1 < questions.length) {
+      const nextQ = questions[questionIndex + 1]
+      if (nextQ && nextQ.type !== 'code') {
+        const currentDiffLevel = currentQ.difficultyLevel || 2
+        const targetLevel = Math.min(4, Math.max(currentDiffLevel + 1, 3))
+        if ((nextQ.difficultyLevel || 1) < targetLevel) {
+          const elevatedQ = createAdaptiveQuestion(
+            profile,
+            t,
+            nextQ.skill || currentQ.skill || 'Core Capability',
+            questionIndex + 2,
+            targetLevel
+          )
+          setQuestions((prevQuestions) => {
+            const copy = [...prevQuestions]
+            copy[questionIndex + 1] = elevatedQ
+            return copy
+          })
+        }
+      }
+    }
+
     if (questionIndex === questions.length - 1) {
       const totalCorrect = updatedResults.filter((r) => r.isCorrect).length
       const calculatedScore = Math.round((totalCorrect / updatedResults.length) * 100)
@@ -1451,31 +3834,29 @@ function App() {
         // Compute weekend rank on leaderboard
         setWeekendCompleted(true)
         setWeekendScore(calculatedScore)
+        localStorage.setItem('skillstat_weekend_completed', 'true')
+        localStorage.setItem('skillstat_weekend_score', String(calculatedScore))
 
-        let newRank = 1
-        if (calculatedScore < 80) newRank = 6
-        else if (calculatedScore < 88) newRank = 4
-        else if (calculatedScore < 95) newRank = 2
-        else newRank = 1
-
+        const newRank = 1
         setUserRank(newRank)
+        localStorage.setItem('skillstat_user_rank', String(newRank))
 
-        // Update leaderboard
-        const updatedBoard = initialCompanyLeaderboard.map((item) => {
-          if (item.isUser) {
-            return {
-              ...item,
-              score: calculatedScore,
-              accuracy: `${calculatedScore}%`,
-              role: profile.role || item.role,
-              rank: newRank,
-              badge: newRank === 1 ? '🥇 Champion' : newRank <= 3 ? '🥈 Top 3' : '⭐ Top 5%',
-            }
-          }
-          return item
-        }).sort((a, b) => b.score - a.score).map((item, idx) => ({ ...item, rank: idx + 1 }))
+        const userInitial = getUserInitial(profile.name)
+        const userEntry = {
+          id: Date.now(),
+          name: profile.name ? `${profile.name} (You)` : 'You',
+          role: (profile.role && profile.role.trim()) || (profile.designation && profile.designation.trim()) || 'Professional',
+          score: calculatedScore,
+          accuracy: `${calculatedScore}%`,
+          rank: 1,
+          badge: calculatedScore >= 90 ? '🥇 Champion' : calculatedScore >= 75 ? '🥈 Top Performer' : '⭐ Certified',
+          avatar: userInitial || 'U',
+          isUser: true,
+        }
 
+        const updatedBoard = [userEntry]
         setLeaderboard(updatedBoard)
+        localStorage.setItem('skillstat_leaderboard', JSON.stringify(updatedBoard))
       } else {
         // Formal competency update: Only after assessment evaluation
         const assessedSkill = currentQuizSkill || (currentQ.skill && !currentQ.skill.startsWith('Notes') ? currentQ.skill : selectedSkillList[0] || 'AI/ML')
@@ -1555,27 +3936,347 @@ function App() {
   )
 
   // -------------------------------------------------------------
-  // VIEW: Loading Screen
+  // VIEW: Loading Screen (Rotating Circular Coil Splash)
   // -------------------------------------------------------------
   if (step === 'loading') {
     return (
-      <div className="loading-page">
-        <div className="loading-orbit">
-          <span>S</span>
-        </div>
-        <Brand />
-        <p>{tx('initializing')}</p>
-        <div className="loading-track">
-          <i />
-        </div>
+      <div className="landing-viewport">
+        <header className="landing-top-bar" style={{ opacity: 0.7 }}>
+          <Brand />
+        </header>
+
+        <main className="landing-hero-center">
+          <RotatingCoil logoSrc="/logo.png" />
+          <div className="landing-progress-wrap">
+            <div className="landing-progress-bar">
+              <div className="landing-progress-fill" />
+            </div>
+            <div className="landing-init-text">
+              {tx('initializing')}
+            </div>
+          </div>
+        </main>
+
+        <footer className="landing-footer" style={{ opacity: 0.7 }}>
+          <div>🔒 {tx('securePlatform')} • Official Government of India Competency Portal</div>
+          <div>MoSPI & Civil Services Digital Dossier</div>
+        </footer>
       </div>
     )
   }
 
   // -------------------------------------------------------------
-  // VIEW: Login Page (Centered + Interactive Canvas + Top-Right Language)
+  // VIEW: Landing Page (2nd Screenshot Aesthetic + Rotating Circular Coil + 1st SS Logo)
   // -------------------------------------------------------------
   if (step === 'login') {
+    return (
+      <div className="landing-viewport">
+        {/* Top Navigation Bar */}
+        <header className="landing-top-bar">
+          <Brand />
+
+          <div className="landing-nav-right">
+            <div className="language-badge">
+              <span className="lang-icon">🌐</span>
+              <select
+                className="lang-select"
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                aria-label="Select Language"
+              >
+                {supportedLanguages.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              type="button"
+              className="theme-toggle"
+              onClick={() => setIsDarkMode((value) => !value)}
+              title="Toggle Theme"
+            >
+              {isDarkMode ? '☀ Light' : '◐ Dark'}
+            </button>
+
+            <button
+              type="button"
+              className="landing-secondary-btn"
+              onClick={() => setAuthModal('login')}
+            >
+              {t.signIn || 'Sign In'}
+            </button>
+          </div>
+        </header>
+
+        {/* Center Hero: 2nd Screenshot Aesthetic with 1st SS Logo & Rotating Circular Coil */}
+        <main className="landing-hero-center">
+          <RotatingCoil logoSrc="/logo.png" />
+
+          {/* Action Buttons */}
+          <div className="landing-actions-group">
+            <button
+              type="button"
+              className="landing-primary-btn"
+              onClick={() => {
+                if (sessionToken) {
+                  setStep('dashboard')
+                } else {
+                  setProfile((prev) => ({
+                    ...prev,
+                    name: prev.name || 'Sathvika Sharma',
+                    role: prev.role || 'Statistical Officer',
+                    designation: prev.designation || 'Statistical Officer',
+                    department: prev.department || "India's Official Statistical System",
+                    organization: prev.organization || 'National Statistical Office (NSO)',
+                  }))
+                  setStep('dashboard')
+                }
+              }}
+            >
+              <span>Launch Platform</span>
+              <span className="btn-arrow">→</span>
+            </button>
+
+            <button
+              type="button"
+              className="landing-secondary-btn"
+              onClick={() => setAuthModal('login')}
+            >
+              <span>{t.signIn || 'Sign In'}</span>
+            </button>
+
+            <button
+              type="button"
+              className="landing-secondary-btn"
+              onClick={() => {
+                setSignupError('')
+                setStep('signup')
+              }}
+            >
+              <span>Create Account</span>
+            </button>
+
+            <button
+              type="button"
+              className="landing-sso-btn"
+              onClick={() => {
+                setSignupError('')
+                setIsSsoRegistrationOpen(true)
+                setAuthModal('sso')
+              }}
+            >
+              <span className="sso-flag">🇮🇳</span>
+              <span>{tx('continueSso')}</span>
+            </button>
+          </div>
+        </main>
+
+        {/* Footer */}
+        <footer className="landing-footer">
+          <div>🔒 {tx('securePlatform')} • Official Government of India Competency Portal</div>
+          <div>MoSPI & Civil Services Digital Dossier</div>
+        </footer>
+
+        {/* Sign In Modal */}
+        {authModal === 'login' && (
+          <div className="auth-modal-backdrop" onClick={() => setAuthModal(null)} role="dialog" aria-modal="true">
+            <div className="auth-modal-dialog" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                className="auth-modal-close"
+                onClick={() => setAuthModal(null)}
+                aria-label="Close"
+              >
+                ✕
+              </button>
+              <Brand />
+              <p className="kicker" style={{ marginTop: '12px' }}>{tx('intelligentEvaluation')}</p>
+              <h2 style={{ fontSize: '24px', fontWeight: 700, margin: '4px 0 6px' }}>{t.welcome}</h2>
+              <p className="helper">{t.signIn}</p>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  setSignupError('')
+                  const identity = e.currentTarget.elements.identity.value.trim()
+                  const password = e.currentTarget.elements.password.value
+                  const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identity)
+                  if (!isEmail && !/^[A-Za-z0-9][A-Za-z0-9-]{2,}$/.test(identity)) {
+                    setSignupError('Enter a valid work email or employee ID.')
+                    return
+                  }
+                  apiRequest('/api/auth/login', {
+                    method: 'POST',
+                    body: JSON.stringify({ email: isEmail ? identity : '', employeeId: isEmail ? '' : identity, password }),
+                  }).then(({ token, state }) => {
+                    onboardingSessionRef.current = false
+                    localStorage.removeItem('skillstat_onboarding')
+                    localStorage.setItem('skillstat_session', token)
+                    setSessionToken(token)
+                    if (state?.profile) setProfile((current) => ({ ...current, ...state.profile }))
+                    setAuthModal(null)
+                    setStep('dashboard')
+                  }).catch((error) => {
+                    setSignupError(error.message)
+                    if (error.emailUnverified || error.message?.toLowerCase().includes('verify your email')) {
+                      setUnverifiedEmail(error.email || (isEmail ? identity : ''))
+                    } else {
+                      setUnverifiedEmail('')
+                    }
+                  })
+                }}
+              >
+                <label className="auth-form-field">
+                  <span>Work email or employee ID</span>
+                  <input name="identity" type="text" placeholder="you@company.com or EMP-24018" autoComplete="username" required />
+                </label>
+                <label className="auth-form-field">
+                  <span>{t.password}</span>
+                  <input name="password" type="password" placeholder="••••••••" required />
+                </label>
+                {signupError && <p className="form-error" role="alert">{signupError}</p>}
+                {unverifiedEmail && (
+                  <div className="unverified-action-box">
+                    <span>Account requires email verification.</span>
+                    <button
+                      type="button"
+                      className="unverified-verify-btn"
+                      onClick={() => {
+                        setVerifyEmail(unverifiedEmail)
+                        setOtpDigits(['', '', '', '', '', ''])
+                        setVerificationError('')
+                        setVerificationSuccess('')
+                        setAuthModal(null)
+                        setStep('verify-email')
+                      }}
+                    >
+                      Enter verification code →
+                    </button>
+                  </div>
+                )}
+
+                <button type="submit" className="primary-action" style={{ width: '100%', justifyContent: 'center', marginTop: '12px' }}>
+                  {t.continue} <span>→</span>
+                </button>
+              </form>
+
+              <div className="login-divider"><span>OR</span></div>
+
+              <button
+                className="sso-demo-button"
+                type="button"
+                disabled={ssoLoading}
+                onClick={() => {
+                  setSignupError('')
+                  setIsSsoRegistrationOpen(true)
+                  setAuthModal('sso')
+                }}
+              >
+                {tx('continueSso')}
+              </button>
+
+              <p className="signup-prompt" style={{ marginTop: '16px' }}>
+                New to Skillstat AI?{' '}
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => {
+                    setSignupError('')
+                    setAuthModal(null)
+                    setStep('signup')
+                  }}
+                >
+                  Create an account
+                </button>
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* SSO Modal */}
+        {authModal === 'sso' && isSsoRegistrationOpen && (
+          <div className="auth-modal-backdrop" onClick={() => setAuthModal(null)} role="dialog" aria-modal="true">
+            <div className="auth-modal-dialog" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                className="auth-modal-close"
+                onClick={() => {
+                  setAuthModal(null)
+                  setIsSsoRegistrationOpen(false)
+                }}
+                aria-label="Close"
+              >
+                ✕
+              </button>
+              <Brand />
+              <p className="sso-form-heading" style={{ marginTop: '12px' }}>Parichay account details</p>
+              <p className="sso-form-hint">One-time registration is completed by your government department.</p>
+
+              <form
+                className="sso-registration-form"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  const formData = new FormData(event.currentTarget)
+                  const details = {
+                    name: String(formData.get('name') || '').trim(),
+                    email: String(formData.get('email') || '').trim().toLowerCase(),
+                    mobile: String(formData.get('mobile') || '').trim(),
+                    designation: String(formData.get('designation') || '').trim(),
+                    department: String(formData.get('department') || '').trim(),
+                    officialIdProof: String(formData.get('officialIdProof') || '').trim(),
+                    nodalApproval: formData.get('nodalApproval') === 'on',
+                  }
+                  if (!/@(?:nic\.in|gov\.in)$/i.test(details.email)) {
+                    setSignupError('Use your government email ending in @nic.in or @gov.in.')
+                    return
+                  }
+                  if (!/^\+?[0-9\s-]{10,15}$/.test(details.mobile)) {
+                    setSignupError('Enter a valid mobile number.')
+                    return
+                  }
+                  if (!details.officialIdProof || !details.nodalApproval) {
+                    setSignupError('Official ID proof and Nodal Officer / Reporting Officer approval are required.')
+                    return
+                  }
+                  setSsoLoading(true)
+                  apiRequest('/api/auth/parichay', { method: 'POST', body: JSON.stringify(details) })
+                    .then(({ token, state }) => {
+                      localStorage.setItem('skillstat_session', token)
+                      setSessionToken(token)
+                      setProfile((current) => ({ ...current, ...(state?.profile || {}), ...details, employeeId: state?.profile?.employeeId || '' }))
+                      setSsoDetails(details)
+                      setIsSsoRegistrationOpen(false)
+                      setAuthModal(null)
+                      setSignupError('')
+                      setStep('profile')
+                    })
+                    .catch((error) => setSignupError(error.message || 'Unable to connect to Government SSO.'))
+                    .finally(() => setSsoLoading(false))
+                }}
+              >
+                <label className="auth-form-field"><span>Full name</span><input name="name" value={ssoDetails.name} onChange={(event) => setSsoDetails((current) => ({ ...current, name: event.target.value }))} required /></label>
+                <label className="auth-form-field"><span>Government email</span><input name="email" type="email" placeholder="name@nic.in" value={ssoDetails.email} onChange={(event) => setSsoDetails((current) => ({ ...current, email: event.target.value }))} required /></label>
+                <label className="auth-form-field"><span>Mobile number</span><input name="mobile" type="tel" placeholder="+91 9876543210" value={ssoDetails.mobile} onChange={(event) => setSsoDetails((current) => ({ ...current, mobile: event.target.value }))} required /></label>
+                <label className="auth-form-field"><span>Designation</span><input name="designation" value={ssoDetails.designation} onChange={(event) => setSsoDetails((current) => ({ ...current, designation: event.target.value }))} required /></label>
+                <label className="auth-form-field"><span>Department / organisation</span><input name="department" value={ssoDetails.department} onChange={(event) => setSsoDetails((current) => ({ ...current, department: event.target.value }))} required /></label>
+                <label className="auth-form-field"><span>Official ID proof reference</span><input name="officialIdProof" placeholder="ID / document reference" value={ssoDetails.officialIdProof} onChange={(event) => setSsoDetails((current) => ({ ...current, officialIdProof: event.target.value }))} required /></label>
+                <label className="sso-approval-control"><input name="nodalApproval" type="checkbox" required /> <span>Nodal Officer / Reporting Officer approval confirmed</span></label>
+                {signupError && <p className="form-error" role="alert">{signupError}</p>}
+                <button type="submit" className="primary-action" disabled={ssoLoading} style={{ width: '100%', justifyContent: 'center', marginTop: '12px' }}>
+                  {ssoLoading ? tx('connectingSso') : 'Verify with Parichay'} <span>→</span>
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  if (step === 'signup') {
     return (
       <div className="login-screen-container">
         <InteractiveBackground />
@@ -1594,91 +4295,298 @@ function App() {
           </div>
         </div>
 
-        <section className="login-card">
+        <section className="login-card signup-card">
           <Brand />
-          <p className="kicker">{tx('intelligentEvaluation')}</p>
-          <h1>{t.welcome}</h1>
-          <p className="helper">{t.signIn}</p>
+          <p className="kicker">GET STARTED</p>
+          <h1>Create your account</h1>
+          <p className="helper">Set up your Skillstat AI account to begin your competency journey.</p>
 
           <form
             onSubmit={(e) => {
               e.preventDefault()
-              const emailInput = e.target.querySelector('input[type="email"]')?.value || ''
-              const extractedName = emailInput ? emailInput.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : ''
-              setProfile({
-                name: extractedName,
-                employeeId: '',
-                department: '',
-                organization: '',
-                designation: '',
-                assignment: '',
-                location: '',
-                role: '',
-                skills: '',
-                experience: '',
-                previousIGOT: '',
-                previousNSSTA: '',
-                externalTraining: '',
-                certifications: '',
-              })
-              setDepartmentSearch('')
-              setIsDepartmentMenuOpen(false)
-              setSelectedSkillList([])
-              setQuizzesCompleted(0)
-              setOverallScore(0)
-              setStep('profile')
+              const formData = new FormData(e.currentTarget)
+              const password = formData.get('password')
+              const confirmPassword = formData.get('confirmPassword')
+              if (password !== confirmPassword) {
+                setSignupError('Passwords do not match.')
+                return
+              }
+
+              const name = formData.get('name')?.toString().trim() || ''
+              const email = formData.get('email')?.toString().trim().toLowerCase() || ''
+              apiRequest('/api/auth/signup', {
+                method: 'POST',
+                body: JSON.stringify({ name, email, password }),
+              }).then((data) => {
+                if (data.requiresVerification) {
+                  setVerifyEmail(email)
+                  setOtpDigits(['', '', '', '', '', ''])
+                  setVerificationError('')
+                  setVerificationSuccess('')
+                  setDevVerificationCode(data.devCode || '')
+                  setResendCooldown(30)
+                  setStep('verify-email')
+                } else if (data.token) {
+                  onboardingSessionRef.current = true
+                  localStorage.setItem('skillstat_onboarding', '1')
+                  localStorage.setItem('skillstat_session', data.token)
+                  setSessionToken(data.token)
+                  setSignupError('')
+                  setProfile((previous) => ({ ...previous, ...(data.state?.profile || {}), name, email }))
+                  setDepartmentSearch('')
+                  setIsDepartmentMenuOpen(false)
+                  setSelectedSkillList([])
+                  setQuizzesCompleted(0)
+                  setOverallScore(0)
+                  setStep('profile')
+                }
+              }).catch((error) => setSignupError(error.message || 'Unable to sign in. Start the backend server and try again.'))
             }}
           >
             <label>
-              {t.email}
-              <input type="email" placeholder="your@company.com" required />
+              Full name
+              <input name="name" type="text" placeholder="e.g. Sathvika Sharma" autoComplete="name" required />
             </label>
             <label>
-              {t.password}
-              <input type="password" placeholder="••••••••" required />
+              Work email
+              <input name="email" type="email" placeholder="your@company.com" autoComplete="email" required />
             </label>
-
+            <label>
+              Password
+              <input name="password" type="password" placeholder="At least 8 characters" minLength="8" autoComplete="new-password" required />
+            </label>
+            <label>
+              Confirm password
+              <input name="confirmPassword" type="password" placeholder="Re-enter your password" minLength="8" autoComplete="new-password" required />
+            </label>
+            {signupError && <p className="form-error" role="alert">{signupError}</p>}
             <button type="submit" className="primary-action">
-              {t.continue} <span>→</span>
+              Create account <span>→</span>
             </button>
           </form>
-          <div className="login-divider"><span>OR</span></div>
-          <button className="sso-demo-button" type="button" disabled={ssoLoading} onClick={() => {
-            setSsoLoading(true)
-            setTimeout(() => {
-              setSsoLoading(false)
-              setProfile({
-                name: '',
-                employeeId: '',
-                department: '',
-                organization: '',
-                designation: '',
-                assignment: '',
-                location: '',
-                role: '',
-                skills: '',
-                experience: '',
-                previousIGOT: '',
-                previousNSSTA: '',
-                externalTraining: '',
-                certifications: '',
-              })
-              setDepartmentSearch('')
-              setIsDepartmentMenuOpen(false)
-              setSelectedSkillList([])
-              setQuizzesCompleted(0)
-              setOverallScore(0)
-              setStep('profile')
-            }, 900)
-          }}>
-            {ssoLoading ? tx('connectingSso') : tx('continueSso')}
+          <p className="signup-prompt">Already have an account? <button type="button" className="text-button" onClick={() => { setSignupError(''); setStep('login') }}>Sign in</button></p>
+          <button type="button" className="theme-toggle" onClick={() => setIsDarkMode((value) => !value)}>
+            {isDarkMode ? '☀ Light theme' : '◐ Dark theme'}
           </button>
-          <div className="login-meta-row">
-            <label className="remember-control"><input type="checkbox" /> {tx('remember')}</label>
-            <button type="button" className="text-button">{tx('forgot')}</button>
+        </section>
+      </div>
+    )
+  }
+
+  if (step === 'verify-email') {
+    const handleOtpChange = (index, value) => {
+      const clean = value.replace(/\D/g, '')
+      if (clean.length > 1) {
+        const digits = clean.slice(0, 6).split('')
+        const next = [...otpDigits]
+        digits.forEach((d, i) => {
+          if (index + i < 6) next[index + i] = d
+        })
+        setOtpDigits(next)
+        const nextIdx = Math.min(5, index + digits.length)
+        document.getElementById(`otp-digit-${nextIdx}`)?.focus()
+        return
+      }
+
+      const next = [...otpDigits]
+      next[index] = clean.slice(-1)
+      setOtpDigits(next)
+
+      if (clean && index < 5) {
+        document.getElementById(`otp-digit-${index + 1}`)?.focus()
+      }
+    }
+
+    const handleOtpKeyDown = (index, e) => {
+      if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
+        document.getElementById(`otp-digit-${index - 1}`)?.focus()
+      }
+    }
+
+    const handleVerifySubmit = (e) => {
+      if (e) e.preventDefault()
+      const code = otpDigits.join('')
+      if (code.length < 6) {
+        setVerificationError('Please enter all 6 digits of the verification code.')
+        return
+      }
+
+      setIsVerifying(true)
+      setVerificationError('')
+      setVerificationSuccess('')
+
+      apiRequest('/api/auth/verify-email', {
+        method: 'POST',
+        body: JSON.stringify({ email: verifyEmail, code }),
+      })
+        .then(({ token, state, user }) => {
+          onboardingSessionRef.current = true
+          localStorage.setItem('skillstat_onboarding', '1')
+          localStorage.setItem('skillstat_session', token)
+          setSessionToken(token)
+          setProfile((previous) => ({
+            ...previous,
+            ...(state?.profile || {}),
+            email: verifyEmail,
+            name: user?.profile?.name || previous.name,
+          }))
+          setDepartmentSearch('')
+          setIsDepartmentMenuOpen(false)
+          setSelectedSkillList([])
+          setQuizzesCompleted(0)
+          setOverallScore(0)
+          setStep('profile')
+        })
+        .catch((err) => {
+          setVerificationError(err.message || 'Verification failed. Please check the code and try again.')
+        })
+        .finally(() => {
+          setIsVerifying(false)
+        })
+    }
+
+    const handleResend = () => {
+      if (resendCooldown > 0) return
+      setVerificationError('')
+      setVerificationSuccess('')
+      apiRequest('/api/auth/resend-verification', {
+        method: 'POST',
+        body: JSON.stringify({ email: verifyEmail }),
+      })
+        .then((data) => {
+          setResendCooldown(30)
+          if (data.devCode) setDevVerificationCode(data.devCode)
+          setVerificationSuccess('A new verification code has been dispatched to your email.')
+        })
+        .catch((err) => {
+          setVerificationError(err.message || 'Unable to resend verification code.')
+        })
+    }
+
+    return (
+      <div className="login-screen-container">
+        <InteractiveBackground />
+
+        <div className="top-right-bar">
+          <div className="language-badge">
+            <span className="lang-icon">🌐</span>
+            <select
+              className="lang-select"
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              aria-label="Select Language"
+            >
+              {supportedLanguages.map(([val, label]) => (
+                <option key={val} value={val}>{label}</option>
+              ))}
+            </select>
           </div>
-          <div className="security-note">🔒 {tx('securePlatform')}</div>
-          <p className="privacy-note">{tx('privacy')}</p>
+        </div>
+
+        <section className="login-card verify-card">
+          <Brand />
+          <div className="verify-icon-container">
+            <span className="verify-mail-icon" aria-hidden="true">✉</span>
+          </div>
+          <p className="kicker">EMAIL VERIFICATION</p>
+          <h1>Verify your email</h1>
+          <p className="helper">
+            We sent a 6-digit verification code to<br />
+            <strong className="verify-target-email">{verifyEmail}</strong>
+          </p>
+
+          {devVerificationCode && (
+            <div className="dev-code-banner">
+              <span className="dev-pill">DEV MODE</span>
+              <span className="dev-text">Test OTP: <strong>{devVerificationCode}</strong></span>
+              <button
+                type="button"
+                className="dev-fill-button"
+                onClick={() => {
+                  const digits = devVerificationCode.slice(0, 6).split('')
+                  setOtpDigits(digits)
+                  setVerificationError('')
+                }}
+              >
+                Auto-fill
+              </button>
+            </div>
+          )}
+
+          <form onSubmit={handleVerifySubmit} className="verify-form">
+            <div className="otp-digit-grid">
+              {otpDigits.map((digit, idx) => (
+                <input
+                  key={idx}
+                  id={`otp-digit-${idx}`}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={digit}
+                  autoComplete="one-time-code"
+                  autoFocus={idx === 0}
+                  className={`otp-digit-box ${digit ? 'is-filled' : ''}`}
+                  onChange={(e) => handleOtpChange(idx, e.target.value)}
+                  onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                  onPaste={(e) => {
+                    e.preventDefault()
+                    const pasteData = e.clipboardData.getData('text')
+                    handleOtpChange(idx, pasteData)
+                  }}
+                />
+              ))}
+            </div>
+
+            {verificationError && <p className="form-error" role="alert">{verificationError}</p>}
+            {verificationSuccess && <p className="form-success" role="status">{verificationSuccess}</p>}
+
+            <button
+              type="submit"
+              className="primary-action"
+              disabled={isVerifying || otpDigits.join('').length < 6}
+            >
+              {isVerifying ? 'Verifying...' : 'Verify & Complete'} <span>→</span>
+            </button>
+          </form>
+
+          <div className="resend-control-row">
+            <span className="resend-label">Didn't receive the email?</span>
+            <button
+              type="button"
+              className="text-button resend-action-btn"
+              disabled={resendCooldown > 0}
+              onClick={handleResend}
+            >
+              {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}
+            </button>
+          </div>
+
+          <div className="verify-nav-links">
+            <button
+              type="button"
+              className="text-button inline-link"
+              onClick={() => {
+                setVerificationError('')
+                setVerificationSuccess('')
+                setStep('signup')
+              }}
+            >
+              ← Edit details / Back to sign up
+            </button>
+            <span className="divider-dot">•</span>
+            <button
+              type="button"
+              className="text-button inline-link"
+              onClick={() => {
+                setVerificationError('')
+                setVerificationSuccess('')
+                setStep('login')
+              }}
+            >
+              Sign in
+            </button>
+          </div>
+
           <button type="button" className="theme-toggle" onClick={() => setIsDarkMode((value) => !value)}>
             {isDarkMode ? '☀ Light theme' : '◐ Dark theme'}
           </button>
@@ -1694,7 +4602,7 @@ function App() {
       <div className="simple-page">
         <div className="page-centered-container selection-page">
           <div className="top-nav-bar">
-            <button className="back-nav-btn" onClick={() => setStep('login')}>← {t.back}</button>
+            <button className="back-nav-btn" onClick={() => setStep(sessionToken ? 'dashboard' : 'login')}>← {sessionToken ? 'Back to Dashboard' : t.back}</button>
             <div className="nav-brand"><Brand /></div>
           </div>
           <section className="selection-card profile-onboarding-card">
@@ -1710,18 +4618,24 @@ function App() {
               <label className="profile-field">{tx('employeeId')}
                 <input value={profile.employeeId} placeholder="e.g. EMP-24018" onChange={(e) => updateProfile('employeeId', e.target.value)} />
               </label>
-              <label className="profile-field department-combobox">{tx('department')}
+              <label className="profile-field">Current assignment
+                <input value={profile.currentAssignment || profile.assignment} placeholder="e.g. Consumer Price Index compilation" onChange={(e) => { updateProfile('currentAssignment', e.target.value); updateProfile('assignment', e.target.value) }} />
+              </label>
+              <label className="profile-field">Educational qualifications
+                <input value={profile.educationalQualifications} placeholder="e.g. M.Stat, Economics, Mathematics, Data Science" onChange={(e) => updateProfile('educationalQualifications', e.target.value)} />
+              </label>
+              <label className="profile-field department-combobox">Departments
                 <div className="department-input-wrap">
                   <input
                     value={departmentSearch}
-                    placeholder="Search government departments"
+                    placeholder="India's Official Statistical System"
                     onFocus={() => setIsDepartmentMenuOpen(true)}
                     onChange={(e) => {
                       setDepartmentSearch(e.target.value)
                       setIsDepartmentMenuOpen(true)
                       if (profile.department && e.target.value !== profile.department) updateProfile('department', '')
                     }}
-                    aria-label="Search government departments"
+                    aria-label="Select India's Official Statistical System"
                     role="combobox"
                     aria-expanded={isDepartmentMenuOpen}
                   />
@@ -1737,7 +4651,7 @@ function App() {
                   </div>
                 )}
               </label>
-              <label className="profile-field">{tx('designation')}
+              <label className="profile-field">Statistical designation
                 <select
                   value={profile.designation}
                   disabled={!selectedDepartment}
@@ -1748,14 +4662,19 @@ function App() {
                     updateProfile('skills', '')
                   }}
                 >
-                  <option value="">{selectedDepartment ? 'Select your designation' : 'Select a department first'}</option>
+                  <option value="">{selectedDepartment ? 'Select your statistical designation' : 'Select the statistical system first'}</option>
                   {(selectedDepartment?.designations || []).map((designation) => <option key={designation} value={designation}>{designation}</option>)}
                 </select>
               </label>
             </div>
             <div className="selection-actions">
-              <button className="secondary-action btn-back" onClick={() => setStep('login')}>← {t.back}</button>
-              <button className="primary-action btn-next" disabled={!profile.department || !profile.designation} onClick={() => setStep('role')}>Continue <span>→</span></button>
+              <button className="secondary-action btn-back" onClick={() => setStep(sessionToken ? 'dashboard' : 'login')}>← {sessionToken ? 'Cancel & Return to Dashboard' : t.back}</button>
+              {sessionToken && (
+                <button className="secondary-action" disabled={!profile.department || !profile.designation} onClick={() => setStep('dashboard')}>
+                  Save & Return to Dashboard <span>✓</span>
+                </button>
+              )}
+              <button className="primary-action btn-next" disabled={!profile.department || !profile.designation} onClick={() => setStep('role')}>Continue to Role <span>→</span></button>
             </div>
           </section>
         </div>
@@ -1771,7 +4690,7 @@ function App() {
       <div className="simple-page">
         <div className="page-centered-container selection-page">
           <div className="top-nav-bar">
-            <button className="back-nav-btn" onClick={() => setStep('login')}>
+            <button className="back-nav-btn" onClick={() => setStep('profile')}>
               ← {t.back}
             </button>
             <div className="nav-brand">
@@ -1831,13 +4750,11 @@ function App() {
                   key={role}
                   onClick={() => {
                     updateProfile('role', role)
+                    setSelectedSkillList([])
+                    updateProfile('skills', '')
                     if (!profile.designation || !profile.designation.trim()) {
                       updateProfile('designation', role)
                     }
-                    const categories = getRoleSkillCategories(role, profile.designation)
-                    const initialSkills = categories[0]?.[1]?.slice(0, 3) || ['Communication', 'Problem solving']
-                    setSelectedSkillList(initialSkills)
-                    updateProfile('skills', initialSkills.join(', '))
                   }}
                 >
                   <span className="role-icon">💼</span>
@@ -1897,11 +4814,7 @@ function App() {
   // VIEW: Step 2 - Choose Skills (Filtered to Role & Min 2 Required)
   // -------------------------------------------------------------
   if (step === 'skills') {
-    const isMinSkillsMet = selectedSkillList.length >= 2
-    const normalizedCodingSkills = selectedSkillList.filter(isCodingSkill)
-    const hasTooManyCodingSkills = normalizedCodingSkills.length > 4
-    const hasTooFewCodingSkills = normalizedCodingSkills.length === 1
-    const codingSelectionValid = !hasTooManyCodingSkills && !hasTooFewCodingSkills
+    const isMinSkillsMet = selectedSkillList.length >= 1
     const availableSkills = [...new Set(skillCategories.flatMap(([, domainSkills]) => domainSkills))]
 
     return (
@@ -1925,17 +4838,13 @@ function App() {
               </p>
             </div>
 
-            <div className={`skill-requirement-banner ${isMinSkillsMet && codingSelectionValid ? 'met' : 'needed'}`}>
-              <span className="banner-icon">{isMinSkillsMet && codingSelectionValid ? '✓' : 'ℹ'}</span>
+            <div className={`skill-requirement-banner ${isMinSkillsMet ? 'met' : 'needed'}`}>
+              <span className="banner-icon">{isMinSkillsMet ? '✓' : 'ℹ'}</span>
               <span>
                 {selectedSkillList.length} {t.skillsSelected} (
                 {!isMinSkillsMet
-                  ? `Please select at least ${2 - selectedSkillList.length} more skill(s)`
-                  : !codingSelectionValid
-                  ? hasTooManyCodingSkills
-                  ? 'Remove coding skills until you have a maximum of 4'
-                  : 'Select at least 2 coding skills'
-                  : 'Choose any skills that match your work'}
+                  ? 'Select at least 1 skill to continue'
+                  : 'Coding and non-coding skills can be selected in any combination'}
                 )
               </span>
             </div>
@@ -1966,6 +4875,7 @@ function App() {
                   Add Skill
                 </button>
               </div>
+              {skillError && <p className="skill-entry-error" role="alert">{skillError}</p>}
             </div>
 
             {selectedSkillList.length > 0 && (
@@ -1990,7 +4900,7 @@ function App() {
               </button>
               <button
                 className="primary-action btn-next"
-                disabled={!isMinSkillsMet || !codingSelectionValid}
+                disabled={!isMinSkillsMet}
                 onClick={() => setStep('experience')}
               >
                 {t.continue} <span>→</span>
@@ -2115,6 +5025,8 @@ function App() {
                     setCompetencyGaps(dynamicGaps)
                     setSelectedSkillForRec(dynamicGaps[0])
                   }
+                  onboardingSessionRef.current = false
+                  localStorage.removeItem('skillstat_onboarding')
                   setDashboardView('dashboard')
                   setStep('dashboard')
                 }}
@@ -2153,9 +5065,8 @@ function App() {
             <div className="nav-brand">
               <Brand />
             </div>
-            <div className="quiz-skill-tag" title={activeQuizType === 'notes' ? (currentQuestion.sourceBadge || 'Uploaded Notes') : (currentQuestion.skill || profile.role)}>
-              <span>{activeQuizType === 'weekend' ? '🏆 Weekend Challenge' : activeQuizType === 'notes' ? '📄 Notes AI Quiz' : 'Assessing:'}</span>{' '}
-              <strong>{activeQuizType === 'notes' ? (currentQuestion.sourceBadge || 'Uploaded Notes') : (currentQuestion.skill || profile.role)}</strong>
+            <div className="quiz-skill-tag">
+              <span>{activeQuizType === 'weekend' ? '🏆 Weekend Challenge' : activeQuizType === 'notes' ? '📄 Notes AI Quiz' : 'Skill Assessment'}</span>
             </div>
           </div>
 
@@ -2167,8 +5078,8 @@ function App() {
               </div>
               <div>
                 <small>Quiz Focus</small>
-                <strong className="active-skill-highlight">
-                  {activeQuizType === 'weekend' ? 'Weekend Company Challenge' : activeQuizType === 'notes' ? (currentQuestion.sourceBadge || 'Uploaded Notes / PDF') : currentQuestion.skill}
+                  <strong className="active-skill-highlight">
+                  {activeQuizType === 'weekend' ? 'Weekend Company Challenge' : activeQuizType === 'notes' ? (currentQuestion.sourceBadge || 'Uploaded Notes / PDF') : 'Mixed selected skills'}
                 </strong>
               </div>
               <div>
@@ -2182,12 +5093,12 @@ function App() {
                 <span>
                   {t.question} {questionIndex + 1} of {questions.length}
                 </span>
-                <span>{Math.round(((questionIndex + 1) / questions.length) * 100)}% Complete</span>
+                <span>{Math.round((questionIndex / questions.length) * 100)}% Complete</span>
               </div>
               <div className="progress-track">
                 <div
                   className="progress-fill"
-                  style={{ width: `${((questionIndex + 1) / questions.length) * 100}%` }}
+                  style={{ width: `${(questionIndex / questions.length) * 100}%` }}
                 />
               </div>
             </div>
@@ -2195,6 +5106,20 @@ function App() {
             <div className="question-card-inner">
               <div className="question-badge-row">
                 <span className="question-badge">{currentQuestion.label}</span>
+                {(() => {
+                  const diff = currentQuestion.difficultyLabel
+                    ? {
+                        label: currentQuestion.difficultyLabel,
+                        cls: currentQuestion.difficultyBadgeClass || `diff-${(currentQuestion.difficulty || 'intermediate').toLowerCase()}`
+                      }
+                    : getQuestionDifficulty(questionIndex, questions.length)
+                  return (
+                    <span className={`difficulty-badge ${diff.badgeClass || diff.cls || 'diff-intermediate'}`}>
+                      <span className="diff-dot">●</span>
+                      <span>{diff.label || currentQuestion.difficulty || 'Level: Intermediate'}</span>
+                    </span>
+                  )
+                })()}
                 {currentQuestion.sourceBadge && (
                   <span className="source-concept-badge">
                     <strong>Source:</strong> {currentQuestion.sourceBadge}
@@ -2217,6 +5142,7 @@ function App() {
                     spellCheck="false"
                     rows={8}
                   />
+                  <p className="code-check-requirement">4 implementation checks · pass at least 2 to continue</p>
                   <p className={`code-feedback ${codeValidation?.state || 'empty'}`}>
                     {codeValidation?.message}
                   </p>
@@ -2301,9 +5227,9 @@ function App() {
               <div className="score-summary">
                 {activeQuizType === 'weekend' ? (
                   <>
-                    <h3>Company Rank: #{userRank} of 148 Employees</h3>
+                    <h3>Company Rank: #{userRank || 1}</h3>
                     <p>
-                      Your weekend assessment placed you in the <strong>Top {userRank <= 2 ? '2%' : userRank <= 4 ? '5%' : '10%'}</strong> across all company departments!
+                      Your weekend assessment placed you in the <strong>Top Tier</strong> of active participants!
                     </p>
                   </>
                 ) : (
@@ -2395,7 +5321,7 @@ function App() {
             onClick={() => setDashboardView('recommendations')}
           >
             <span className="nav-icon">✦</span>
-            <span>{navText[language]?.[2] || navText.en[2]}</span>
+            <span>{navText[language]?.[1] || navText.en[1]}</span>
           </button>
 
           <button
@@ -2409,6 +5335,15 @@ function App() {
 
           <button
             type="button"
+            className="header-nav-item"
+            onClick={() => startQuiz('standard')}
+          >
+            <span className="nav-icon">⚡</span>
+            <span>{navText[language]?.[3] || navText.en[3]}</span>
+          </button>
+
+          <button
+            type="button"
             className={`header-nav-item ${dashboardView === 'notes' ? 'active' : ''}`}
             onClick={() => setDashboardView('notes')}
           >
@@ -2418,12 +5353,13 @@ function App() {
 
           <button
             type="button"
-            className={`header-nav-item ${dashboardView === 'profile' ? 'active' : ''}`}
-            onClick={() => setDashboardView('profile')}
+            className={`header-nav-item ${dashboardView === 'promotions' ? 'active' : ''}`}
+            onClick={() => setDashboardView('promotions')}
           >
-            <span className="nav-icon">👤</span>
-            <span>{navText[language]?.[1] || navText.en[1]}</span>
+            <span className="nav-icon">🎖️</span>
+            <span>{navText[language]?.[5] || navText.en[5]}</span>
           </button>
+
         </nav>
 
         <div className="nav-right">
@@ -2446,14 +5382,18 @@ function App() {
               onClick={() => setIsProfileMenuOpen((open) => !open)}
             >
               <span className="profile-menu-avatar">
-                {(profile.designation || profile.role || profile.name || 'User').slice(0, 2).toUpperCase()}
+                {getUserInitial(profile.name)}
               </span>
-              <span>{(profile.name ? profile.name.split(' ')[0] : (profile.designation || profile.role || 'User'))}</span>
+              <span>{(profile.name ? profile.name.split(' ')[0] : ((profile.role && profile.role.trim()) || (profile.designation && profile.designation.trim()) || 'User'))}</span>
               <span className="profile-menu-chevron">⌄</span>
             </button>
             {isProfileMenuOpen && (
               <div className="profile-menu" role="menu">
                 <button type="button" role="menuitem" onClick={() => { setDashboardView('profile'); setIsProfileMenuOpen(false) }}>{t.myProfile}</button>
+                <button type="button" role="menuitem" onClick={() => {
+                  setDashboardView('promotions')
+                  setIsProfileMenuOpen(false)
+                }}>🎖️ {navText[language]?.[5] || navText.en[5]}</button>
                 <button type="button" role="menuitem" onClick={() => setIsSettingsOpen((open) => !open)}>{t.settings}</button>
                 {isSettingsOpen && (
                   <div className="theme-settings" role="group" aria-label={t.settings}>
@@ -2461,12 +5401,12 @@ function App() {
                     <button type="button" className={isDarkMode ? 'theme-choice active' : 'theme-choice'} onClick={() => setIsDarkMode(true)}>{t.darkMode}</button>
                   </div>
                 )}
-                <button type="button" role="menuitem" onClick={() => { setIsProfileMenuOpen(false); setStep('login') }}>{t.logout}</button>
+                <button type="button" role="menuitem" onClick={clearSession}>{t.logout}</button>
               </div>
             )}
           </div>
 
-          <button className="nav-btn-secondary" onClick={() => setStep('skills')}>
+          <button className="nav-btn-secondary" onClick={() => setStep('profile')}>
             ← {tx('editProfile')}
           </button>
         </div>
@@ -2487,7 +5427,7 @@ function App() {
             </div>
             {isProfileEditing ? (
               <div className="profile-form-grid profile-edit-grid">
-                {[['name', tx('fullName')], ['employeeId', tx('employeeId')], ['department', tx('department')], ['designation', tx('designation')]].map(([key, label]) => (
+                {[['name', tx('fullName')], ['employeeId', tx('employeeId')], ['department', 'Department'], ['designation', 'Designation'], ['currentAssignment', 'Current assignment'], ['educationalQualifications', 'Educational qualifications']].map(([key, label]) => (
                   <label className="profile-field" key={key}>
                     {label}
                     <input value={profileDraft[key] || ''} onChange={(event) => setProfileDraft((draft) => ({ ...draft, [key]: event.target.value }))} />
@@ -2500,7 +5440,7 @@ function App() {
               </div>
             ) : (
               <div className="profile-form-grid profile-summary-grid">
-                {[[tx('fullName'), profile.name || 'Not provided'], [tx('employeeId'), profile.employeeId || 'Not provided'], [tx('department'), profile.department || 'Not provided'], [tx('designation'), profile.designation || 'Not provided'], [t.roleLabel, profile.role || 'Not selected'], [t.experienceLabel, profile.experience || 'Not selected']].map(([label, value]) => (
+                {[[tx('fullName'), profile.name || 'Not provided'], [tx('employeeId'), profile.employeeId || 'Not provided'], ['Department', profile.department || 'Not provided'], ['Designation', profile.designation || 'Not provided'], ['Current assignment', profile.currentAssignment || profile.assignment || 'Not provided'], ['Educational qualifications', profile.educationalQualifications || 'Not provided'], [t.roleLabel, profile.role || 'Not selected'], [t.experienceLabel, profile.experience || 'Not selected']].map(([label, value]) => (
                   <div className="profile-summary-item" key={label}>
                     <span>{label}</span>
                     <strong>{value}</strong>
@@ -2625,7 +5565,7 @@ function App() {
 
             <div className="view-heading">
               <p className="kicker">PERSONALIZED RECOMMENDATION ENGINE</p>
-              <h1>AI Learning & Specialised Training Pathway</h1>
+              <h1>Recommendations</h1>
               <p className="helper">
                 A complete learning path for every skill in your profile.
               </p>
@@ -2672,7 +5612,7 @@ function App() {
                     {selectedSkillForRec.domain || 'Technical Competencies'}
                   </span>
                   <h2>{selectedSkillForRec.skill}</h2>
-                  <span>Target Benchmark for {profile.role || profile.designation || 'Statistical Officer'}</span>
+                  <span>Target Benchmark for {(profile.role && profile.role.trim()) || (profile.designation && profile.designation.trim()) || 'Statistical Officer'}</span>
                 </div>
 
                 <div className="comparison-bars">
@@ -2833,15 +5773,15 @@ function App() {
         <section className="dashboard-welcome-banner">
           <div className="user-profile-badge">
             <div className="avatar-circle">
-              {(profile.designation || profile.role || profile.name || 'DO').slice(0, 2).toUpperCase()}
+              {getUserInitial(profile.name)}
             </div>
             <div>
               <h2>Welcome to your Skillstat Hub</h2>
               <p className="user-sub">
-                Target Role: <strong>{profile.designation || profile.role || 'Doctor'}</strong>
+                Target Role: <strong>{(profile.role && profile.role.trim()) || (profile.designation && profile.designation.trim()) || 'Statistical Officer'}</strong>
                 {profile.department ? <> • Department: <strong>{profile.department}</strong></> : null}
                 {' '}• Experience: <strong>{profile.experience || '10-15 years'}</strong> • Employee Rank:{' '}
-                <strong className="rank-highlight-tag">#{userRank} in Company</strong>
+                <strong className="rank-highlight-tag">{userRank ? `#${userRank} in Company` : 'Unranked'}</strong>
               </p>
             </div>
           </div>
@@ -2853,12 +5793,53 @@ function App() {
           </div>
         </section>
 
+        {/* Career Progression & Promotion Milestone Banner */}
+        {(() => {
+          const userCurrentRole = (profile.role && profile.role.trim()) || (profile.designation && profile.designation.trim()) || 'Statistical Officer'
+          const pathwayPreview = getPromotionPathway(userCurrentRole, overallScore)
+          return (
+            <section className="dashboard-promo-preview-banner">
+              <div className="promo-preview-left">
+                <div className="promo-badge-row">
+                  <span className="promo-pill-label">🎖️ Career Progression Track</span>
+                  <span className="promo-pill-cadre">{pathwayPreview.cadre}</span>
+                </div>
+                <h3 className="promo-target-heading">
+                  Next Promotion Milestone: <span className="promo-target-role-text">{pathwayPreview.targetRole}</span>
+                </h3>
+                <p className="promo-target-sub">
+                  Target Benchmark: <strong>{pathwayPreview.benchmarkScore}%</strong> • Current Score: <strong>{overallScore}%</strong> • 
+                  Expected Increment: <strong>{pathwayPreview.gradeIncrement}</strong>
+                </p>
+                <div className="promo-preview-summary-pills">
+                  <span className="promo-tag-item">📚 {pathwayPreview.courses.length} Accredited Courses</span>
+                  <span className="promo-tag-item">🎯 Key Role Outcomes Defined</span>
+                  <span className="promo-tag-item">⚖️ APAR & Competency Aligned</span>
+                </div>
+              </div>
+              <div className="promo-preview-right">
+                <div className="promo-readiness-circle">
+                  <span className="promo-gauge-pct">{pathwayPreview.readinessPct}%</span>
+                  <span className="promo-gauge-sub">Readiness</span>
+                </div>
+                <button 
+                  type="button" 
+                  className="primary-action promo-explore-btn"
+                  onClick={() => setDashboardView('promotions')}
+                >
+                  View Role Courses & Outcomes →
+                </button>
+              </div>
+            </section>
+          )
+        })()}
+
         <div className="dashboard-main-grid">
               {/* Profile Overview */}
               <div className="dashboard-panel profile-panel">
                 <div className="panel-head">
                   <h3>{t.profile}</h3>
-                  <button className="edit-link" onClick={() => setStep('skills')}>
+                  <button className="edit-link" onClick={() => setStep('profile')}>
                     Edit
                   </button>
                 </div>
@@ -2866,7 +5847,7 @@ function App() {
                 <div className="profile-details-list">
                   <div className="detail-item">
                     <span className="detail-label">{t.roleLabel}</span>
-                    <span className="detail-val">{profile.designation || profile.role || 'Not selected'}</span>
+                    <span className="detail-val">{(profile.role && profile.role.trim()) || (profile.designation && profile.designation.trim()) || 'Not selected'}</span>
                   </div>
                   {profile.department && (
                     <div className="detail-item">
@@ -3050,9 +6031,9 @@ function App() {
               <div className="weekend-hero-right">
                 <div className="user-rank-box">
                   <span className="rank-sub">Your Current Rank</span>
-                  <div className="rank-number">#{userRank}</div>
+                  <div className="rank-number">{userRank ? `#${userRank}` : '—'}</div>
                   <span className="rank-tier-badge">
-                    {userRank === 1 ? '🥇 Champion Tier' : userRank <= 3 ? '🥈 Top 3 Elite' : '⭐ Top 5% Tier'}
+                    {userRank === 1 ? '🥇 Champion Tier' : userRank ? `#${userRank} Tier` : 'Unranked'}
                   </span>
                   <span className="rank-score-sub">
                     {weekendCompleted ? `Score: ${weekendScore}/100` : 'Not attempted yet'}
@@ -3076,7 +6057,7 @@ function App() {
                     Rankings updated live based on weekend challenge scores & accuracy.
                   </p>
                 </div>
-                <span className="leaderboard-count">148 Active Employees</span>
+                <span className="leaderboard-count">{leaderboard.length} {leaderboard.length === 1 ? 'Active Participant' : 'Active Participants'}</span>
               </div>
 
               <div className="leaderboard-table">
@@ -3089,32 +6070,42 @@ function App() {
                   <span>Status Badge</span>
                 </div>
 
-                {leaderboard.map((emp) => (
-                  <div
-                    key={emp.id}
-                    className={`leaderboard-row ${emp.isUser ? 'user-highlight' : ''}`}
-                  >
-                    <div className="rank-col">
-                      <span className={`rank-badge rank-${emp.rank}`}>
-                        {emp.rank === 1 ? '🥇 1' : emp.rank === 2 ? '🥈 2' : emp.rank === 3 ? '🥉 3' : `#${emp.rank}`}
-                      </span>
-                    </div>
-                    <div className="emp-col">
-                      <div className="emp-avatar">{emp.avatar}</div>
-                      <strong>{emp.name}</strong>
-                    </div>
-                    <div className="role-col">{emp.role}</div>
-                    <div className="score-col">
-                      <strong>{emp.score}</strong> / 100
-                    </div>
-                    <div className="accuracy-col">
-                      <span className="acc-tag">{emp.accuracy}</span>
-                    </div>
-                    <div className="badge-col">
-                      <span className="emp-tier-badge">{emp.badge}</span>
-                    </div>
+                {leaderboard.length === 0 ? (
+                  <div className="leaderboard-empty-state" style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--muted)' }}>
+                    <div style={{ fontSize: '36px', marginBottom: '10px' }}>🏆</div>
+                    <h4 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--ink)', marginBottom: '6px' }}>No Challenge Entries Yet</h4>
+                    <p style={{ fontSize: '13px', maxWidth: '440px', margin: '0 auto' }}>
+                      Take this weekend's championship sprint above to record your score and claim the #1 spot on the company leaderboard!
+                    </p>
                   </div>
-                ))}
+                ) : (
+                  leaderboard.map((emp) => (
+                    <div
+                      key={emp.id}
+                      className={`leaderboard-row ${emp.isUser ? 'user-highlight' : ''}`}
+                    >
+                      <div className="rank-col">
+                        <span className={`rank-badge rank-${emp.rank}`}>
+                          {emp.rank === 1 ? '🥇 1' : emp.rank === 2 ? '🥈 2' : emp.rank === 3 ? '🥉 3' : `#${emp.rank}`}
+                        </span>
+                      </div>
+                      <div className="emp-col">
+                        <div className="emp-avatar">{emp.avatar}</div>
+                        <strong>{emp.name}</strong>
+                      </div>
+                      <div className="role-col">{emp.role}</div>
+                      <div className="score-col">
+                        <strong>{emp.score}</strong> / 100
+                      </div>
+                      <div className="accuracy-col">
+                        <span className="acc-tag">{emp.accuracy}</span>
+                      </div>
+                      <div className="badge-col">
+                        <span className="emp-tier-badge">{emp.badge}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -3224,6 +6215,250 @@ function App() {
           </div>
         )}
 
+        {/* VIEW: Role-Based Career & Promotion Progression */}
+        {dashboardView === 'promotions' && (() => {
+          const userDesignatedRole = (profile.role && profile.role.trim()) || (profile.designation && profile.designation.trim()) || 'Statistical Officer'
+          const pathway = getPromotionPathway(userDesignatedRole, overallScore)
+
+          return (
+            <div className="promotions-view-container">
+              {/* Promotion Header */}
+              <div className="promo-header-card">
+                <div className="promo-header-top">
+                  <div className="promo-header-info">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                      <span className="promo-cadre-tag">🎖️ {pathway.cadre}</span>
+                      <span className="status-pill green">Target: {userDesignatedRole}</span>
+                      {profile.department && <span className="status-pill blue">{profile.department}</span>}
+                    </div>
+                    <h2 className="promo-title">Career Progression & Promotion Pathway</h2>
+                    <p className="promo-sub">
+                      Review official promotion targets, salary grade increments, and accredited learning modules with tangible outcomes required for career advancement.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Career Progression Roadmap Banner */}
+                <div className="promo-hero-roadmap">
+                  <div className="promo-roadmap-flow">
+                    <div className="roadmap-step current">
+                      <span className="step-badge">Current Tier</span>
+                      <strong className="step-role-title">{pathway.currentRole}</strong>
+                      <span className="step-status">Assessed at {overallScore}% Score</span>
+                    </div>
+
+                    <div className="roadmap-arrow">
+                      <span className="arrow-line"></span>
+                      <span className="arrow-icon">➔</span>
+                      <span className="arrow-label">Promotion Target</span>
+                    </div>
+
+                    <div className="roadmap-step target">
+                      <span className="step-badge highlight">Next Cadre</span>
+                      <strong className="step-role-title">🎖️ {pathway.targetRole}</strong>
+                      <span className="step-status">Benchmark: {pathway.benchmarkScore}%+</span>
+                    </div>
+
+                    <div className="roadmap-arrow secondary">
+                      <span className="arrow-line"></span>
+                      <span className="arrow-icon">➔</span>
+                      <span className="arrow-label">Leadership Track</span>
+                    </div>
+
+                    <div className="roadmap-step horizon">
+                      <span className="step-badge">Future Milestone</span>
+                      <strong className="step-role-title">🚀 {pathway.higherTarget}</strong>
+                      <span className="step-status">Senior Directorate</span>
+                    </div>
+                  </div>
+
+                  {/* Readiness Progress Meter */}
+                  <div className="promo-readiness-meter-block">
+                    <div className="meter-header">
+                      <div className="meter-label-group">
+                        <span className="meter-title">Promotion Readiness Benchmark</span>
+                        <span className={`readiness-status-badge ${pathway.isEligible ? 'eligible' : 'in-progress'}`}>
+                          {pathway.isEligible ? '✅ Benchmark Achieved' : `⏳ ${pathway.remainingGap}% Competency Gap`}
+                        </span>
+                      </div>
+                      <div className="meter-score-numbers">
+                        <span className="score-val current">{overallScore}% Current</span>
+                        <span className="score-divider">/</span>
+                        <span className="score-val benchmark">{pathway.benchmarkScore}% Required</span>
+                      </div>
+                    </div>
+
+                    <div className="promo-meter-track">
+                      <div
+                        className={`promo-meter-fill ${pathway.isEligible ? 'complete' : 'progressing'}`}
+                        style={{ width: `${pathway.readinessPct}%` }}
+                      />
+                      <div
+                        className="benchmark-target-marker"
+                        style={{ left: `${Math.min(100, pathway.benchmarkScore)}%` }}
+                        title={`Promotion threshold: ${pathway.benchmarkScore}%`}
+                      >
+                        <span className="marker-flag">Min {pathway.benchmarkScore}%</span>
+                      </div>
+                    </div>
+
+                    <div className="promo-meter-caption">
+                      {pathway.isEligible ? (
+                        <p className="caption-text success">
+                          🎉 Outstanding! You have reached the minimum competency benchmark for <strong>{pathway.targetRole}</strong>. Complete the accredited courses below to finalize your APAR profile.
+                        </p>
+                      ) : (
+                        <p className="caption-text neutral">
+                          Complete the accredited courses and competency quizzes below to close your remaining <strong>{pathway.remainingGap}% gap</strong> and unlock formal promotion eligibility.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Promotion Benefits & Criteria Matrix */}
+              <div className="promo-benefits-grid">
+                {/* Benefit 1: Pay Scale Upgrade */}
+                <div className="promo-benefit-card compensation">
+                  <div className="benefit-card-header">
+                    <span className="benefit-card-icon">💰</span>
+                    <h4>Pay Scale & Grade Promotion</h4>
+                  </div>
+                  <div className="benefit-grade-highlight">
+                    {pathway.gradeIncrement}
+                  </div>
+                  <p className="benefit-card-desc">
+                    Eligible for promotional grade pay revision, higher allowances, and advanced seniority status within the department.
+                  </p>
+                </div>
+
+                {/* Benefit 2: Expanded Responsibilities */}
+                <div className="promo-benefit-card responsibilities">
+                  <div className="benefit-card-header">
+                    <span className="benefit-card-icon">🏛️</span>
+                    <h4>Key Scope & Responsibilities</h4>
+                  </div>
+                  <ul className="promo-benefit-bullets">
+                    {pathway.responsibilities.map((resp, idx) => (
+                      <li key={idx}>
+                        <span className="bullet-dot">•</span>
+                        <span>{resp}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Benefit 3: Promotion Criteria & APAR Value */}
+                <div className="promo-benefit-card criteria">
+                  <div className="benefit-card-header">
+                    <span className="benefit-card-icon">📋</span>
+                    <h4>Promotion Screening Criteria</h4>
+                  </div>
+                  <ul className="promo-criteria-checklist">
+                    {pathway.promotionCriteria.map((crit, idx) => {
+                      const isFirstAndMet = idx === 0 && pathway.isEligible
+                      return (
+                        <li key={idx} className={`criteria-item ${isFirstAndMet ? 'cleared' : 'pending'}`}>
+                          <span className="criteria-check">{isFirstAndMet ? '✓' : '○'}</span>
+                          <span>{crit}</span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                  <div className="apar-note-box">
+                    <span className="apar-icon">⭐</span>
+                    <small>Official completion certificates are directly documented in your digital competency dossier.</small>
+                  </div>
+                </div>
+              </div>
+
+              {/* Curated Promotion Courses with Tangible Outcomes */}
+              <div className="promo-courses-section">
+                <div className="promo-courses-header">
+                  <div>
+                    <span className="section-eyebrow">Accredited Learning Tracks</span>
+                    <h3 className="section-title">Courses Required for Promotion & Tangible Outcomes</h3>
+                    <p className="section-sub">
+                      The following certified courses are mapped directly to the competencies evaluated for promotion to <strong>{pathway.targetRole}</strong>.
+                    </p>
+                  </div>
+                  <span className="promo-courses-count">{pathway.courses.length} Accredited Programs</span>
+                </div>
+
+                <div className="promo-courses-grid">
+                  {pathway.courses.map((course) => (
+                    <div key={course.id} className="promo-course-card">
+                      {/* Top Badges */}
+                      <div className="promo-course-top">
+                        <span className={`promo-provider-badge ${course.provider.toLowerCase().includes('nssta') ? 'nssta' : 'igot'}`}>
+                          {course.provider.includes('NSSTA') ? '🏛️ ' : '🎓 '}{course.provider}
+                        </span>
+                        <span className="promo-impact-pill">
+                          ⚡ {course.promotionImpact}
+                        </span>
+                      </div>
+
+                      {/* Title & Metadata */}
+                      <h4 className="promo-course-title">{course.title}</h4>
+                      
+                      <div className="promo-course-meta">
+                        <span className="meta-chip">⏱️ {course.duration}</span>
+                        <span className="meta-chip">📊 {course.difficulty}</span>
+                        <span className="meta-chip">💻 {course.format}</span>
+                        <span className="meta-chip competency">🎯 {course.competency || course.skill}</span>
+                      </div>
+
+                      {/* Tangible Outcomes Box */}
+                      <div className="promo-outcomes-box">
+                        <div className="outcomes-header">
+                          <span className="outcomes-icon">🎯</span>
+                          <strong>Tangible Learning Outcomes & Mastery:</strong>
+                        </div>
+                        <ul className="outcomes-list">
+                          {course.outcomes.map((outcome, idx) => (
+                            <li key={idx} className="outcome-item">
+                              <span className="outcome-check">✓</span>
+                              <span className="outcome-text">{outcome}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      {/* Certification Credential */}
+                      <div className="promo-cert-box">
+                        <span className="cert-icon">📜</span>
+                        <div className="cert-info">
+                          <span className="cert-lbl">Accredited Credential:</span>
+                          <strong className="cert-name">{course.certification}</strong>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="promo-course-actions">
+                        <button
+                          type="button"
+                          className="secondary-action btn-sm"
+                          onClick={() => setActiveCourseModal(course)}
+                        >
+                          📖 View Syllabus & Objectives
+                        </button>
+                        <button
+                          type="button"
+                          className="primary-action btn-sm"
+                          onClick={() => startQuiz('standard', course.competency || course.skill)}
+                        >
+                          ⚡ Assess Competency ({course.competency || course.skill}) →
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )
+        })()}
+
         {/* Interactive In-App Course Details Modal (No external iGOT redirect) */}
         {activeCourseModal && (
           <div className="course-modal-backdrop" onClick={() => setActiveCourseModal(null)} role="dialog" aria-modal="true">
@@ -3266,6 +6501,37 @@ function App() {
                   </div>
                 </div>
 
+                {activeCourseModal.promotionImpact && (
+                  <div className="course-modal-promo-banner">
+                    <div className="promo-callout-header">
+                      <span className="promo-callout-badge">🎖️ Promotion Advancement Track</span>
+                      <span className="promo-callout-impact">{activeCourseModal.promotionImpact}</span>
+                    </div>
+                    <p className="promo-callout-text">
+                      Completing this accredited program directly contributes to closing competency screening requirements for your next promotion.
+                    </p>
+                    {activeCourseModal.certification && (
+                      <div className="promo-callout-cert">
+                        <span className="cert-lead">📜 Official Credential:</span> <strong>{activeCourseModal.certification}</strong>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeCourseModal.outcomes && activeCourseModal.outcomes.length > 0 && (
+                  <div className="course-modal-section">
+                    <h4>🎯 Tangible Learning Outcomes & Practical Mastery</h4>
+                    <ul className="course-modal-outcomes">
+                      {activeCourseModal.outcomes.map((out, idx) => (
+                        <li key={idx} className="outcome-item">
+                          <span className="outcome-check">✓</span>
+                          <span>{out}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 <div className="course-modal-section">
                   <h4>Course Curriculum & Objectives</h4>
                   <p className="course-modal-desc">
@@ -3273,39 +6539,130 @@ function App() {
                   </p>
                 </div>
 
-                <div className="course-modal-section">
-                  <h4>Structured Learning Modules</h4>
-                  <div className="course-syllabus-list">
-                    <div className="syllabus-item">
-                      <span className="mod-num">Module 1</span>
-                      <div>
-                        <strong>Core Principles & Departmental Guidelines</strong>
-                        <p>Foundational principles, governance standards, and official procedures for {activeCourseModal.title || activeCourseModal.name}.</p>
+                {/* Module Progression, Start → Button, and Expandable Topics Drawer */}
+                {(() => {
+                  const curriculum = getCourseCurriculum(activeCourseModal)
+                  const completedModuleCount = curriculum.filter((mod) =>
+                    mod.topics.every((top) => completedTopics[top.id])
+                  ).length
+                  const overallProgressPct = Math.round((completedModuleCount / curriculum.length) * 100)
+
+                  return (
+                    <div className="course-modal-section">
+                      <h4>Structured Learning Modules</h4>
+                      
+                      {/* Overall Progress Bar */}
+                      <div className="course-progress-header">
+                        <div className="course-progress-info">
+                          <span>Course Progression</span>
+                          <span>
+                            {completedModuleCount} of {curriculum.length} modules completed{' '}
+                            <span className="course-progress-pct">({overallProgressPct}%)</span>
+                          </span>
+                        </div>
+                        <div className="course-progress-track">
+                          <div className="course-progress-fill" style={{ width: `${overallProgressPct}%` }} />
+                        </div>
+                      </div>
+
+                      {/* Module Overview Cards */}
+                      <div className="course-syllabus-list">
+                        {curriculum.map((mod, mIdx) => {
+                          const isModuleDone = mod.topics.every((top) => completedTopics[top.id])
+                          const doneTopicsCount = mod.topics.filter((top) => completedTopics[top.id]).length
+                          const isExpanded = expandedModule === mIdx
+
+                          return (
+                            <div
+                              className={`module-overview-card ${isExpanded ? 'expanded' : ''} ${isModuleDone ? 'all-done' : ''}`}
+                              key={`mod-card-${mod.index}`}
+                            >
+                              <div
+                                className="mod-card-top"
+                                onClick={() => setExpandedModule(isExpanded ? null : mIdx)}
+                              >
+                                <div className="mod-title-group">
+                                  <div className="mod-meta-row">
+                                    <span className="mod-num-badge">Module {mod.index}</span>
+                                    <span className="mod-topic-counter">{doneTopicsCount}/5 topics completed</span>
+                                  </div>
+                                  <strong>{mod.title}</strong>
+                                  <p>{mod.desc}</p>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  className={`mod-action-btn ${isModuleDone ? 'btn-done' : isExpanded ? 'btn-active' : ''}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setExpandedModule(isExpanded ? null : mIdx)
+                                  }}
+                                >
+                                  {isModuleDone ? '✓ Done' : isExpanded ? '✕ Close' : doneTopicsCount > 0 ? 'Continue →' : 'Start →'}
+                                </button>
+                              </div>
+
+                              {isExpanded && (
+                                <div className="module-topics-drawer">
+                                  {isModuleDone && (
+                                    <div className="module-done-banner">
+                                      ✓ All topics completed! This module is marked as done.
+                                    </div>
+                                  )}
+                                  {mod.topics.map((topic, tIdx) => {
+                                    const isTopicDone = Boolean(completedTopics[topic.id])
+                                    return (
+                                      <div
+                                        className={`drawer-topic-item ${isTopicDone ? 'topic-completed' : ''}`}
+                                        key={topic.id}
+                                      >
+                                        <div className="drawer-topic-left">
+                                          <span className={`drawer-topic-idx ${isTopicDone ? 'idx-done' : ''}`}>
+                                            {isTopicDone ? '✓' : topic.index}
+                                          </span>
+                                          <button
+                                            type="button"
+                                            className="drawer-topic-title-btn"
+                                            onClick={() => setActiveLessonView({
+                                              course: activeCourseModal,
+                                              moduleIndex: mIdx,
+                                              topicIndex: tIdx,
+                                              topic,
+                                            })}
+                                          >
+                                            {topic.title}
+                                          </button>
+                                        </div>
+
+                                        <div className="drawer-topic-right">
+                                          <span className="topic-meta-tag video-badge">▶ Video</span>
+                                          <span className="topic-meta-tag">{topic.duration}</span>
+                                          <button
+                                            type="button"
+                                            className={`drawer-topic-play-btn ${isTopicDone ? 'btn-is-done' : ''}`}
+                                            title={isTopicDone ? 'Completed - Click to watch again' : 'Play Video Lesson'}
+                                            onClick={() => setActiveLessonView({
+                                              course: activeCourseModal,
+                                              moduleIndex: mIdx,
+                                              topicIndex: tIdx,
+                                              topic,
+                                            })}
+                                          >
+                                            {isTopicDone ? '✓' : '▶'}
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
                       </div>
                     </div>
-                    <div className="syllabus-item">
-                      <span className="mod-num">Module 2</span>
-                      <div>
-                        <strong>Applied Workflows & Case Applications</strong>
-                        <p>Implementation methodologies, practical frameworks, and domain-specific scenarios.</p>
-                      </div>
-                    </div>
-                    <div className="syllabus-item">
-                      <span className="mod-num">Module 3</span>
-                      <div>
-                        <strong>Quality Verification & Best Practices</strong>
-                        <p>Field-tested best practices, error prevention techniques, and compliance checks.</p>
-                      </div>
-                    </div>
-                    <div className="syllabus-item">
-                      <span className="mod-num">Module 4</span>
-                      <div>
-                        <strong>Competency Benchmark & Assessment Preparation</strong>
-                        <p>Hands-on scenario evaluations aligned with national certification standards.</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  )
+                })()}
 
                 {activeCourseModal.skills && activeCourseModal.skills.length > 0 && (
                   <div className="course-modal-section">
@@ -3342,6 +6699,178 @@ function App() {
             </div>
           </div>
         )}
+
+        {/* Coursera-Style Fullscreen Video Learning Platform Overlay */}
+        {activeLessonView && (() => {
+          const currentCourse = activeLessonView.course
+          const curriculum = getCourseCurriculum(currentCourse)
+          const currentModule = curriculum[activeLessonView.moduleIndex] || curriculum[0]
+          const currentTopic = activeLessonView.topic || currentModule.topics[0]
+          const mIdx = activeLessonView.moduleIndex
+          const tIdx = activeLessonView.topicIndex
+          const isCurrentTopicDone = Boolean(completedTopics[currentTopic.id])
+          const isFirstTopic = mIdx === 0 && tIdx === 0
+          const isLastTopic = mIdx === 3 && tIdx === 4
+          const isLastInModule = tIdx === 4
+
+          return (
+            <div className="lesson-view-overlay" role="dialog" aria-modal="true">
+              {/* Top Navigation Bar (.lesson-topbar) */}
+              <header className="lesson-topbar">
+                <div className="lesson-topbar-left">
+                  <button
+                    type="button"
+                    className="lesson-back-btn"
+                    onClick={() => setActiveLessonView(null)}
+                  >
+                    ← Back to Course
+                  </button>
+                  <div className="lesson-breadcrumbs">
+                    <span>{currentCourse.title || currentCourse.name}</span>
+                    <span className="crumb-sep">&gt;</span>
+                    <strong>{currentModule.title}</strong>
+                  </div>
+                </div>
+
+                <div className="lesson-topbar-right">
+                  <button
+                    type="button"
+                    className="lesson-toggle-sidebar-btn"
+                    onClick={() => setSidebarCollapsed((prev) => !prev)}
+                  >
+                    {sidebarCollapsed ? '≡ Show' : '≡ Hide'}
+                  </button>
+                </div>
+              </header>
+
+              {/* Main Workspace */}
+              <div className="lesson-workspace">
+                {/* Left Course Syllabus Sidebar (.lesson-sidebar) */}
+                <aside className={`lesson-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
+                  <div className="lsb-header">
+                    <span>Course Syllabus</span>
+                    <span>4 Modules · 20 Topics</span>
+                  </div>
+                  {curriculum.map((mod, modI) => {
+                    const modDoneCount = mod.topics.filter((t) => completedTopics[t.id]).length
+                    return (
+                      <div className="lsb-module-group" key={`lsb-mod-${mod.index}`}>
+                        <div className="lsb-module-header">
+                          <span className="lsb-module-title">Module {mod.index}: {mod.title}</span>
+                          <span className="lsb-module-progress">{modDoneCount}/5</span>
+                        </div>
+                        <div className="lsb-topic-list">
+                          {mod.topics.map((t, topI) => {
+                            const isDone = Boolean(completedTopics[t.id])
+                            const isActive = modI === mIdx && topI === tIdx
+                            return (
+                              <div
+                                key={t.id}
+                                className={`lsb-topic-item ${isActive ? 'lsb-topic-active' : ''} ${isDone ? 'lsb-topic-done' : ''}`}
+                                onClick={() => setActiveLessonView({
+                                  course: currentCourse,
+                                  moduleIndex: modI,
+                                  topicIndex: topI,
+                                  topic: t,
+                                })}
+                              >
+                                <span className="lsb-topic-badge">{isDone ? '✓' : t.index}</span>
+                                <span className="lsb-topic-label">{t.title}</span>
+                                <span className="lsb-topic-time">{t.duration}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </aside>
+
+                {/* Responsive 16:9 Video Player & Topic Content */}
+                <main className="lesson-main-pane">
+                  <div className="lesson-content-container">
+                    {/* Responsive 16:9 Video Player (.lesson-video-wrap) */}
+                    <div className="lesson-video-wrap">
+                      <iframe
+                        src={currentTopic.videoUrl}
+                        title={currentTopic.title}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+
+                    {/* Navigation Bar (.lesson-nav-row) */}
+                    <div className="lesson-nav-row">
+                      <button
+                        type="button"
+                        className="lesson-nav-btn"
+                        disabled={isFirstTopic}
+                        onClick={handlePreviousTopic}
+                      >
+                        ← Previous
+                      </button>
+
+                      <span className="lesson-position-counter">
+                        Module {mIdx + 1} · Topic {tIdx + 1} of 5
+                      </span>
+
+                      <button
+                        type="button"
+                        className="lesson-nav-btn primary"
+                        onClick={handleMarkCompleteAndContinue}
+                      >
+                        {isLastTopic ? 'Finish Course ✦' : isLastInModule ? 'Next Module →' : 'Next →'}
+                      </button>
+                    </div>
+
+                    {/* Topic Info & Action Section (.lesson-content-area) */}
+                    <div className="lesson-content-area">
+                      <div className="lesson-badges-row">
+                        <span className="lesson-pill">▶ Video Lesson</span>
+                        <span className="lesson-pill">{currentTopic.duration}</span>
+                        {isCurrentTopicDone && (
+                          <span className="lesson-pill completed">✓ Completed</span>
+                        )}
+                      </div>
+
+                      <h1 className="lesson-title">{currentTopic.title}</h1>
+                      <p className="lesson-desc">{currentTopic.description}</p>
+
+                      <div className="lesson-cta-row">
+                        <button
+                          type="button"
+                          className="lesson-cta-primary"
+                          onClick={handleMarkCompleteAndContinue}
+                        >
+                          ✓ Mark Complete & Continue →
+                        </button>
+
+                        <div className="lesson-cta-secondary-group">
+                          {isCurrentTopicDone && (
+                            <button
+                              type="button"
+                              className="lesson-cta-secondary"
+                              onClick={handleUndoCompletion}
+                            >
+                              Undo Completion
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="lesson-cta-secondary"
+                            onClick={handleSkipForNow}
+                          >
+                            Skip for Now
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </main>
+              </div>
+            </div>
+          )
+        })()}
       </main>
 
       {/* Floating Skillstat AI Copilot Assistant */}
@@ -3356,6 +6885,8 @@ function App() {
           setDashboardView(targetView)
         }}
         startQuiz={startQuiz}
+        initialHistory={chatHistory}
+        onHistoryChange={setChatHistory}
       />
     </div>
   )

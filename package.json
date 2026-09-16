@@ -4,13 +4,16 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node dev.mjs",
+    "dev:client": "vite",
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "api": "node server.mjs"
+    "api": "node server.mjs",
+    "migrate:supabase": "node scripts/migrate-to-supabase.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.116.0",
     "pdfjs-dist": "^6.3.289",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"

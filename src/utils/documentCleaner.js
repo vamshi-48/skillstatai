@@ -141,35 +141,55 @@ export function extractConceptsFromText(cleanedText, count = 5) {
     return ['Core Methodologies', 'Workflow Standards', 'Operational Guidance', 'Quality Protocols', 'Compliance Guidelines'].slice(0, count)
   }
 
-  // Extract key topic phrases from top sentences
-  const concepts = []
-  for (let i = 0; i < Math.min(rawSentences.length, count * 2); i++) {
-    const s = rawSentences[i]
-    // Clean out leading bullet points, numbers, or dashes
-    const cleanSentence = s.replace(/^[\d.)\-\s*•]+/, '').trim()
-    const words = cleanSentence.split(/\s+/)
+    // Extract key topic phrases from top sentences
+    const concepts = []
+    for (let i = 0; i < Math.min(rawSentences.length, count * 3); i++) {
+      const s = rawSentences[i]
+      // Clean out leading bullet points, numbers, dashes, or markdown
+      const cleanSentence = s.replace(/^[\d.)\-\s*•#]+/, '').trim()
+      const words = cleanSentence.split(/\s+/).filter(Boolean)
+      if (words.length < 3) continue
 
-    // Create a 3-6 word concept summary
-    let conceptTitle = words.slice(0, 5).join(' ')
-    if (conceptTitle.length > 35) {
-      conceptTitle = conceptTitle.slice(0, 32) + '...'
+      // Look for clean topic phrases: take 2 to 4 words
+      let meaningfulWords = words.slice(0, 4)
+      // Trim dangling prepositions/conjunctions/verbs from end
+      while (
+        meaningfulWords.length > 2 &&
+        /^(by|is|are|was|were|of|in|to|for|with|and|or|a|an|the|from|as|at|that|which|into|on)$/i.test(
+          meaningfulWords[meaningfulWords.length - 1]
+        )
+      ) {
+        meaningfulWords.pop()
+      }
+
+      let conceptTitle = meaningfulWords
+        .join(' ')
+        .replace(/^[^\w]+|[^\w]+$/g, '')
+        .trim()
+
+      // Capitalize first character of each word for clean presentation
+      if (conceptTitle) {
+        conceptTitle = conceptTitle
+          .split(' ')
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(' ')
+      }
+
+      if (conceptTitle && conceptTitle.length >= 4 && !concepts.some((c) => c.title.toLowerCase() === conceptTitle.toLowerCase())) {
+        concepts.push({
+          index: concepts.length + 1,
+          title: conceptTitle,
+          context: cleanSentence,
+        })
+      }
+
+      if (concepts.length >= count) break
     }
 
-    if (conceptTitle && !concepts.some((c) => c.title === conceptTitle)) {
-      concepts.push({
-        index: concepts.length + 1,
-        title: conceptTitle,
-        context: cleanSentence,
-      })
-    }
-
-    if (concepts.length >= count) break
+    return concepts.length > 0
+      ? concepts
+      : [{ index: 1, title: 'Core Document Principles', context: cleanedText.slice(0, 150) }]
   }
-
-  return concepts.length > 0
-    ? concepts
-    : [{ index: 1, title: 'Core Document Principles', context: cleanedText.slice(0, 150) }]
-}
 
 /**
  * Asynchronously extracts text from an uploaded File object.
