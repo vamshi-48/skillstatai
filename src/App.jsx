@@ -3222,6 +3222,7 @@ function App() {
   const [ssoLoading, setSsoLoading] = useState(false)
   const [isSsoRegistrationOpen, setIsSsoRegistrationOpen] = useState(false)
   const [signupError, setSignupError] = useState('')
+  const [isSigningUp, setIsSigningUp] = useState(false)
   const [unverifiedEmail, setUnverifiedEmail] = useState('')
   const [verifyEmail, setVerifyEmail] = useState('')
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', ''])
@@ -4287,6 +4288,7 @@ function App() {
           <form
             onSubmit={(e) => {
               e.preventDefault()
+              if (isSigningUp) return
               const formData = new FormData(e.currentTarget)
               const password = formData.get('password')
               const confirmPassword = formData.get('confirmPassword')
@@ -4297,6 +4299,8 @@ function App() {
 
               const name = formData.get('name')?.toString().trim() || ''
               const email = formData.get('email')?.toString().trim().toLowerCase() || ''
+              setIsSigningUp(true)
+              setSignupError('')
               apiRequest('/api/auth/signup', {
                 method: 'POST',
                 body: JSON.stringify({ name, email, password }),
@@ -4322,7 +4326,11 @@ function App() {
                   setOverallScore(0)
                   setStep('profile')
                 }
-              }).catch((error) => setSignupError(error.message || 'Unable to sign in. Start the backend server and try again.'))
+              }).catch((error) => {
+                setSignupError(error.message || 'Unable to sign in. Start the backend server and try again.')
+              }).finally(() => {
+                setIsSigningUp(false)
+              })
             }}
           >
             <label>
@@ -4342,8 +4350,8 @@ function App() {
               <input name="confirmPassword" type="password" placeholder="Re-enter your password" minLength="8" autoComplete="new-password" required />
             </label>
             {signupError && <p className="form-error" role="alert">{signupError}</p>}
-            <button type="submit" className="primary-action">
-              Create account <span>→</span>
+            <button type="submit" className="primary-action" disabled={isSigningUp}>
+              {isSigningUp ? 'Creating account & sending code...' : <>Create account <span>→</span></>}
             </button>
           </form>
           <p className="signup-prompt">Already have an account? <button type="button" className="text-button" onClick={() => { setSignupError(''); setStep('login') }}>Sign in</button></p>

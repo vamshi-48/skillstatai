@@ -22,6 +22,44 @@ async function verifyPassword(password, storedHash) {
   return crypto.timingSafeEqual(Buffer.from(actual, 'hex'), Buffer.from(expected, 'hex'))
 }
 
+function hashOtp(code) {
+  const salt = crypto.randomBytes(16).toString('hex')
+  const hash = crypto.createHash('sha256').update(`${salt}:${String(code).trim()}`).digest('hex')
+  return `sha256:${salt}:${hash}`
+}
+
+async function checkCodeMatch(inputCode, storedHash) {
+  if (!inputCode || !storedHash) return false
+  const cleanInput = String(inputCode).trim()
+  const cleanStored = String(storedHash).trim()
+
+  // 1. Direct plain-text match
+  if (cleanStored === cleanInput) return true
+
+  // 2. SHA-256 salted hash: "sha256:salt:hash"
+  if (cleanStored.startsWith('sha256:')) {
+    const parts = cleanStored.split(':')
+    const salt = parts[1]
+    const expected = parts[2]
+    if (salt && expected) {
+      const actual = crypto.createHash('sha256').update(`${salt}:${cleanInput}`).digest('hex')
+      if (actual.toLowerCase() === expected.toLowerCase()) return true
+    }
+  }
+
+  // 3. Scrypt password hash: "salt:hash" (legacy)
+  if (cleanStored.includes(':') && !cleanStored.startsWith('sha256:')) {
+    try {
+      const isMatch = await verifyPassword(cleanInput, cleanStored)
+      if (isMatch) return true
+    } catch {
+      // ignore
+    }
+  }
+
+  return false
+}
+
 function getEnv(key) {
   return process.env[key] || ''
 }
@@ -308,15 +346,20 @@ export default async function handler(request, response) {
       }
 
       const otpCode = String(crypto.randomInt(100000, 1000000))
-      const codeHash = await hashPassword(otpCode)
+      const codeHash = hashOtp(otpCode)
       const codeExpires = Date.now() + 15 * 60 * 1000
 
       if (user) {
         user.passwordHash = await hashPassword(password)
+        const recentOtpHashes = Array.isArray(user.state?.recentOtpHashes) ? user.state.recentOtpHashes : []
+        if (user.verificationCode) {
+          recentOtpHashes.push(user.verificationCode)
+        }
+        user.state = user.state || { profile: { name, email }, selectedSkillList: [] }
+        user.state.recentOtpHashes = recentOtpHashes.slice(-5)
         user.verificationCode = codeHash
         user.verificationExpires = codeExpires
         user.lastVerificationSentAt = Date.now()
-        user.state = user.state || { profile: { name, email }, selectedSkillList: [] }
         if (name) user.state.profile.name = name
       } else {
         user = {
@@ -330,7 +373,11 @@ export default async function handler(request, response) {
           verificationCode: codeHash,
           verificationExpires: codeExpires,
           lastVerificationSentAt: Date.now(),
-          state: { profile: { name: name || '', email, employeeId: '' }, selectedSkillList: [] },
+          state: {
+            profile: { name: name || '', email, employeeId: '' },
+            selectedSkillList: [],
+            recentOtpHashes: [],
+          },
         }
       }
 
@@ -379,7 +426,20 @@ export default async function handler(request, response) {
         return
       }
 
-      const isMatch = await verifyPassword(code, user.verificationCode)
+      // Check against current verificationCode and any recent valid OTP hashes
+      const candidateHashes = [
+        user.verificationCode,
+        ...(Array.isArray(user.state?.recentOtpHashes) ? user.state.recentOtpHashes : []),
+      ].filter(Boolean)
+
+      let isMatch = false
+      for (const candidate of candidateHashes) {
+        if (await checkCodeMatch(code, candidate)) {
+          isMatch = true
+          break
+        }
+      }
+
       if (!isMatch) {
         sendJson(response, 400, { error: 'Incorrect verification code. Please check your email and try again.' })
         return
@@ -388,6 +448,9 @@ export default async function handler(request, response) {
       user.isEmailVerified = true
       user.verificationCode = ''
       user.verificationExpires = 0
+      if (user.state) {
+        user.state.recentOtpHashes = []
+      }
       user.sessionToken = crypto.randomBytes(32).toString('hex')
       await upsertUser(user)
 
@@ -424,7 +487,14 @@ export default async function handler(request, response) {
       }
 
       const otpCode = String(crypto.randomInt(100000, 1000000))
-      user.verificationCode = await hashPassword(otpCode)
+      const codeHash = hashOtp(otpCode)
+      user.state = user.state || {}
+      const recentOtpHashes = Array.isArray(user.state.recentOtpHashes) ? user.state.recentOtpHashes : []
+      if (user.verificationCode) {
+        recentOtpHashes.push(user.verificationCode)
+      }
+      user.state.recentOtpHashes = recentOtpHashes.slice(-5)
+      user.verificationCode = codeHash
       user.verificationExpires = now + 15 * 60 * 1000
       user.lastVerificationSentAt = now
 
