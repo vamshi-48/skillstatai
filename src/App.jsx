@@ -2406,7 +2406,7 @@ function getQuestionDifficulty(index, total = 10) {
 
 function buildScenarioQuestions(profile, t, userSkills, quizMode = 'standard', notesContent = '', targetSkill = '') {
   const profileSkills = profile?.skills
-    ? profile.skills.split(',').map((s) => s.trim()).filter(Boolean)
+    ? (Array.isArray(profile.skills) ? profile.skills : String(profile.skills).split(',')).map((s) => String(s).trim()).filter(Boolean)
     : []
   const defaultSkills = profileSkills.length > 0
     ? profileSkills
@@ -3932,7 +3932,7 @@ function App() {
     let skillList = specificSkill ? [specificSkill] : [...selectedSkillList]
     if (skillList.length === 0) {
       if (profile.skills) {
-        const fromProfile = profile.skills.split(',').map((s) => s.trim()).filter(Boolean)
+        const fromProfile = (Array.isArray(profile.skills) ? profile.skills : String(profile.skills).split(',')).map((s) => String(s).trim()).filter(Boolean)
         if (fromProfile.length > 0) skillList = fromProfile
       }
       if (skillList.length === 0 && competencyGaps && competencyGaps.length > 0) {
@@ -3942,7 +3942,7 @@ function App() {
       if (skillList.length === 0) {
         const roleSkills = getRoleSkillCategories(profile.role, profile.designation)
         if (Array.isArray(roleSkills) && roleSkills.length > 0) {
-          skillList = roleSkills.slice(0, 3)
+          skillList = roleSkills.flatMap(([, skills]) => skills).slice(0, 3)
         } else {
           skillList = ['Official Statistics & Survey Methodology', 'Public Sector Data Governance', 'Statistical Data Analysis']
         }
