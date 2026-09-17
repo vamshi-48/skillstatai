@@ -7,15 +7,36 @@ import {
   initialNotifications,
 } from './adminData'
 import './admin.css'
+import { isAllowedAdmin } from '../../config/adminConfig'
 
 export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
   const [activeTab, setActiveTab] = useState('dashboard')
+
+  // Helper to detect if a stored list contains legacy mock demo data
+  const isDemoList = (list) => {
+    if (!Array.isArray(list) || list.length === 0) return false
+    return list.some((item) =>
+      ['emp-101', 'emp-102', 'emp-103', 'emp-104', 'emp-105', 'dept-1', 'dept-2', 'dept-3', 'dept-4', 'dept-5', 'crs-1', 'crs-2', 'crs-3', 'crs-4', 'crs-5', 'notif-1', 'notif-2', 'notif-3'].includes(item.id) ||
+      item.email === 'karshikalamvamshi34@gmail.com' ||
+      item.email === 'pooja.sharma@nic.in' ||
+      item.title === 'Official Data Quality & Audit Frameworks' ||
+      item.skill === 'Data Quality Frameworks'
+    )
+  }
 
   // Reactive state synced with localStorage
   const [employees, setEmployees] = useState(() => {
     try {
       const saved = localStorage.getItem('skillstat_admin_employees')
-      return saved ? JSON.parse(saved) : initialEmployees
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (isDemoList(parsed)) {
+          localStorage.removeItem('skillstat_admin_employees')
+          return []
+        }
+        return parsed
+      }
+      return initialEmployees
     } catch {
       return initialEmployees
     }
@@ -24,7 +45,15 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
   const [departments, setDepartments] = useState(() => {
     try {
       const saved = localStorage.getItem('skillstat_admin_departments')
-      return saved ? JSON.parse(saved) : initialDepartments
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (isDemoList(parsed)) {
+          localStorage.removeItem('skillstat_admin_departments')
+          return []
+        }
+        return parsed
+      }
+      return initialDepartments
     } catch {
       return initialDepartments
     }
@@ -33,16 +62,32 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
   const [courses, setCourses] = useState(() => {
     try {
       const saved = localStorage.getItem('skillstat_admin_courses')
-      return saved ? JSON.parse(saved) : initialCourses
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (isDemoList(parsed)) {
+          localStorage.removeItem('skillstat_admin_courses')
+          return []
+        }
+        return parsed
+      }
+      return initialCourses
     } catch {
       return initialCourses
     }
   })
 
-  const [skillGaps, _setSkillGaps] = useState(() => {
+  const [skillGaps, setSkillGaps] = useState(() => {
     try {
       const saved = localStorage.getItem('skillstat_admin_gaps')
-      return saved ? JSON.parse(saved) : initialSkillGaps
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (isDemoList(parsed)) {
+          localStorage.removeItem('skillstat_admin_gaps')
+          return []
+        }
+        return parsed
+      }
+      return initialSkillGaps
     } catch {
       return initialSkillGaps
     }
@@ -51,7 +96,15 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
   const [notifications, setNotifications] = useState(() => {
     try {
       const saved = localStorage.getItem('skillstat_admin_notifs')
-      return saved ? JSON.parse(saved) : initialNotifications
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (isDemoList(parsed)) {
+          localStorage.removeItem('skillstat_admin_notifs')
+          return []
+        }
+        return parsed
+      }
+      return initialNotifications
     } catch {
       return initialNotifications
     }
@@ -69,10 +122,26 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
 
   // Modals State
   const [modalType, setModalType] = useState(null) // 'addEmployee' | 'addCourse' | 'addDepartment' | 'addNotification'
-  const [employeeForm, setEmployeeForm] = useState({ name: '', email: '', employeeId: '', department: initialDepartments[0].name, designation: '', role: '' })
+  const [employeeForm, setEmployeeForm] = useState({ name: '', email: '', employeeId: '', department: initialDepartments[0]?.name || '', designation: '', role: '' })
   const [courseForm, setCourseForm] = useState({ title: '', provider: 'iGOT Karmayogi', department: 'All Departments', competency: '', duration: '6 Hours' })
   const [deptForm, setDeptForm] = useState({ name: '', head: '', code: '' })
   const [notifForm, setNotifForm] = useState({ title: '', message: '', target: 'All Departments', type: 'Announcement' })
+
+  const handleResetAllAdminData = () => {
+    if (window.confirm('Are you sure you want to clear all stored admin data?')) {
+      localStorage.removeItem('skillstat_admin_employees')
+      localStorage.removeItem('skillstat_admin_departments')
+      localStorage.removeItem('skillstat_admin_courses')
+      localStorage.removeItem('skillstat_admin_gaps')
+      localStorage.removeItem('skillstat_admin_notifs')
+      setEmployees([])
+      setDepartments([])
+      setCourses([])
+      setSkillGaps([])
+      setNotifications([])
+      alert('All admin data has been cleared.')
+    }
+  }
 
   // Sync to localStorage
   useEffect(() => {
@@ -185,6 +254,23 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
     const matchesDept = deptFilter === 'All' || e.department === deptFilter
     return matchesSearch && matchesDept
   })
+
+  if (!isAllowedAdmin(adminUser?.email)) {
+    return (
+      <div className="admin-layout" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+        <div style={{ textAlign: 'center', padding: '40px', background: 'var(--panel-bg, #ffffff)', borderRadius: '16px', border: '1px solid var(--border-color, #e2e8f0)', maxWidth: '480px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
+          <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px', color: '#0f172a' }}>Access Restricted</h2>
+          <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px', lineHeight: 1.5 }}>
+            The Admin Portal is restricted to authorized administrators. The current account ({adminUser?.email || 'No email associated'}) does not have administrative privileges.
+          </p>
+          <button type="button" className="primary-action" onClick={onReturnToLearner} style={{ margin: '0 auto' }}>
+            Return to Dashboard
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="admin-layout">
@@ -313,34 +399,46 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
                 <div className="admin-table-card" style={{ padding: '24px' }}>
                   <h3 style={{ margin: '0 0 16px 0', fontSize: '16px' }}>Priority Skill Deficiencies</h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                    {skillGaps.map((gap) => (
-                      <div key={gap.skill} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' }}>
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: '14px' }}>{gap.skill}</div>
-                          <div style={{ fontSize: '12px', color: '#64748b' }}>{gap.department} · {gap.employeesDeficient} employees deficient</div>
+                  {skillGaps.length === 0 ? (
+                    <div style={{ color: '#64748b', fontSize: '13.5px', padding: '16px 0', textAlign: 'center' }}>
+                      No skill gaps recorded. Data will populate as staff complete assessments.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                      {skillGaps.map((gap) => (
+                        <div key={gap.skill} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' }}>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: '14px' }}>{gap.skill}</div>
+                            <div style={{ fontSize: '12px', color: '#64748b' }}>{gap.department} · {gap.employeesDeficient} employees deficient</div>
+                          </div>
+                          <span className={`admin-badge ${gap.priority === 'Critical' ? 'red' : gap.priority === 'Moderate' ? 'amber' : 'green'}`}>
+                            {gap.gap}% Gap ({gap.priority})
+                          </span>
                         </div>
-                        <span className={`admin-badge ${gap.priority === 'Critical' ? 'red' : gap.priority === 'Moderate' ? 'amber' : 'green'}`}>
-                          {gap.gap}% Gap ({gap.priority})
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="admin-table-card" style={{ padding: '24px' }}>
                   <h3 style={{ margin: '0 0 16px 0', fontSize: '16px' }}>Department Staffing Breakdown</h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {departments.map((dept) => (
-                      <div key={dept.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0' }}>
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: '13.5px' }}>{dept.name}</div>
-                          <div style={{ fontSize: '12px', color: '#64748b' }}>Nodal Head: {dept.head}</div>
+                  {departments.length === 0 ? (
+                    <div style={{ color: '#64748b', fontSize: '13.5px', padding: '16px 0', textAlign: 'center' }}>
+                      No departments registered yet. Use Department Management to add wings.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {departments.map((dept) => (
+                        <div key={dept.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0' }}>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: '13.5px' }}>{dept.name}</div>
+                            <div style={{ fontSize: '12px', color: '#64748b' }}>Nodal Head: {dept.head}</div>
+                          </div>
+                          <strong style={{ fontSize: '15px' }}>{dept.employeeCount} Officers</strong>
                         </div>
-                        <strong style={{ fontSize: '15px' }}>{dept.employeeCount} Officers</strong>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -382,33 +480,41 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredEmployees.map((emp) => (
-                      <tr key={emp.id}>
-                        <td>
-                          <strong>{emp.name}</strong>
-                          <div style={{ fontSize: '12px', color: '#64748b' }}>{emp.email}</div>
-                        </td>
-                        <td><code>{emp.employeeId}</code></td>
-                        <td>
-                          <div>{emp.designation || emp.role}</div>
-                          <div style={{ fontSize: '12px', color: '#64748b' }}>{emp.department}</div>
-                        </td>
-                        <td>
-                          <span className={`admin-badge ${emp.status === 'Active' ? 'green' : 'amber'}`}>{emp.status}</span>
-                        </td>
-                        <td>{emp.coursesCompleted} completed</td>
-                        <td><strong>{emp.avgAssessmentScore}%</strong></td>
-                        <td>
-                          <button
-                            type="button"
-                            style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
-                            onClick={() => handleDeleteEmployee(emp.id)}
-                          >
-                            Delete
-                          </button>
+                    {filteredEmployees.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                          No employees registered yet. Click "+ Add New Employee" to register staff.
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      filteredEmployees.map((emp) => (
+                        <tr key={emp.id}>
+                          <td>
+                            <strong>{emp.name}</strong>
+                            <div style={{ fontSize: '12px', color: '#64748b' }}>{emp.email}</div>
+                          </td>
+                          <td><code>{emp.employeeId}</code></td>
+                          <td>
+                            <div>{emp.designation || emp.role}</div>
+                            <div style={{ fontSize: '12px', color: '#64748b' }}>{emp.department}</div>
+                          </td>
+                          <td>
+                            <span className={`admin-badge ${emp.status === 'Active' ? 'green' : 'amber'}`}>{emp.status}</span>
+                          </td>
+                          <td>{emp.coursesCompleted} completed</td>
+                          <td><strong>{emp.avgAssessmentScore}%</strong></td>
+                          <td>
+                            <button
+                              type="button"
+                              style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
+                              onClick={() => handleDeleteEmployee(emp.id)}
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -426,16 +532,22 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
-                {departments.map((dept) => (
-                  <div key={dept.id} className="admin-stat-card">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span className="admin-badge blue">{dept.code || 'DEPT'}</span>
-                      <strong style={{ fontSize: '18px' }}>{dept.employeeCount} Staff</strong>
-                    </div>
-                    <h3 style={{ margin: '8px 0 4px 0', fontSize: '16px' }}>{dept.name}</h3>
-                    <div style={{ fontSize: '13px', color: '#64748b' }}>Head of Office: {dept.head}</div>
+                {departments.length === 0 ? (
+                  <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', background: '#fff', borderRadius: '12px', border: '1px dashed #cbd5e1', color: '#64748b' }}>
+                    No departments registered yet. Click "+ Add Department" to create your first wing or directorate.
                   </div>
-                ))}
+                ) : (
+                  departments.map((dept) => (
+                    <div key={dept.id} className="admin-stat-card">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span className="admin-badge blue">{dept.code || 'DEPT'}</span>
+                        <strong style={{ fontSize: '18px' }}>{dept.employeeCount} Staff</strong>
+                      </div>
+                      <h3 style={{ margin: '8px 0 4px 0', fontSize: '16px' }}>{dept.name}</h3>
+                      <div style={{ fontSize: '13px', color: '#64748b' }}>Head of Office: {dept.head}</div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           )}
@@ -460,25 +572,33 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {skillGaps.map((gap) => (
-                      <tr key={gap.skill}>
-                        <td><strong>{gap.skill}</strong></td>
-                        <td>{gap.domain}</td>
-                        <td>{gap.department}</td>
-                        <td><span style={{ color: '#b91c1c', fontWeight: 700 }}>{gap.employeesDeficient} Officers</span></td>
-                        <td>
-                          <div style={{ fontSize: '13px' }}>Current: <b>{gap.avgProficiency}%</b> / Required: <b>{gap.targetBenchmark}%</b></div>
-                          <div style={{ width: '120px', height: '6px', background: '#e2e8f0', borderRadius: '3px', marginTop: '4px' }}>
-                            <div style={{ width: `${gap.avgProficiency}%`, height: '100%', background: gap.priority === 'Critical' ? '#ef4444' : '#f59e0b', borderRadius: '3px' }} />
-                          </div>
-                        </td>
-                        <td>
-                          <span className={`admin-badge ${gap.priority === 'Critical' ? 'red' : gap.priority === 'Moderate' ? 'amber' : 'green'}`}>
-                            {gap.priority}
-                          </span>
+                    {skillGaps.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                          No skill gap deficiencies recorded. Gaps will appear automatically as employees complete assessments.
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      skillGaps.map((gap) => (
+                        <tr key={gap.skill}>
+                          <td><strong>{gap.skill}</strong></td>
+                          <td>{gap.domain}</td>
+                          <td>{gap.department}</td>
+                          <td><span style={{ color: '#b91c1c', fontWeight: 700 }}>{gap.employeesDeficient} Officers</span></td>
+                          <td>
+                            <div style={{ fontSize: '13px' }}>Current: <b>{gap.avgProficiency}%</b> / Required: <b>{gap.targetBenchmark}%</b></div>
+                            <div style={{ width: '120px', height: '6px', background: '#e2e8f0', borderRadius: '3px', marginTop: '4px' }}>
+                              <div style={{ width: `${gap.avgProficiency}%`, height: '100%', background: gap.priority === 'Critical' ? '#ef4444' : '#f59e0b', borderRadius: '3px' }} />
+                            </div>
+                          </td>
+                          <td>
+                            <span className={`admin-badge ${gap.priority === 'Critical' ? 'red' : gap.priority === 'Moderate' ? 'amber' : 'green'}`}>
+                              {gap.priority}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -509,17 +629,25 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {courses.map((crs) => (
-                      <tr key={crs.id}>
-                        <td><strong>{crs.title}</strong></td>
-                        <td><span className="admin-badge blue">{crs.provider}</span></td>
-                        <td>{crs.competency}</td>
-                        <td>{crs.department}</td>
-                        <td>{crs.duration}</td>
-                        <td><strong>{crs.enrolledCount}</strong></td>
-                        <td><span className="admin-badge green">{crs.status}</span></td>
+                    {courses.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                          No courses in catalog. Click "+ Add New Course" to add training modules.
+                        </td>
                       </tr>
-                    ))}
+                    ) : (
+                      courses.map((crs) => (
+                        <tr key={crs.id}>
+                          <td><strong>{crs.title}</strong></td>
+                          <td><span className="admin-badge blue">{crs.provider}</span></td>
+                          <td>{crs.competency}</td>
+                          <td>{crs.department}</td>
+                          <td>{crs.duration}</td>
+                          <td><strong>{crs.enrolledCount}</strong></td>
+                          <td><span className="admin-badge green">{crs.status}</span></td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -546,25 +674,33 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {employees.map((emp) => (
-                      <tr key={emp.id}>
-                        <td>
-                          <strong>{emp.name}</strong>
-                          <div style={{ fontSize: '12px', color: '#64748b' }}>{emp.designation}</div>
-                        </td>
-                        <td>{emp.department}</td>
-                        <td><span className="admin-badge green">{emp.coursesCompleted} Completed</span></td>
-                        <td><span className="admin-badge amber">{emp.coursesInProgress} Active</span></td>
-                        <td><strong>{emp.avgAssessmentScore}%</strong></td>
-                        <td>
-                          {emp.avgAssessmentScore >= passThreshold ? (
-                            <span className="admin-badge green">Competency Benchmark Met</span>
-                          ) : (
-                            <span className="admin-badge red">Upskilling In Progress</span>
-                          )}
+                    {employees.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                          No employee progress records available. Add employees to track progress.
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      employees.map((emp) => (
+                        <tr key={emp.id}>
+                          <td>
+                            <strong>{emp.name}</strong>
+                            <div style={{ fontSize: '12px', color: '#64748b' }}>{emp.designation}</div>
+                          </td>
+                          <td>{emp.department}</td>
+                          <td><span className="admin-badge green">{emp.coursesCompleted} Completed</span></td>
+                          <td><span className="admin-badge amber">{emp.coursesInProgress} Active</span></td>
+                          <td><strong>{emp.avgAssessmentScore}%</strong></td>
+                          <td>
+                            {emp.avgAssessmentScore >= passThreshold ? (
+                              <span className="admin-badge green">Competency Benchmark Met</span>
+                            ) : (
+                              <span className="admin-badge red">Upskilling In Progress</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -579,25 +715,31 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
-                {skillGaps.map((gap, idx) => (
-                  <div key={idx} className="admin-stat-card">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span className="admin-badge amber">AI Recommended Pathway</span>
-                      <span style={{ fontSize: '12px', color: '#64748b' }}>Target: {gap.department}</span>
-                    </div>
-                    <h3 style={{ margin: '10px 0 4px 0', fontSize: '16px' }}>{gap.skill}</h3>
-                    <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 14px 0' }}>
-                      Identified {gap.employeesDeficient} officers below required benchmark. Recommended 2 iGOT Karmayogi modules and 1 NSSTA workshop.
-                    </p>
-                    <button
-                      type="button"
-                      className="admin-btn-secondary"
-                      onClick={() => alert(`Assigned AI recommended curriculum for ${gap.skill} to officers in ${gap.department}`)}
-                    >
-                      Assign Pathway to Department →
-                    </button>
+                {skillGaps.length === 0 ? (
+                  <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', background: '#fff', borderRadius: '12px', border: '1px dashed #cbd5e1', color: '#64748b' }}>
+                    No skill gap pathways to recommend at this time. Pathways generate automatically as assessment gaps are identified.
                   </div>
-                ))}
+                ) : (
+                  skillGaps.map((gap, idx) => (
+                    <div key={idx} className="admin-stat-card">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span className="admin-badge amber">AI Recommended Pathway</span>
+                        <span style={{ fontSize: '12px', color: '#64748b' }}>Target: {gap.department}</span>
+                      </div>
+                      <h3 style={{ margin: '10px 0 4px 0', fontSize: '16px' }}>{gap.skill}</h3>
+                      <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 14px 0' }}>
+                        Identified {gap.employeesDeficient} officers below required benchmark. Recommended 2 iGOT Karmayogi modules and 1 NSSTA workshop.
+                      </p>
+                      <button
+                        type="button"
+                        className="admin-btn-secondary"
+                        onClick={() => alert(`Assigned AI recommended curriculum for ${gap.skill} to officers in ${gap.department}`)}
+                      >
+                        Assign Pathway to Department →
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           )}
@@ -627,14 +769,22 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {departments.map((dept) => (
-                      <tr key={dept.id}>
-                        <td><strong>{dept.name}</strong></td>
-                        <td>{dept.employeeCount} Officers</td>
-                        <td>{Math.round(dept.employeeCount * 0.72)} Modules Certified</td>
-                        <td><span className="admin-badge green">Healthy (78% Compliance)</span></td>
+                    {departments.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                          No department records available for reporting.
+                        </td>
                       </tr>
-                    ))}
+                    ) : (
+                      departments.map((dept) => (
+                        <tr key={dept.id}>
+                          <td><strong>{dept.name}</strong></td>
+                          <td>{dept.employeeCount} Officers</td>
+                          <td>{Math.round(dept.employeeCount * 0.72)} Modules Certified</td>
+                          <td><span className="admin-badge green">Healthy (78% Compliance)</span></td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -652,17 +802,23 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {notifications.map((notif) => (
-                  <div key={notif.id} className="admin-stat-card">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span className="admin-badge blue">{notif.type}</span>
-                      <span style={{ fontSize: '12px', color: '#64748b' }}>{notif.date} · Read by {notif.readCount} officers</span>
-                    </div>
-                    <h3 style={{ margin: '8px 0 4px 0', fontSize: '15.5px' }}>{notif.title}</h3>
-                    <p style={{ margin: '0 0 8px 0', fontSize: '13.5px', color: '#475569' }}>{notif.message}</p>
-                    <div style={{ fontSize: '12px', color: '#64748b' }}>Target Audience: <strong>{notif.target}</strong></div>
+                {notifications.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px', background: '#fff', borderRadius: '12px', border: '1px dashed #cbd5e1', color: '#64748b' }}>
+                    No broadcast announcements or reminders sent yet. Click "+ Send Announcement / Reminder" to post updates.
                   </div>
-                ))}
+                ) : (
+                  notifications.map((notif) => (
+                    <div key={notif.id} className="admin-stat-card">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span className="admin-badge blue">{notif.type}</span>
+                        <span style={{ fontSize: '12px', color: '#64748b' }}>{notif.date} · Read by {notif.readCount} officers</span>
+                      </div>
+                      <h3 style={{ margin: '8px 0 4px 0', fontSize: '15.5px' }}>{notif.title}</h3>
+                      <p style={{ margin: '0 0 8px 0', fontSize: '13.5px', color: '#475569' }}>{notif.message}</p>
+                      <div style={{ fontSize: '12px', color: '#64748b' }}>Target Audience: <strong>{notif.target}</strong></div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           )}
@@ -709,9 +865,12 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
                   </label>
                 </div>
 
-                <div style={{ marginTop: '24px' }}>
+                <div style={{ marginTop: '24px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                   <button type="button" className="admin-btn-primary" onClick={() => alert('Admin configuration settings successfully saved!')}>
                     Save Preferences
+                  </button>
+                  <button type="button" className="admin-btn-secondary" style={{ color: '#dc2626', borderColor: '#fca5a5' }} onClick={handleResetAllAdminData}>
+                    🗑️ Clear Stored Admin Data
                   </button>
                 </div>
               </div>
@@ -740,9 +899,13 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
               </div>
               <div className="admin-form-group">
                 <label>Department</label>
-                <select value={employeeForm.department} onChange={(e) => setEmployeeForm({ ...employeeForm, department: e.target.value })}>
-                  {departments.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
-                </select>
+                {departments.length > 0 ? (
+                  <select value={employeeForm.department} onChange={(e) => setEmployeeForm({ ...employeeForm, department: e.target.value })}>
+                    {departments.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
+                  </select>
+                ) : (
+                  <input value={employeeForm.department} onChange={(e) => setEmployeeForm({ ...employeeForm, department: e.target.value })} placeholder="e.g. Statistical Wing" />
+                )}
               </div>
               <div className="admin-form-group">
                 <label>Designation / Role</label>

@@ -22,7 +22,9 @@
   position: sticky;
   top: 0;
   height: 100vh;
-  overflow-y: auto;
+  max-height: 100vh;
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
   z-index: 20;
   transition: width 0.2s ease;
 }
@@ -33,11 +35,13 @@
 }
 
 .admin-sidebar-header {
-  padding: 20px 22px;
+  padding: 12px 16px;
+  min-height: 52px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   border-bottom: 1px solid #f1f5f9;
+  flex-shrink: 0;
 }
 
 .theme-dark .admin-sidebar-header {
@@ -63,20 +67,22 @@
 }
 
 .admin-nav-list {
-  padding: 16px 12px;
+  padding: 8px 10px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   flex: 1;
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
 }
 
 .admin-nav-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  border-radius: 8px;
-  font-size: 13.5px;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 12.5px;
   font-weight: 500;
   color: #475569;
   background: transparent;
@@ -113,14 +119,15 @@
 }
 
 .admin-nav-item .nav-icon {
-  font-size: 16px;
-  width: 20px;
+  font-size: 15px;
+  width: 18px;
   text-align: center;
 }
 
 .admin-sidebar-footer {
-  padding: 16px;
+  padding: 10px 14px;
   border-top: 1px solid #f1f5f9;
+  flex-shrink: 0;
 }
 
 .theme-dark .admin-sidebar-footer {
@@ -133,7 +140,8 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 10px 14px;
+  padding: 8px 12px;
+  font-size: 12.5px;
   border-radius: 8px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;

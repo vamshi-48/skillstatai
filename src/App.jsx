@@ -5,6 +5,7 @@ import { validateAndCleanQuiz } from './utils/questionValidator'
 import { getRecommendations } from './services/recommendationService'
 import ChatBot from './components/ChatBot'
 import AdminPortal from './components/admin/AdminPortal'
+import { isAllowedAdmin } from './config/adminConfig'
 
 const getUserInitial = (name) => String(name || '').trim().charAt(0).toUpperCase() || 'U'
 
@@ -3250,6 +3251,16 @@ function App() {
     previousIGOT: '', previousNSSTA: '', externalTraining: '', certifications: '',
   })
   const [profileDraft, setProfileDraft] = useState({})
+  const isAdmin = isAllowedAdmin(profile?.email)
+
+  useEffect(() => {
+    if (dashboardView === 'admin' && !isAdmin) {
+      const timer = setTimeout(() => {
+        setDashboardView('dashboard')
+      }, 0)
+      return () => clearTimeout(timer)
+    }
+  }, [dashboardView, isAdmin])
   const [isProfileEditing, setIsProfileEditing] = useState(false)
   const [customRole, setCustomRole] = useState('')
   const [customSkill, setCustomSkill] = useState('')
@@ -5357,40 +5368,47 @@ function App() {
               <span className="nav-label">{navText[language]?.[4] || navText.en[4]}</span>
             </button>
           </nav>
-
-          <div className="sidebar-section-label">MANAGEMENT</div>
-          <nav className="sidebar-nav-group" aria-label="Management">
-            <button
-              type="button"
-              className={`sidebar-nav-item admin-portal-btn ${dashboardView === 'admin' ? 'active' : ''}`}
-              onClick={() => { setDashboardView('admin'); setIsMobileSidebarOpen(false) }}
-            >
-              <span className="nav-icon">🛡️</span>
-              <span className="nav-label">Admin Portal</span>
-              <span className="sidebar-pill-badge admin">Portal</span>
-            </button>
-          </nav>
         </div>
 
-        {/* Sidebar Footer User Card */}
-        <div className="sidebar-user-footer">
-          <div
-            className="sidebar-user-card"
-            onClick={() => { setDashboardView('profile'); setIsMobileSidebarOpen(false) }}
-            role="button"
-            tabIndex={0}
-            title="View Profile"
-          >
-            <div className="sidebar-user-avatar">
-              {getUserInitial(profile.name)}
+        {/* Fixed Bottom: Management & User Footer */}
+        <div className="sidebar-fixed-bottom">
+          {isAdmin && (
+            <div className="sidebar-management-wrap">
+              <div className="sidebar-section-label">MANAGEMENT</div>
+              <nav className="sidebar-nav-group" aria-label="Management">
+                <button
+                  type="button"
+                  className={`sidebar-nav-item admin-portal-btn ${dashboardView === 'admin' ? 'active' : ''}`}
+                  onClick={() => { setDashboardView('admin'); setIsMobileSidebarOpen(false) }}
+                >
+                  <span className="nav-icon">🛡️</span>
+                  <span className="nav-label">Admin Portal</span>
+                  <span className="sidebar-pill-badge admin">Portal</span>
+                </button>
+              </nav>
             </div>
-            <div className="sidebar-user-info">
-              <span className="sidebar-user-name">
-                {profile.name ? profile.name.split(' ')[0] : 'User'}
-              </span>
-              <span className="sidebar-user-role">
-                {(profile.role && profile.role.trim()) || (profile.designation && profile.designation.trim()) || 'Employee'}
-              </span>
+          )}
+
+          {/* Sidebar Footer User Card */}
+          <div className="sidebar-user-footer">
+            <div
+              className="sidebar-user-card"
+              onClick={() => { setDashboardView('profile'); setIsMobileSidebarOpen(false) }}
+              role="button"
+              tabIndex={0}
+              title="View Profile"
+            >
+              <div className="sidebar-user-avatar">
+                {getUserInitial(profile.name)}
+              </div>
+              <div className="sidebar-user-info">
+                <span className="sidebar-user-name">
+                  {profile.name ? profile.name.split(' ')[0] : 'User'}
+                </span>
+                <span className="sidebar-user-role">
+                  {(profile.role && profile.role.trim()) || (profile.designation && profile.designation.trim()) || 'Employee'}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -5419,7 +5437,7 @@ function App() {
                 {dashboardView === 'notes' && (navText[language]?.[4] || 'Document Studio')}
                 {dashboardView === 'promotions' && (navText[language]?.[5] || 'Career & Promotions')}
                 {dashboardView === 'profile' && 'My Profile'}
-                {dashboardView === 'admin' && 'Admin Portal'}
+                {dashboardView === 'admin' && isAdmin && 'Admin Portal'}
               </h1>
             </div>
           </div>
@@ -5464,10 +5482,6 @@ function App() {
                     setDashboardView('promotions')
                     setIsProfileMenuOpen(false)
                   }}>🎖️ {navText[language]?.[5] || navText.en[5]}</button>
-                  <button type="button" role="menuitem" onClick={() => {
-                    setDashboardView('admin')
-                    setIsProfileMenuOpen(false)
-                  }}>🛡️ Admin Portal</button>
                   <button type="button" role="menuitem" onClick={() => setIsSettingsOpen((open) => !open)}>{t.settings}</button>
                   {isSettingsOpen && (
                     <div className="theme-settings" role="group" aria-label={t.settings}>
@@ -5484,7 +5498,7 @@ function App() {
 
       {/* Main Body */}
       <main className="dashboard-body">
-        {dashboardView === 'admin' && (
+        {dashboardView === 'admin' && isAdmin && (
           <AdminPortal
             onReturnToLearner={() => setDashboardView('dashboard')}
             adminUser={profile}
