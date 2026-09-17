@@ -5293,7 +5293,7 @@ function App() {
       )}
 
       {/* Modern Left Navigation Sidebar */}
-      <aside className="dashboard-sidebar" aria-label="Sidebar Navigation">
+      <aside className="dashboard-sidebar" aria-label="Sidebar Navigation" onWheel={(e) => e.stopPropagation()}>
         <div className="sidebar-header">
           <Brand />
           <button

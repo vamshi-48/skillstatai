@@ -1634,11 +1634,12 @@ h4 {
   width: 260px;
   min-width: 260px;
   max-width: 260px;
-  height: 100vh;
-  max-height: 100vh;
-  position: sticky;
-  top: 0;
-  left: 0;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  bottom: 0 !important;
   display: flex;
   flex-direction: column;
   background: var(--surface);
@@ -1792,11 +1793,12 @@ h4 {
 
 /* Sidebar Fixed Bottom (Management & User Footer) */
 .sidebar-fixed-bottom {
+  margin-top: auto;
   flex-shrink: 0;
   border-top: 1px solid var(--line-light);
   background: var(--surface);
-  position: sticky;
-  bottom: 0;
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
   z-index: 10;
 }
 
@@ -1874,6 +1876,10 @@ h4 {
   max-width: 72px;
 }
 
+.dashboard-app-layout.sidebar-collapsed .dashboard-main-viewport {
+  margin-left: 72px;
+}
+
 .dashboard-app-layout.sidebar-collapsed .sidebar-header {
   justify-content: center;
   padding: 18px 8px;
@@ -1924,6 +1930,8 @@ h4 {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  margin-left: 260px;
+  transition: margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .dashboard-top-nav {
@@ -2020,10 +2028,10 @@ h4 {
   }
 
   .dashboard-sidebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
     width: 270px;
     max-width: 82vw;
     transform: translateX(-100%);
@@ -2033,6 +2041,10 @@ h4 {
 
   .dashboard-app-layout.mobile-sidebar-open .dashboard-sidebar {
     transform: translateX(0);
+  }
+
+  .dashboard-main-viewport {
+    margin-left: 0 !important;
   }
 
   .sidebar-collapse-toggle {
