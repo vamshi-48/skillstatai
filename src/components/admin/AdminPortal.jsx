@@ -28,9 +28,7 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
   // Helper to detect if a stored list contains legacy empty mock demo data
   const isDemoList = (list) => {
     if (!Array.isArray(list) || list.length === 0) return false
-    return list.some((item) =>
-      ['emp-101', 'emp-102', 'emp-103', 'emp-104', 'emp-105', 'dept-1', 'dept-2', 'dept-3', 'dept-4', 'dept-5', 'crs-1', 'crs-2', 'crs-3', 'crs-4', 'crs-5'].includes(item.id)
-    )
+    return list.some((item) => String(item.id).length < 16)
   }
 
   // Reactive state synced with localStorage and application event bus
