@@ -5,32 +5,52 @@
  * Handles course catalog querying, role/skill matching, progress lookup, and enrollment status.
  */
 import { IGOT_CATALOGUE } from '../data/igotMockData.js'
+import { initialCourses } from '../components/admin/adminData.js'
+
+/**
+ * Retrieve the active catalog combining verified standard catalog with courses
+ * dynamically registered or edited by administrators in the Admin Portal.
+ */
+export function getUnifiedCatalog() {
+  let adminCourses = []
+  try {
+    const saved = localStorage.getItem('skillstat_admin_courses')
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        adminCourses = parsed
+      }
+    }
+  } catch {}
+
+  // Merge admin courses, initialCourses, and legacy IGOT_CATALOGUE
+  const basePool = [...(adminCourses.length > 0 ? adminCourses : initialCourses), ...IGOT_CATALOGUE]
+  const map = new Map()
+  for (const c of basePool) {
+    if (!c?.id) continue
+    if (!map.has(c.id)) {
+      map.set(c.id, c)
+    }
+  }
+  return Array.from(map.values())
+}
 
 /**
  * Domain semantic keyword groups for multi-tier matching.
  */
 const DOMAIN_KEYWORDS = {
-  agriculture: ['agri', 'crop', 'yield', 'rural', 'horticulture', 'farm', 'krishi', 'soil', 'harvest', 'cultivation'],
-  economics: ['macro', 'micro', 'econometric', 'econometrics', 'economics', 'economy', 'cpi', 'inflation', 'price', 'gdp', 'wpi', 'fiscal', 'monetary', 'market intelligence'],
-  statistics: ['statistic', 'statistics', 'sampling', 'survey', 'regression', 'inference', 'hypothesis', 'census', 'nss', 'mospi', 'sample', 'variance', 'probability', 'data analysis'],
+  health: ['health', 'medical', 'doctor', 'nurse', 'clinical', 'patient', 'hospital', 'epidemiology', 'biostat', 'medicine', 'disease', 'pharma', 'surgery', 'care'],
+  agriculture: ['agri', 'crop', 'yield', 'rural', 'horticulture', 'farm', 'krishi', 'soil', 'harvest', 'cultivation', 'farmer'],
+  economics: ['macro', 'micro', 'econometric', 'econometrics', 'economics', 'economy', 'cpi', 'inflation', 'price', 'gdp', 'wpi', 'fiscal', 'monetary', 'market intelligence', 'finance'],
+  statistics: ['statistic', 'statistics', 'sampling', 'survey', 'regression', 'inference', 'hypothesis', 'census', 'nss', 'mospi', 'sample', 'variance', 'probability', 'data analysis', 'nqaf', 'quality'],
   policy: ['policy', 'governance', 'public', 'administration', 'civil', 'apar', 'program evaluation', 'niti', 'regulation', 'administrative', 'compliance'],
-  technology: ['ai', 'ml', 'machine learning', 'python', 'sql', 'cloud', 'gis', 'database', 'cybersecurity'],
+  technology: ['ai', 'ml', 'machine learning', 'python', 'sql', 'cloud', 'gis', 'database', 'cybersecurity', 'software', 'developer', 'code', 'programming'],
+  labour: ['labour', 'labor', 'employment', 'worker', 'workforce', 'wage', 'job', 'plfs', 'occupational'],
+  industry: ['industry', 'industrial', 'manufacturing', 'factory', 'production', 'iip', 'asi', 'plant', 'engineering'],
 }
 
 /**
- * Curated Fallback Course IDs from official core civil service catalog.
- */
-const CURATED_FALLBACK_IDS = [
-  'igot-stat-10', // Official Statistics Fundamentals & Sampling Techniques
-  'igot-gov-07',  // Government Data Governance and Digital Personal Data Protection
-  'igot-python-06', // Python for Public Policy Analysis and Automated Reporting
-  'igot-ai-01',   // AI for Official Statistics and Public Governance
-  'igot-dataqual-05', // Data Quality Frameworks & National Statistical Standards
-]
-
-/**
  * Tokenize an input string or array into a lowercase set of non-trivial words.
- * Ensures order-independent matching.
  */
 function extractTokens(input) {
   if (!input) return new Set()
@@ -44,32 +64,33 @@ function extractTokens(input) {
 }
 
 /**
- * Retrieve all verified iGOT courses.
+ * Retrieve all verified courses from the unified catalog.
  */
 export async function getCourses() {
-  return [...IGOT_CATALOGUE]
+  return getUnifiedCatalog()
 }
 
 /**
- * Search iGOT courses matching a skill or job role.
+ * Search courses matching a skill, role, or department.
  */
-export async function searchCourses(skill = '', role = '') {
+export async function searchCourses(skill = '', role = '', department = '') {
   const normSkill = skill.toLowerCase().trim()
   const normRole = role.toLowerCase().trim()
+  const normDept = department.toLowerCase().trim()
+  const catalog = getUnifiedCatalog()
 
-  return IGOT_CATALOGUE.filter((course) => {
-    const matchSkill =
-      !normSkill ||
-      course.competency.toLowerCase().includes(normSkill) ||
-      course.skills.some((s) => s.toLowerCase().includes(normSkill)) ||
-      course.title.toLowerCase().includes(normSkill)
+  return catalog.filter((course) => {
+    const courseDept = (course.department || '').toLowerCase()
+    const courseSkills = (course.skills || []).map((s) => s.toLowerCase())
+    const courseComp = (course.competency || '').toLowerCase()
+    const courseTitle = (course.title || '').toLowerCase()
+    const courseRole = (course.role || course.whyRecommended || '').toLowerCase()
 
-    const matchRole =
-      !normRole ||
-      course.whyRecommended.toLowerCase().includes(normRole) ||
-      course.title.toLowerCase().includes(normRole)
+    const matchDept = !normDept || courseDept === 'all departments' || courseDept.includes(normDept) || normDept.includes(courseDept)
+    const matchSkill = !normSkill || courseComp.includes(normSkill) || courseSkills.some((s) => s.includes(normSkill)) || courseTitle.includes(normSkill)
+    const matchRole = !normRole || courseRole.includes(normRole) || courseTitle.includes(normRole)
 
-    return matchSkill || matchRole
+    return matchDept && (matchSkill || matchRole)
   })
 }
 
@@ -77,20 +98,20 @@ export async function searchCourses(skill = '', role = '') {
  * Fetch a specific course by ID.
  */
 export async function getCourse(courseId) {
-  const course = IGOT_CATALOGUE.find((c) => c.id === courseId)
+  const catalog = getUnifiedCatalog()
+  const course = catalog.find((c) => c.id === courseId)
   return course ? { ...course } : null
 }
 
 /**
- * Get recommended official iGOT courses based on employee profile and skill gap.
- *
- * Implements Multi-Tier Semantic Matching:
- * 1. Direct Role/Designation Domain Mapping (Agri, Economics, Statistics, Public Policy)
- * 2. Competency/Skill Tag Aggregation (order-independent token sets)
- * 3. Curated Civil Service Fallback Catalog (ensuring user never sees empty list)
+ * Get recommended official iGOT courses strictly personalized to:
+ * 1. Employee Department (highest priority)
+ * 2. Role & Designation
+ * 3. Specific Evaluated Skill / Selected Skills
  */
 export async function getRecommendedCourses(profile = {}, skillGap = {}) {
-  // Aggregate all user inputs regardless of order
+  const catalog = getUnifiedCatalog()
+  const userDept = String(profile.department || '').trim()
   const roleName = String(profile.role || profile.designation || '').trim()
   const targetSkill = String(skillGap.skill || '').trim()
   const domainHint = String(skillGap.domain || '').trim()
@@ -100,81 +121,122 @@ export async function getRecommendedCourses(profile = {}, skillGap = {}) {
       ? profile.selectedSkills
       : []
 
-  // Tokenize all user inputs into order-independent token sets
   const userTokens = new Set([
+    ...extractTokens(userDept),
     ...extractTokens(roleName),
     ...extractTokens(targetSkill),
     ...extractTokens(domainHint),
     ...extractTokens(userSkills),
   ])
 
-  const normTargetSkill = targetSkill.toLowerCase()
+  const normUserDept = userDept.toLowerCase()
   const normRole = roleName.toLowerCase()
+  const normTargetSkill = targetSkill.toLowerCase()
 
-  // Identify active domain affinities from tokens
+  // Domain flags
+  const isHealth = [...userTokens].some((t) => DOMAIN_KEYWORDS.health.some((k) => t.includes(k) || k.includes(t)))
   const isAgri = [...userTokens].some((t) => DOMAIN_KEYWORDS.agriculture.some((k) => t.includes(k) || k.includes(t)))
   const isEcon = [...userTokens].some((t) => DOMAIN_KEYWORDS.economics.some((k) => t.includes(k) || k.includes(t)))
   const isStat = [...userTokens].some((t) => DOMAIN_KEYWORDS.statistics.some((k) => t.includes(k) || k.includes(t)))
-  const isPolicy = [...userTokens].some((t) => DOMAIN_KEYWORDS.policy.some((k) => t.includes(k) || k.includes(t)))
+  const isTech = [...userTokens].some((t) => DOMAIN_KEYWORDS.technology.some((k) => t.includes(k) || k.includes(t)))
+  const isLabour = [...userTokens].some((t) => DOMAIN_KEYWORDS.labour.some((k) => t.includes(k) || k.includes(t)))
+  const isIndustry = [...userTokens].some((t) => DOMAIN_KEYWORDS.industry.some((k) => t.includes(k) || k.includes(t)))
 
-  // Score each course in catalog
-  const scored = IGOT_CATALOGUE.map((course) => {
+  // Score each course in unified catalog
+  const scored = catalog.map((course) => {
     let score = 0
-    const courseComp = course.competency.toLowerCase()
-    const courseTitle = course.title.toLowerCase()
-    const courseSkills = course.skills.map((s) => s.toLowerCase())
+    const courseDept = (course.department || 'All Departments').toLowerCase()
+    const courseComp = (course.competency || '').toLowerCase()
+    const courseTitle = (course.title || '').toLowerCase()
+    const courseSkills = (course.skills || []).map((s) => s.toLowerCase())
+    const courseRole = (course.role || '').toLowerCase()
     const courseReason = (course.whyRecommended || '').toLowerCase()
     const courseTokens = new Set([
       ...extractTokens(course.title),
       ...extractTokens(course.competency),
       ...extractTokens(course.skills),
       ...extractTokens(course.whyRecommended),
+      ...extractTokens(course.department),
     ])
 
-    // Tier 1: Direct Target Skill Match
+    // --- TIER 1: EXACT DEPARTMENT AFFINITY ---
+    if (normUserDept) {
+      if (courseDept === normUserDept) {
+        score += 85
+      } else if (courseDept !== 'all departments' && (courseDept.includes(normUserDept) || normUserDept.includes(courseDept))) {
+        score += 65
+      } else if (courseDept === 'all departments') {
+        score += 25
+      } else {
+        // Course is assigned to a different explicit department -> penalize heavily
+        score -= 90
+      }
+    }
+
+    // --- TIER 2: ROLE & DESIGNATION MATCH ---
+    if (normRole) {
+      if (courseRole && (courseRole === normRole || normRole.includes(courseRole) || courseRole.includes(normRole))) {
+        score += 55
+      } else if (courseTitle.includes(normRole) || courseReason.includes(normRole)) {
+        score += 35
+      }
+    }
+
+    // --- TIER 3: SPECIFIC SKILL & COMPETENCY MATCH ---
     if (normTargetSkill) {
-      if (courseComp === normTargetSkill) score += 50
-      else if (courseComp.includes(normTargetSkill) || normTargetSkill.includes(courseComp)) score += 30
-      if (courseSkills.includes(normTargetSkill)) score += 40
-      else if (courseSkills.some((s) => s.includes(normTargetSkill) || normTargetSkill.includes(s))) score += 25
-      if (courseTitle.includes(normTargetSkill)) score += 20
+      if (courseComp === normTargetSkill) {
+        score += 60
+      } else if (courseComp.includes(normTargetSkill) || normTargetSkill.includes(courseComp)) {
+        score += 40
+      }
+      if (courseSkills.includes(normTargetSkill)) {
+        score += 50
+      } else if (courseSkills.some((s) => s.includes(normTargetSkill) || normTargetSkill.includes(s))) {
+        score += 30
+      }
+      if (courseTitle.includes(normTargetSkill)) {
+        score += 25
+      }
     }
 
-    // Tier 2: Specific Domain Keyword Alignment
-    if (isAgri && (courseComp.includes('agri') || courseTitle.includes('agri') || courseSkills.some((s) => s.includes('agri') || s.includes('crop')))) {
+    // --- TIER 4: DOMAIN ALIGNMENT ---
+    if (isHealth && (courseDept.includes('health') || courseComp.includes('health') || courseSkills.some((s) => s.includes('medic') || s.includes('health') || s.includes('patient')))) {
+      score += 40
+    }
+    if (isAgri && (courseDept.includes('agri') || courseComp.includes('agri') || courseTitle.includes('crop') || courseSkills.some((s) => s.includes('agri') || s.includes('yield')))) {
+      score += 40
+    }
+    if (isEcon && (courseDept.includes('price') || courseComp.includes('econ') || courseTitle.includes('cpi') || courseSkills.some((s) => s.includes('econ') || s.includes('price')))) {
+      score += 40
+    }
+    if (isTech && (courseDept.includes('tech') || courseComp.includes('python') || courseComp.includes('sql') || courseSkills.some((s) => s.includes('python') || s.includes('data science') || s.includes('sql')))) {
+      score += 40
+    }
+    if (isLabour && (courseDept.includes('labour') || courseComp.includes('labour') || courseTitle.includes('employment'))) {
+      score += 40
+    }
+    if (isIndustry && (courseDept.includes('industry') || courseComp.includes('industrial') || courseTitle.includes('manufacturing'))) {
+      score += 40
+    }
+    if (isStat && (courseDept.includes('nso') || courseComp.includes('stat') || courseSkills.some((s) => s.includes('sampling') || s.includes('survey')))) {
       score += 35
     }
-    if (isEcon && (courseComp.includes('econ') || courseTitle.includes('econ') || courseTitle.includes('price') || courseSkills.some((s) => s.includes('econ') || s.includes('cpi')))) {
-      score += 35
-    }
-    if (isStat && (courseComp.includes('stat') || courseTitle.includes('stat') || courseSkills.some((s) => s.includes('stat') || s.includes('sampling')))) {
-      score += 30
-    }
-    if (isPolicy && (courseComp.includes('policy') || courseTitle.includes('policy') || courseTitle.includes('governance'))) {
-      score += 30
-    }
 
-    // Tier 3: Role Name Substring Overlap
-    if (normRole && (courseTitle.includes(normRole) || courseReason.includes(normRole))) {
-      score += 25
-    }
-
-    // Tier 4: Order-Independent Token Intersection
+    // --- TIER 5: TOKEN OVERLAP ---
     let tokenOverlap = 0
     for (const t of userTokens) {
       if (courseTokens.has(t)) tokenOverlap++
     }
-    score += tokenOverlap * 4
+    score += tokenOverlap * 3
 
     return { course, score }
   })
 
-  // Filter and sort by score descending
+  // Filter out negatively scored courses (which belong to other incompatible departments)
   scored.sort((a, b) => b.score - a.score)
-  const matches = scored.filter((item) => item.score > 15).map((item) => item.course)
+  const matches = scored.filter((item) => item.score > 20).map((item) => item.course)
 
   if (matches.length > 0) {
-    // Deduplicate and return top 3-4 matches
     const uniqueIds = new Set()
     const result = []
     for (const c of matches) {
@@ -187,12 +249,25 @@ export async function getRecommendedCourses(profile = {}, skillGap = {}) {
     return result
   }
 
-  // Tier 5: Curated Fallback Catalog (Guarantees civil service recommendations never render empty)
-  const fallbackCourses = CURATED_FALLBACK_IDS
-    .map((id) => IGOT_CATALOGUE.find((c) => c.id === id))
-    .filter(Boolean)
+  // --- TIER 6: CONTEXTUAL DOMAIN FALLBACK ---
+  // If no high score match, find courses matching the user's department first
+  if (normUserDept) {
+    const deptFallback = catalog.filter((c) => {
+      const d = (c.department || '').toLowerCase()
+      return d === normUserDept || d.includes(normUserDept) || normUserDept.includes(d)
+    })
+    if (deptFallback.length > 0) {
+      return deptFallback.slice(0, 3)
+    }
+  }
 
-  return fallbackCourses.slice(0, 3)
+  // General fallbacks: prefer general governance and data quality courses
+  const generalFallbacks = catalog.filter((c) => (c.department || '') === 'All Departments' || c.id === 'crs-gov-01' || c.id === 'crs-nso-01')
+  if (generalFallbacks.length > 0) {
+    return generalFallbacks.slice(0, 3)
+  }
+
+  return catalog.slice(0, 3)
 }
 
 /**
@@ -200,7 +275,7 @@ export async function getRecommendedCourses(profile = {}, skillGap = {}) {
  */
 export async function getCourseProgress(courseId) {
   const course = await getCourse(courseId)
-  return course ? course.progress : 0
+  return course ? (course.progress || 0) : 0
 }
 
 /**
@@ -208,5 +283,5 @@ export async function getCourseProgress(courseId) {
  */
 export async function getEnrollmentStatus(courseId) {
   const course = await getCourse(courseId)
-  return course ? course.enrollmentStatus : 'Not Enrolled'
+  return course ? (course.enrollmentStatus || 'Available') : 'Available'
 }

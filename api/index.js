@@ -645,6 +645,84 @@ Provide practical, well-formatted answers with clear action steps, recommending 
     // ---------------- QUESTIONS (OPENAI) ----------------
     if (pathname === '/api/questions') {
       const profile = await readJson(request)
+      const isNotesMode = profile.quizMode === 'notes' || Boolean(profile.notesContent || profile.documentText)
+      const rawNotes = String(profile.notesContent || profile.documentText || '').trim()
+
+      if (!effectiveKey) {
+        sendJson(response, 503, {
+          error: 'API key is not configured on server. Local fallback questions will be used.',
+        })
+        return
+      }
+
+      if (isNotesMode && rawNotes.length >= 20) {
+        const notesExcerpt = rawNotes.slice(0, 7500)
+        const promptText = `You are an expert assessment creator. Generate exactly 10 high-quality, realistic multiple-choice questions directly based on the uploaded document text provided below.
+
+DOCUMENT CONTENT:
+"""
+${notesExcerpt}
+"""
+
+CRITICAL RULES:
+1. Every question MUST test real facts, principles, directives, definitions, numerical thresholds, or procedures explicitly mentioned in the document text above.
+2. Distribute questions across different sections/topics of the document. Do NOT ask about the same sentence or concept multiple times.
+3. Every question MUST be unique (NO repeated prompts).
+4. Each question MUST have:
+   - "type": "choice"
+   - "skill": A concise 2-4 word topic or section title extracted from the document
+   - "label": "Document Question 1" (up to 10)
+   - "sourceBadge": "Notes • [topic title]"
+   - "prompt": A clear, realistic scenario or comprehension question directly referencing the document content
+   - "options": exactly 4 distinct, meaningful options. One option must be the accurate statement from the document. The other 3 must be plausible, distinct alternative claims. NEVER repeat options within a question, and NEVER use identical option text across questions.
+   - "answerIndex": index of the correct answer (0, 1, 2, or 3). Randomly distribute the correct answer index across 0, 1, 2, and 3.
+
+Return valid JSON strictly in this format:
+{
+  "questions": [
+    {
+      "type": "choice",
+      "skill": "...",
+      "label": "Document Question 1",
+      "sourceBadge": "Notes • ...",
+      "prompt": "...",
+      "options": ["...", "...", "...", "..."],
+      "answerIndex": 1
+    }
+  ]
+}`
+        const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${effectiveKey}`,
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              {
+                role: 'system',
+                content:
+                  'You generate accurate document-based multiple-choice assessments in valid JSON. Distribute correct answer indices across all positions (0, 1, 2, 3) so that questions do not have the same answer position. Never repeat questions or options.',
+              },
+              { role: 'user', content: promptText },
+            ],
+            temperature: 0.6,
+            response_format: { type: 'json_object' },
+          }),
+        })
+
+        const payload = await aiResponse.json()
+        if (!aiResponse.ok) {
+          throw new Error(payload.error?.message || `AI API returned status ${aiResponse.status}`)
+        }
+
+        const content = payload.choices?.[0]?.message?.content || '{}'
+        const parsed = JSON.parse(content)
+        sendJson(response, 200, { questions: parsed.questions || [] })
+        return
+      }
+
       const skillsList = String(profile.skills || '')
         .split(',')
         .map((s) => s.trim())
@@ -661,13 +739,6 @@ Provide practical, well-formatted answers with clear action steps, recommending 
         .map((skill) => skill.trim())
         .filter(Boolean)
       const hasCodingSkill = codingLanguages.length > 0 && !codingLanguages.every((skill) => skill.toLowerCase() === 'none')
-
-      if (!effectiveKey) {
-        sendJson(response, 503, {
-          error: 'API key is not configured on server. Local fallback questions will be used.',
-        })
-        return
-      }
 
       const questionsPerSkill = 10
       const totalQuestions = skillsList.length * questionsPerSkill
@@ -688,13 +759,17 @@ CRITICAL RULES:
           ? `For every selected coding skill (${codingSkills.join(', ')}), all 10 questions for that skill must be practical coding challenges of type "code". Each challenge must include exactly 4 independently checkable requirements. For non-coding skills, use practical scenario questions of type "choice".`
           : `STRICT REQUIREMENT: This is a NON-CODING profile. You MUST NEVER generate any coding challenges, syntax questions, code blocks, or 'code' type questions. ALL ${totalQuestions} questions MUST be type "choice" scenario questions covering practical real-world situations, problem-solving, and domain judgment.`
       }
-3. Each 'choice' question must have:
+3. REAL WORLD SCENARIOS & NO REPETITION:
+   - Each question prompt must be an authentic, practical scenario from real-world public administration, governance, official statistics, clinical healthcare, agricultural estimation, economic price tracking, or data management.
+   - Do NOT repeat questions. Every question must describe a unique, distinct scenario or challenge.
+   - For choice questions, every option across the question must be distinct and meaningful. Do NOT repeat options within a question, and do NOT use repetitive option text across different questions.
+4. Each 'choice' question must have:
    - "type": "choice"
    - "skill": "exact skill name from the user's selected skills"
    - "prompt": "Realistic, challenging scenario question"
    - "options": ["Option 1", "Option 2", "Option 3", "Option 4"] (distribute the correct answer dynamically among options 0, 1, 2, and 3; NEVER place the correct option at index 0 every time)
    - "answerIndex": index of the correct answer (0, 1, 2, or 3)
-4. Any 'code' question (ONLY if coding skill was selected) must have:
+5. Any 'code' question (ONLY if coding skill was selected) must have:
    - "type": "code"
    - "skill": "one of the selected coding skills"
    - "prompt": "Coding problem description"

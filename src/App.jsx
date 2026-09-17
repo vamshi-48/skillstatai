@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import './App.css'
-import { extractTextFromFile, cleanExtractedText, validateDocumentText, extractConceptsFromText } from './utils/documentCleaner'
+import { extractTextFromFile, cleanExtractedText, validateDocumentText, extractConceptsFromText, extractDocumentQuizItems } from './utils/documentCleaner'
 import { validateAndCleanQuiz } from './utils/questionValidator'
 import { getRecommendations } from './services/recommendationService'
 import ChatBot from './components/ChatBot'
@@ -187,7 +187,56 @@ const governmentDepartments = [
   { name: 'Environment & Climate Statistics', designations: ['Environmental Statistics Officer', 'Climate Data Analyst', 'GIS Analyst', 'Survey Officer', 'Research Officer'] },
 ]
 
-const getDepartmentDetails = (departmentName) => governmentDepartments.find((department) => department.name === departmentName)
+export function getEffectiveDepartments() {
+  try {
+    const raw = typeof window !== 'undefined' ? localStorage.getItem('skillstat_admin_departments') : null
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const merged = [...governmentDepartments]
+        parsed.forEach((d) => {
+          if (d && d.name) {
+            const existingIndex = merged.findIndex((m) => m.name.toLowerCase() === d.name.toLowerCase())
+            if (existingIndex >= 0) {
+              merged[existingIndex] = {
+                ...merged[existingIndex],
+                ...d,
+                designations: d.designations || merged[existingIndex].designations || ['Statistical Officer', 'Data Analyst', 'Research Officer'],
+              }
+            } else {
+              merged.push({
+                name: d.name,
+                designations: d.designations || ['Statistical Officer', 'Data Analyst', 'Research Officer'],
+                ...d,
+              })
+            }
+          }
+        })
+        return merged
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to parse admin departments:', err)
+  }
+  return governmentDepartments
+}
+
+export function getAdminPassThreshold() {
+  try {
+    const raw = typeof window !== 'undefined' ? localStorage.getItem('skillstat_admin_settings') : null
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (parsed.passThreshold && !isNaN(Number(parsed.passThreshold))) {
+        return Number(parsed.passThreshold)
+      }
+    }
+  } catch {
+    // fallback
+  }
+  return 75
+}
+
+const getDepartmentDetails = (departmentName) => getEffectiveDepartments().find((department) => department.name === departmentName)
 
 const DEPARTMENT_ROLE_MAP = {
   'National Statistical Office (NSO)': [
@@ -311,9 +360,9 @@ function getRolesForDepartment(departmentName, userRole = '', userDesignation = 
     }
   }
 
-  // If still not matched, check governmentDepartments designations
+  // If still not matched, check getEffectiveDepartments designations
   if (matchedRoles.length === 0) {
-    const deptObj = governmentDepartments.find((d) => d.name.toLowerCase() === normDept)
+    const deptObj = getEffectiveDepartments().find((d) => d.name.toLowerCase() === normDept)
     if (deptObj?.designations?.length) {
       matchedRoles = [...deptObj.designations]
     }
@@ -1481,7 +1530,8 @@ const rolePromotionCatalog = {
 }
 
 function enhancePathway(data, currentScore, currentRole) {
-  const benchmark = data.benchmarkScore || 75
+  const adminThreshold = getAdminPassThreshold()
+  const benchmark = adminThreshold || data.benchmarkScore || 75
   const readinessPct = Math.min(100, Math.round((currentScore / benchmark) * 100))
   const isEligible = currentScore >= benchmark
   const remainingGap = Math.max(0, benchmark - currentScore)
@@ -2355,7 +2405,13 @@ function getQuestionDifficulty(index, total = 10) {
 }
 
 function buildScenarioQuestions(profile, t, userSkills, quizMode = 'standard', notesContent = '', targetSkill = '') {
-  const skills = targetSkill ? [targetSkill] : (userSkills.length ? userSkills : ['Problem solving', 'Communication'])
+  const profileSkills = profile?.skills
+    ? profile.skills.split(',').map((s) => s.trim()).filter(Boolean)
+    : []
+  const defaultSkills = profileSkills.length > 0
+    ? profileSkills
+    : ['Official Statistics & Survey Methodology', 'Public Sector Data Governance']
+  const skills = targetSkill ? [targetSkill] : (userSkills && userSkills.length ? userSkills : defaultSkills)
   const exp = profile.experience || '1–2 years'
   const _targetRole = profile.role || profile.designation || 'the selected target role'
 
@@ -2366,133 +2422,54 @@ function buildScenarioQuestions(profile, t, userSkills, quizMode = 'standard', n
     if (!val.isValid) {
       return []
     }
+    const rawItems = extractDocumentQuizItems(cleanNotes, 10)
+    if (rawItems && rawItems.length > 0) {
+      const validated = validateAndCleanQuiz(rawItems, 'Document Concept')
+      if (validated && validated.length >= 4) {
+        return validated.map((q, idx) => shuffleQuestionOptions(q, idx))
+      }
+    }
+
+    // Fallback for short notes text: extract concepts and build contextual comprehension questions
     const concepts = extractConceptsFromText(cleanNotes, 5)
     const questions = []
     const count = 10
-
-    const tieredNoteSpecs = {
-      1: [ // Level 1: Foundational
-        {
-          promptFn: (title) => `[Foundational] What is the core architectural purpose and primary function of ${title}?`,
-          optionsFn: (title) => [
-            `Establish standard initialization, adhere to baseline conventions, and verify data contracts for ${title}.`,
-            `Proceed with unverified parameter bindings and bypass baseline type checking.`,
-            `Assume default runtime state without inspecting environment prerequisites.`,
-            `Instantiate global mutable variables without encapsulation or lifecycle management.`,
-          ],
-        },
-        {
-          promptFn: (title) => `[Foundational] Which standard definition or syntax rule directly governs the initial configuration of ${title}?`,
-          optionsFn: (title) => [
-            `Adhere to authoritative definitions, enforce structural contracts, and validate configuration schemas for ${title}.`,
-            `Alter configuration parameters arbitrarily to bypass schema validation errors.`,
-            `Rely strictly on unverified third-party scripts without source verification.`,
-            `Disable structural linting and runtime schema assertions to save initialization time.`,
-          ],
-        },
-        {
-          promptFn: (title) => `[Foundational] When establishing a baseline workflow with ${title}, which prerequisite condition must be verified?`,
-          optionsFn: (title) => [
-            `Validate environment readiness, verify dependency compatibility, and confirm access permissions for ${title}.`,
-            `Skip environment checks and deploy directly into active runtime execution.`,
-            `Suppress compiler warnings and omit schema dependency verification.`,
-            `Hardcode staging endpoints into production builds without environment abstraction.`,
-          ],
-        },
-      ],
-      2: [ // Level 2: Intermediate
-        {
-          promptFn: (title) => `[Intermediate] How should data binding, state synchronization, and parameter validation be handled in ${title}?`,
-          optionsFn: (title) => [
-            `Implement thread-safe state synchronization, enforce defensive boundary checks, and validate inputs for ${title}.`,
-            `Execute asynchronous state mutations directly on UI threads without synchronization locks.`,
-            `Rely solely on broad try-catch blocks while swallowing underlying component exceptions.`,
-            `Share unpersisted mutable buffers across concurrent thread pools without locks.`,
-          ],
-        },
-        {
-          promptFn: (title) => `[Intermediate] When ${title} interacts with asynchronous lifecycles or background threads, which protocol guarantees state consistency?`,
-          optionsFn: (title) => [
-            `Enforce modular dependency injection, define clear interface contracts, and isolate asynchronous side effects for ${title}.`,
-            `Tightly couple components to concrete external implementations without abstraction.`,
-            `Bypass validation middleware when processing nested payload transformations.`,
-            `Ignore lifecycle teardown hooks when unmounting dependent services.`,
-          ],
-        },
-        {
-          promptFn: (title) => `[Intermediate] What is the recommended operational practice for isolating dependencies and modularizing ${title} in production code?`,
-          optionsFn: (title) => [
-            `Structure modular boundaries with dependency inversion and comprehensive integration testing for ${title}.`,
-            `Duplicate core logic across multiple classes without shared utility abstraction.`,
-            `Export private internal state variables for direct global manipulation.`,
-            `Remove test assertions once unit tests pass in local development.`,
-          ],
-        },
-      ],
-      3: [ // Level 3: Advanced
-        {
-          promptFn: (title) => `[Advanced] Under peak throughput or heavy memory pressure, an edge-case degradation occurs in ${title}. Which defensive mitigation isolates the bottleneck?`,
-          optionsFn: (title) => [
-            `Deploy bounded worker buffers with backpressure mitigation, idempotent caching, and explicit memory teardown for ${title}.`,
-            `Scale thread concurrency unboundedly without measuring heap allocation thresholds.`,
-            `Disable garbage collection hooks and retain persistent object references across component unmounts.`,
-            `Suppress diagnostic logging and drop failing packets without dead-letter audit records.`,
-          ],
-        },
-        {
-          promptFn: (title) => `[Advanced] When optimizing resource utilization and lifecycle disposal in ${title}, which architectural pattern prevents memory leaks?`,
-          optionsFn: (title) => [
-            `Implement non-blocking reactive pipelines with exponential backoff and circuit-breaking error boundaries for ${title}.`,
-            `Retry failed network calls in tight loops without delay or jitter.`,
-            `Buffer unbounded streaming payloads in memory during downstream service slowdowns.`,
-            `Delegate resource cleanup to user intervention after out-of-memory crashes occur.`,
-          ],
-        },
-      ],
-      4: [ // Level 4: Expert Challenge
-        {
-          promptFn: (title) => `[Expert Challenge] In a high-consequence failure scenario where ${title} encounters state corruption or out-of-order execution, what recovery protocol guarantees auditability and zero data loss?`,
-          optionsFn: (title) => [
-            `Enforce transactional rollback boundaries, write-ahead event journaling, and automated circuit-breaking failover for ${title}.`,
-            `Force uncoordinated process restarts without checkpointing in-flight state mutations.`,
-            `Bypass transactional integrity checks to artificially accelerate throughput during failover.`,
-            `Hardcode recovery parameters and truncate corrupted audit ledgers to restore service.`,
-          ],
-        },
-        {
-          promptFn: (title) => `[Expert Challenge] What architectural decoupling strategy should be enforced when refactoring ${title} for distributed scale, strict security boundaries, and zero-downtime resilience?`,
-          optionsFn: (title) => [
-            `Decouple domain logic via event-driven messaging, enforce cryptographic audit trails, and validate multi-region disaster recovery for ${title}.`,
-            `Consolidate all microservices into a single unmonitored monolithic process.`,
-            `Disable end-to-end telemetry and encryption to temporarily reduce network latency.`,
-            `Allow unauthenticated administrative overrides during live production incidents.`,
-          ],
-        },
-      ],
-    }
 
     for (let i = 0; i < count; i++) {
       const diff = getQuestionDifficulty(i, count)
       const concept = concepts[i % concepts.length]
       const conceptTitle = concept?.title || `Concept ${i + 1}`
-      const conceptContext = concept?.context ? ` Context: ${concept.context.slice(0, 160)}.` : ''
+      const contextSnippet = concept?.context ? ` (Context: "${concept.context.slice(0, 140)}...")` : ''
 
-      const tierSpecs = tieredNoteSpecs[diff.level] || tieredNoteSpecs[1]
-      const spec = tierSpecs[i % tierSpecs.length]
+      const promptTypes = [
+        `According to the uploaded material, what is the primary operational guideline governing "${conceptTitle}"?`,
+        `Based on the provided documentation, which statement accurately reflects the required procedure for "${conceptTitle}"?`,
+        `In the context of the uploaded notes, what standard or directive is mandated regarding "${conceptTitle}"?`,
+        `Which quality verification or governance requirement is outlined in the text for "${conceptTitle}"?`,
+      ]
 
-      const questionPrompt = `${spec.promptFn(conceptTitle)}${conceptContext}`
-      const rawOptions = spec.optionsFn(conceptTitle)
+      const prompt = `${promptTypes[i % promptTypes.length]}${contextSnippet}`
+      const correctText = concept?.context
+        ? `Adhere strictly to the documented findings: ${concept.context.slice(0, 120)}.`
+        : `Enforce established operational standards, verify audit evidence, and follow statutory protocols for ${conceptTitle}.`
+
+      const rawOptions = [
+        correctText,
+        `Bypass ${conceptTitle} protocols to expedite reporting schedules without supervisory clearance.`,
+        `Disregard documented exceptions in ${conceptTitle} and rely on unverified verbal estimates.`,
+        `Defer quality verification of ${conceptTitle} indefinitely until external audits mandate corrections.`,
+      ]
 
       questions.push(shuffleQuestionOptions({
         type: 'choice',
         skill: conceptTitle,
-        label: `Notes Concept ${i + 1}`,
+        label: `Notes Question ${i + 1}`,
         sourceBadge: `Notes • ${conceptTitle}`,
         difficulty: diff.name,
         difficultyLevel: diff.level,
         difficultyLabel: diff.label,
         difficultyBadgeClass: diff.badgeClass,
-        prompt: `Question ${i + 1}: ${questionPrompt}`,
+        prompt: `Question ${i + 1}: ${prompt}`,
         options: rawOptions,
         correctIndex: 0,
       }, i))
@@ -2505,7 +2482,7 @@ function buildScenarioQuestions(profile, t, userSkills, quizMode = 'standard', n
     const weekendTieredScenarios = {
       1: [ // Foundational Sprint (Q1 - Q3)
         {
-          prompt: `[Foundational Sprint] When establishing baseline operational standards in ${skills[0] || 'your role'}, which practice ensures sustainable delivery and verifiable quality?`,
+          prompt: `When establishing baseline operational standards in ${skills[0] || 'your role'}, which practice ensures sustainable delivery and verifiable quality?`,
           options: [
             'Maintain documented standard operating procedures (SOPs), enforce peer review checkpoints, and log execution metrics',
             'Rely exclusively on informal tribal knowledge without documenting baseline workflows',
@@ -2514,7 +2491,7 @@ function buildScenarioQuestions(profile, t, userSkills, quizMode = 'standard', n
           ],
         },
         {
-          prompt: `[Foundational Sprint] When collaborating across cross-functional teams with product and engineering leads, what is the best protocol for SLA alignment?`,
+          prompt: `When collaborating across cross-functional teams with product and engineering leads, what is the best protocol for SLA alignment?`,
           options: [
             'Establish shared transparent milestones, mutual dependency tracking, and proactive status cadence',
             'Commit to conflicting timelines without validating team capacity or resource dependencies',
@@ -2523,7 +2500,7 @@ function buildScenarioQuestions(profile, t, userSkills, quizMode = 'standard', n
           ],
         },
         {
-          prompt: `[Foundational Sprint] When onboarding a new data asset or analytical model in ${skills[1] || 'your domain'}, which validation step is mandatory?`,
+          prompt: `When onboarding a new data asset or analytical model in ${skills[1] || 'your domain'}, which validation step is mandatory?`,
           options: [
             'Verify data provenance, run schema integrity assertions, and document source constraints',
             'Ingest raw unstructured data directly into production systems without validation',
@@ -2534,7 +2511,7 @@ function buildScenarioQuestions(profile, t, userSkills, quizMode = 'standard', n
       ],
       2: [ // Intermediate Triage (Q4 - Q6)
         {
-          prompt: `[Intermediate Triage] In a critical initiative between ${profile.role || 'your department'} and key stakeholders, a dependency delay creates a 48-hour delivery blocker. What is the optimal executive action?`,
+          prompt: `In a critical initiative between ${profile.role || 'your department'} and key stakeholders, a dependency delay creates a 48-hour delivery blocker. What is the optimal executive action?`,
           options: [
             'Run critical-path root cause triage, align stakeholders on trade-off priorities, and communicate revised SLAs proactively',
             'Conceal the delay and attempt unvetted shortcuts without testing',
@@ -2543,56 +2520,29 @@ function buildScenarioQuestions(profile, t, userSkills, quizMode = 'standard', n
           ],
         },
         {
-          prompt: `[Intermediate Triage] When measuring operational efficiency in ${skills[0] || 'your role'}, which leading metric demonstrates sustainable improvement?`,
+          prompt: `When measuring operational efficiency in ${skills[0] || 'your role'}, which leading metric demonstrates sustainable improvement?`,
           options: [
             'High throughput accuracy with reduced rework cycles, documented compliance, and defect containment',
             'Maximum raw activity volume regardless of error and defect rates',
             'Eliminating all peer reviews and compliance checkpoints to shorten cycle time',
-            'Relying solely on retrospective user complaints after public release',
-          ],
-        },
-        {
-          prompt: `[Intermediate Triage] An unexpected data variance is detected during monthly reporting in ${skills[1] || 'your area'}. How should you isolate the discrepancy?`,
-          options: [
-            'Perform structured reconciliation against primary audit logs and isolate variance boundaries',
-            'Overhaul unrelated ledger entries without isolating the root cause discrepancy',
-            'Assume the variance is an acceptable rounding error without verifying underlying records',
-            'Delete historical logs to force matching balance calculations',
+            'Lowering test coverage criteria to accelerate deployment releases',
           ],
         },
       ],
-      3: [ // Advanced Strategic Risk (Q7 - Q8)
+      3: [ // Advanced Optimization (Q7 - Q8)
         {
-          prompt: `[Advanced Strategic Risk] Under strict quarterly deadline pressure, two competing approaches exist for an enterprise ${skills[0] || 'core skill'} challenge. How should leadership evaluate them?`,
+          prompt: `Under sudden resource constraints or system degradation, how should a senior team lead in ${skills[0] || 'your role'} prioritize competing deliverables?`,
           options: [
-            'Evaluate feasibility, maintenance overhead, scalability risk, and stakeholder ROI through an objective decision matrix',
-            'Pick the cheapest option without assessing long-term technical debt and security exposure',
-            'Delegate the choice randomly to avoid individual accountability',
-            'Attempt both implementations simultaneously without adequate resource allocation',
-          ],
-        },
-        {
-          prompt: `[Advanced Strategic Risk] A sudden 400% surge in processing load exposes high latency in ${skills[1] || 'your core services'}. Which mitigation protects system reliability?`,
-          options: [
-            'Implement dynamic rate-limiting, activate read-replicas, and prioritize mission-critical transactions via circuit-breakers',
-            'Disable defensive logging and telemetry to save server CPU cycles',
-            'Restart all database clusters concurrently during peak traffic hours',
-            'Drop all incoming queue messages without notifying users or logging dead-letters',
+            'Apply risk-weighted value triage, protect core compliance and security baselines, and renegotiate secondary milestones',
+            'Cancel ongoing quality audits to free up developer bandwidth',
+            'Deploy untested emergency hotfixes directly to production environments',
+            'Cease all logging and diagnostic telemetry to save server CPU cycles',
           ],
         },
       ],
       4: [ // Expert Crisis Leadership (Q9 - Q10)
         {
-          prompt: `[Expert Crisis Leadership] During an enterprise production outage involving ${skills[0] || 'critical services'}, conflicting diagnostic telemetry is reported. How should incident command respond?`,
-          options: [
-            'Designate a single incident commander, establish isolated forensic triage lanes, and execute proven failback runbooks',
-            'Apply speculative hotfixes directly in production while multiple engineers execute uncoordinated changes',
-            'Silence external customer communications to prevent negative publicity during the outage',
-            'Blame upstream infrastructure providers publicly without verifying internal root cause telemetry',
-          ],
-        },
-        {
-          prompt: `[Expert Crisis Leadership] When presenting an architectural modernization roadmap to senior executive leadership for ${skills[0] || 'your department'}, which strategy secures governance approval?`,
+          prompt: `When presenting an architectural modernization roadmap to senior executive leadership for ${skills[0] || 'your department'}, which strategy secures governance approval?`,
           options: [
             'Quantify risk-adjusted ROI, model phased zero-downtime migration milestones, and establish clear rollback gates',
             'Demand immediate complete system rewrite without transitional coexistence or legacy backward compatibility',
@@ -2626,15 +2576,63 @@ function buildScenarioQuestions(profile, t, userSkills, quizMode = 'standard', n
     return questions
   }
 
-  // Standard skill gap assessment
+  // Standard skill assessment: Extensive, authentic real-world public administration & domain scenario bank
   const scenarioBank = {
+    // HEALTH & BIOSTATISTICS
+    'Biostatistics': [
+      { prompt: `In a Phase-III clinical trial evaluating a new public health intervention, what is the primary purpose of an Intent-to-Treat (ITT) analysis?`, options: ['Preserves prognostic balance established by randomization and prevents bias from subject attrition or non-compliance', 'Excludes non-compliant participants to artificially inflate treatment effect size', 'Permits investigators to reassign subjects to alternative cohorts after unblinding', 'Eliminates the requirement for calculating statistical power or p-values'], correct: 0 },
+      { prompt: `When analyzing patient survival times subject to right-censoring in hospital registries, which statistical methodology is mandatory?`, options: ['Kaplan-Meier product-limit estimation combined with Cox proportional hazards regression', 'Standard ordinary least squares (OLS) linear regression without censoring adjustment', 'Assigning zero survival time to all censored patients and running ANOVA', 'Excluding all censored records from the research cohort entirely'], correct: 0 },
+      { prompt: `When estimating sample size for a multi-center randomized controlled trial, how does cluster randomization affect the required sample size?`, options: ['Increases sample size by the design effect (DEFF = 1 + (m - 1) * ICC) due to intra-cluster correlation', 'Reduces required sample size because clusters are assumed homogeneous', 'Has zero effect on statistical power or variance estimation', 'Permits testing with a single control patient per hospital'], correct: 0 },
+    ],
+    'Epidemiology': [
+      { prompt: `During an emerging infectious disease outbreak, what does a basic reproduction number (R0) greater than 1 indicate?`, options: ['Each primary infected case transmits to more than one susceptible person, signaling epidemic expansion potential', 'The disease is guaranteed to reach self-extinction within two weeks', '100% of the population has acquired natural humoral immunity', 'Vaccination coverage thresholds can be safely reduced to under 10%'], correct: 0 },
+      { prompt: `Under the Integrated Disease Surveillance Programme (IDSP), how do Presumptive (P-form) and Laboratory (L-form) surveillance data differ?`, options: ['P-data captures clinical syndrome diagnoses by medical officers; L-data requires confirmed laboratory diagnostic assays', 'P-data is collected only in private facilities; L-data strictly in rural dispensaries', 'P-data is classified confidential; L-data is published openly without validation', 'P-data is reported once per census decade; L-data is collected hourly'], correct: 0 },
+      { prompt: `When estimating Maternal Mortality Ratio (MMR) from civil registration system (CRS) data with known under-registration, what adjustment is required?`, options: ['Apply dual-record system estimation and brass-type indirect sibling survivorship correction weights', 'Report unadjusted raw sample counts directly as official national statistics', 'Discard all rural mortality records to improve reported national ratios', 'Assume zero maternal deaths occurred in non-reporting district health centers'], correct: 0 },
+    ],
+    // AGRICULTURE & RURAL
+    'Agricultural Statistics': [
+      { prompt: `Under the General Crop Estimation Survey (GCES) methodology, what constitutes the primary sampling unit (PSU)?`, options: ['Revenue village selected through stratified random sampling within an agro-climatic taluk/tehsil', 'Individual farmer holding chosen arbitrarily near state highway access', 'State agricultural university research farm experimental plots', 'Commercial grain warehousing terminal silos'], correct: 0 },
+      { prompt: `When conducting a field crop-cutting experiment (CCE), how are fresh-to-dry weight ratios determined for official yield estimation?`, options: ['Harvested plot produce is weighed fresh, dried under standardized moisture controls, and re-weighed to determine the driage factor', 'Fresh weight is multiplied by an uncalibrated constant of 2.5 without testing', 'Crop moisture content is assumed to be 0% at harvest across all districts', 'Only unharvested standing crops are measured visually without physical harvesting'], correct: 0 },
+    ],
+    'Crop Yield Modeling': [
+      { prompt: `When utilizing Sentinel-2 satellite imagery for pre-harvest crop acreage estimation, how is Normalized Difference Vegetation Index (NDVI) applied?`, options: ['Contrasting red and near-infrared spectral reflectance bands identifies vegetative chlorophyll vigor and crop phenology', 'Thermal infrared channels measure topsoil depth directly in centimeters', 'Satellite imagery completely eliminates the requirement for ground-truth crop-cutting validation', 'NDVI values exceeding 0.6 are discarded as agricultural noise'], correct: 0 },
+      { prompt: `When modeling crop yield vulnerability under erratic monsoon rainfall patterns, which agro-meteorological index provides leading drought indication?`, options: ['Standardized Precipitation-Evapotranspiration Index (SPEI) evaluated across critical flowering and grain-filling windows', 'Gross cumulative seasonal rainfall without temporal distribution modeling', 'Single-day peak temperature records during winter dormancy', 'Total commercial tractor sales recorded across regional transport offices'], correct: 0 },
+    ],
+    // PRICE & CONSUMER STATISTICS
+    'Price Statistics': [
+      { prompt: `In compiling the Consumer Price Index (CPI) using the modified Laspeyres formula, what is the primary cause of commodity substitution bias?`, options: ['The fixed base-year consumption basket fails to account for consumers substituting towards relatively cheaper goods when prices rise', 'The index updates commodity weights dynamically every month, exaggerating volatility', 'Laspeyres formulas systematically exclude all urban service and housing expenditures', 'Seasonal fruit and vegetable prices are given 100% basket weighting during winter'], correct: 0 },
+      { prompt: `When an essential commodity quotation cannot be collected in a designated market due to temporary stock-out, what is standard official protocol?`, options: ['Impute price change using the trend of that commodity in comparable adjacent markets or sub-group price relatives', 'Record a price of zero for that month, artificially reducing the district index', 'Permanently drop the commodity from the national inflation basket', 'Carry forward the last recorded price indefinitely for over 24 months without review'], correct: 0 },
+    ],
+    // LABOUR & EMPLOYMENT
+    'Labour Statistics': [
+      { prompt: `Under the Periodic Labour Force Survey (PLFS), how is a person categorized as employed according to Usual Principal Status (UPS)?`, options: ['Engaged in economic activity for a relatively long period (183 days or more) during the 365 days preceding the survey date', 'Worked for at least 1 hour on any single day during the 7 days preceding the survey date', 'Enrolled in an educational degree program regardless of economic participation', 'Registered with an employment exchange without earning wages or conducting economic work'], correct: 0 },
+      { prompt: `How is the Worker Population Ratio (WPR) formally calculated in national employment publications?`, options: ['(Total number of employed persons / Total estimated population) * 100', '(Total unemployed persons / Total active labour force) * 100', '(Total labour force / Working-age population aged 15-59) * 100', '(Formal sector salaried workers / Informal unorganized workers) * 100'], correct: 0 },
+    ],
+    // OFFICIAL STATISTICS & QUALITY AUDITING
+    'Official Statistics': [
+      { prompt: `Under the National Quality Assurance Framework (NQAF), which institutional safeguard guarantees public trust and statistical integrity?`, options: ['Pre-announced dissemination calendar, equal simultaneous public access, and strict firewalling from political clearance', 'Allowing ministerial departments to inspect and adjust preliminary survey tables 30 days before release', 'Restricting raw microdata tables strictly to registered internal ministry staff', 'Publishing survey estimates only when policy targets have been favorably achieved'], correct: 0 },
+      { prompt: `When survey data contains substantial item non-response, why is hot-deck imputation preferred over mean substitution?`, options: ['Preserves the underlying distribution and variable covariance by matching on demographic and geographic auxiliary strata', 'Reduces all survey variances to zero, guaranteeing statistical significance', 'Generates completely synthetic data points using uncalibrated random number seeds', 'Allows data officers to overwrite respondent entries with target policy benchmarks'], correct: 0 },
+    ],
+    'Sampling': [
+      { prompt: `When calculating standard errors in a multi-stage stratified cluster sample for nationwide surveys, which factor must be accounted for?`, options: ['Design effect (DEFF) and intra-cluster correlation to prevent underestimating sampling variance', 'Assuming simple random sampling (SRS) with equal variance across all primary sampling units', 'Disregarding sampling weights in aggregate national estimations', 'Eliminating second-stage sampling units that require remote rural travel'], correct: 0 },
+      { prompt: `If survey attrition disproportionately affects mobile urban youth strata, how should population representations be adjusted?`, options: ['Apply post-stratification non-response weight calibration based on known census demographic marginals', 'Remove the entire demographic stratum from public survey dissemination', 'Assume non-respondents have the exact same distribution as overall elderly respondents', 'Fabricate synthetic respondents without statistical weighting matrices'], correct: 0 },
+    ],
+    // TECHNOLOGY & DATA SCIENCE
+    'Data analysis': [
+      { prompt: `When comparing district-level social welfare coverage across heterogeneous population sizes, what metric best controls for population scale?`, options: ['Per-capita coverage rate with standardized 95% Wilson score confidence intervals', 'Raw total recipient headcounts without population normalization', 'District geographic square-kilometer area divided by total budget spent', 'Multiplying small district counts by arbitrary scaling constants to match metropolitan totals'], correct: 0 },
+      { prompt: `In an observational evaluation of a public policy reform, why is a Difference-in-Differences (DiD) design superior to simple pre-post comparison?`, options: ['Accounts for common counterfactual time trends by benchmarking against an unaffected control population', 'Guarantees that all regression coefficients have p-values under 0.001', 'Eliminates the requirement for collecting baseline data prior to reform rollout', 'Proves mathematical causation without testing parallel trend assumptions'], correct: 0 },
+    ],
     'AI/ML': [
       { prompt: `When evaluating an AI model deployed on official registration records, you notice performance degrades on new rural demographics (covariate shift). What is the standard protocol?`, options: ['Perform stratified re-sampling, monitor feature distribution drift, and re-calibrate decision thresholds', 'Ignore the distribution shift and continue inference with legacy model weights', 'Immediately remove rural demographic data from processing pipelines', 'Increase model learning rate arbitrarily without testing validation loss'], correct: 0 },
-      { prompt: `In a machine learning pipeline for official statistical data, why is model explainability (SHAP/LIME) mandatory for governance?`, options: ['It provides auditable attribution for each feature, ensuring non-discriminatory and transparent decisions', 'It allows developers to hardcode model predictions manually', 'It reduces the compute required for deep learning training', 'It guarantees 100% accuracy without testing on holdout data'], correct: 0 },
+      { prompt: `In an automated benefit eligibility prediction pipeline, why is feature attribution (SHAP/LIME) legally essential under DPDP and administrative law?`, options: ['Provides auditable, transparent explanations for adverse administrative decisions and enables algorithmic fairness audits', 'Allows backend engineers to hardcode decisions for preferred applicants', 'Reduces deep neural network training latency by 90%', 'Guarantees 100% classification accuracy without testing on holdout validation datasets'], correct: 0 },
     ],
-    'Cloud Computing': [
-      { prompt: `When architecting a secure data ingestion pipeline on government cloud (MeghRaj), which strategy guarantees zero data loss during network interruptions?`, options: ['Implement distributed message queues with dead-letter buffering and idempotent consumers', 'Store incoming records in unpersisted server memory buffers', 'Discard timed-out packets and request manual file re-upload', 'Disable transport encryption to speed up packet throughput'], correct: 0 },
-      { prompt: `What is the primary operational advantage of Role-Based Access Control (RBAC) and least-privilege IAM policies in official cloud repositories?`, options: ['Enforces granular least-privilege access, audit logging, and blast-radius containment', 'Allows all statistical officers root administrative access', 'Eliminates the requirement for user passwords and MFA', 'Prevents all network communication between microservices'], correct: 0 },
+    'SQL': [
+      { prompt: `A query joining a 50-million-row official register with district lookup tables runs sluggishly. What optimization should be examined first?`, options: ['Inspect the execution plan, verify composite indexing on join keys, and eliminate full-table sequential scans', 'Add SELECT * to retrieve all table columns', 'Remove WHERE clauses to allow faster data retrieval', 'Restart the database instance during peak transaction hours'], correct: 0 },
+      { prompt: `When aggregating survey averages where some respondents left optional income fields blank (NULL), how does standard SQL behave?`, options: ['AVG() automatically ignores NULL values; COALESCE should be applied if null defaults are needed', 'AVG() automatically treats NULLs as 0.0, distorting true averages', 'The query immediately throws a runtime fatal syntax error', 'NULL values are converted into maximum possible integer values'], correct: 0 },
+    ],
+    'Python': [
+      { prompt: `When processing a 20GB administrative census file on a 16GB RAM server in Python, which data engineering approach prevents Out-Of-Memory (OOM) crashes?`, options: ['Process the file in chunked streams using Pandas/Polars chunksize or DuckDB out-of-core memory mapping', 'Read the entire file into a single Pandas DataFrame with df = pd.read_csv()', 'Increase Python recursion limits using sys.setrecursionlimit(100000)', 'Convert all numerical columns to Python string objects'], correct: 0 },
+      { prompt: `In a production data pipeline, why should vectorization (NumPy/Pandas) be used instead of standard Python 'for' loops across rows?`, options: ['Leverages low-level compiled C-level contiguous memory operations and SIMD CPU instructions for orders-of-magnitude speedup', 'Vectorization eliminates the requirement for data cleaning or null checks', 'Python loops are syntactically prohibited in official statistical scripts', 'Vectorization automatically formats numbers as currency strings'], correct: 0 },
     ],
     'GIS': [
       { prompt: `When merging field survey census blocks with national satellite shapefiles, spatial misalignment occurs. What is the standard geodetic remediation?`, options: ['Standardize coordinate reference systems (CRS) using EPSG transformations to WGS84', 'Manually drag polygons visually without verifying datum projection', 'Delete survey blocks that do not immediately align', 'Switch from vector shapefiles to low-resolution unreferenced images'], correct: 0 },
@@ -2644,14 +2642,6 @@ function buildScenarioQuestions(profile, t, userSkills, quizMode = 'standard', n
       { prompt: `Under the National Quality Assurance Framework (NQAF), how should extensive item non-response in economic surveys be addressed?`, options: ['Apply validated donor imputation or regression imputation with explicit imputation flags', 'Silently replace missing entries with zeros without documentation', 'Discard all incomplete questionnaires, biasing the sampling frame', 'Duplicate adjacent records without statistical validation'], correct: 0 },
       { prompt: `When performing automated data reconciliation across decentralized departmental registers, what is the best practice for duplicate resolution?`, options: ['Utilize deterministic and probabilistic record linkage with defined confidence thresholds and audit logs', 'Randomly delete one of the conflicting records', 'Average all disparate numerical fields together without inspection', 'Halt all database operations until manual paper audits occur'], correct: 0 },
     ],
-    'SQL': [
-      { prompt: `A query joining a 50-million-row official register with district lookup tables runs sluggishly. What optimization should be examined first?`, options: ['Inspect the execution plan, verify composite indexing on join keys, and eliminate full-table sequential scans', 'Add SELECT * to retrieve all table columns', 'Remove WHERE clauses to allow faster data retrieval', 'Restart the database instance during peak transaction hours'], correct: 0 },
-      { prompt: `When aggregating survey averages where some respondents left optional income fields blank (NULL), how does standard SQL behave?`, options: ['AVG() automatically ignores NULL values; COALESCE should be applied if null defaults are needed', 'AVG() automatically treats NULLs as 0.0, distorting true averages', 'The query immediately throws a runtime fatal syntax error', 'NULL values are converted into maximum possible integer values'], correct: 0 },
-    ],
-    'Sampling': [
-      { prompt: `When calculating standard errors in a multi-stage stratified cluster sample for nationwide surveys, which factor must be accounted for?`, options: ['Design effect (DEFF) and intra-cluster correlation to prevent underestimating variance', 'Assuming simple random sampling (SRS) with equal variance across all clusters', 'Disregarding sampling weights in aggregate national estimations', 'Eliminating second-stage sampling units that require travel'], correct: 0 },
-      { prompt: `If sample attrition disproportionately affects mobile young demographic strata, how should population representations be adjusted?`, options: ['Apply post-stratification non-response weight calibration based on known census marginals', 'Remove the entire demographic stratum from public dissemination', 'Assume non-respondents have the exact same distribution as overall respondents', 'Fabricate synthetic respondents without statistical weighting'], correct: 0 },
-    ],
     'Financial analysis': [
       { prompt: `In a quarterly financial model for ${profile.role}, an unexpected 14% variance appears between forecasted and actual operating costs. What is the standard first step?`, options: ['Perform a line-item variance audit to isolate fixed vs variable cost drivers', 'Adjust the target forecast retroactively to mask the gap', 'Immediately cut project headcount without analyzing the category', 'Ignore the variance until year-end reporting'], correct: 0 },
       { prompt: `When assessing project capital expenditure ROI under ${exp} constraints, how should you factor inflation risks?`, options: ['Apply discounted cash flow with an adjusted hurdle rate and sensitivity analysis', 'Assume historical interest rates remain completely static', 'Only evaluate the nominal gross return of year 1', 'Exclude tax amortization and salvage value'], correct: 0 },
@@ -2659,20 +2649,6 @@ function buildScenarioQuestions(profile, t, userSkills, quizMode = 'standard', n
     'Excel': [
       { prompt: `To combine dynamic transactional datasets across multiple tabs without breaking on column shifts, which formula is recommended in modern Excel?`, options: ['XLOOKUP or INDEX(MATCH) combined with dynamic spill ranges', 'Hardcoded static VLOOKUP with fixed index numbers', 'Manual copy-paste across sheets', 'CONCATENATE all cell rows into text strings'], correct: 0 },
       { prompt: `When designing an audit-proof financial tracker in Excel, what is the best practice for raw data integrity?`, options: ['Separate raw data tabs from calculation models and summary dashboards', 'Mix calculation formulas directly inside raw input rows', 'Color code cells manually without validation rules', 'Avoid using structured Excel tables or named ranges'], correct: 0 },
-    ],
-    'Digital marketing': [
-      { prompt: `A multi-channel paid acquisition campaign experiences a 35% drop in conversion rate despite stable click-through rates. What should you evaluate first?`, options: ['Landing page load speed, messaging alignment, and checkout drop-off funnel', 'Double the campaign ad spend immediately', 'Change the brand logo and colors across all ads', 'Turn off all tracking pixels and conversion tags'], correct: 0 },
-      { prompt: `When allocating budget across top-of-funnel brand awareness vs bottom-of-funnel retargeting, how should incrementality be measured?`, options: ['Run geo-lift experiments or holdout control groups to measure true incremental conversions', 'Attribute 100% credit exclusively to the last ad clicked', 'Rely purely on impression counts without attribution modeling', 'Stop running search campaigns completely'], correct: 0 },
-    ],
-    'UI design': [
-      { prompt: `When designing a complex enterprise dashboard for high-frequency users, which visual hierarchy principle improves usability the most?`, options: ['Establish clear typographical scales, consistent spatial grids, and prioritized primary action anchors', 'Use 10 different vivid accent colors across all buttons', 'Hide all navigation menus inside deep nested drawers', 'Remove all labels and rely exclusively on ambiguous abstract icons'], correct: 0 },
-      { prompt: `During an accessibility audit (WCAG 2.1 AA), a primary button with white text fails contrast against an emerald background. How do you resolve it?`, options: ['Increase the background luminance contrast ratio to at least 4.5:1', 'Reduce the font size to make the text less noticeable', 'Remove the button label text entirely', 'Disable keyboard focus indicators on all inputs'], correct: 0 },
-    ],
-    'User research': [
-      { prompt: `When planning usability testing for a critical workflow, what is the most effective approach to uncover authentic user friction?`, options: ['Observe users performing task-based scenarios using think-aloud protocol without leading prompts', 'Ask users hypothetical questions like "Would you buy this feature?"', 'Tell users the correct answers whenever they hesitate', 'Test only with internal employees who built the product'], correct: 0 },
-    ],
-    'Project management': [
-      { prompt: `A key dependency is delayed by 3 weeks, threatening a fixed client milestone. What is the most effective management action?`, options: ['Assess critical path impact, evaluate scope descope or fast-tracking options, and communicate trade-offs early to stakeholders', 'Silently delay the deadline without notifying stakeholders', 'Require 18-hour daily overtime without reviewing the critical path', 'Cancel the entire project without an impact assessment'], correct: 0 },
     ],
     'Leadership': [
       { prompt: `Two senior team members disagree fundamentally on the technical approach for a new initiative. As a leader, how do you steer alignment?`, options: ['Facilitate an objective decision matrix evaluating alignment with business goals, constraints, and risk mitigation', 'Choose one approach arbitrarily without explaining the reasoning', 'Let them argue indefinitely without resolution', 'Reassign both team members to unrelated individual tasks'], correct: 0 },
@@ -2683,24 +2659,128 @@ function buildScenarioQuestions(profile, t, userSkills, quizMode = 'standard', n
     'Problem solving': [
       { prompt: `An intermittent production bottleneck occurs only during peak hours. How should you systematically isolate the root cause?`, options: ['Collect telemetry logs, map system throughput bottlenecks under load, and formulate falsifiable hypotheses', 'Make 5 random architectural changes simultaneously to see if one helps', 'Assume the issue is a user mistake and close the ticket', 'Restart servers repeatedly without gathering trace telemetry'], correct: 0 },
     ],
-    'Sales': [
-      { prompt: `A qualified enterprise prospect raises a severe pricing objection during final negotiations. What is the best sales response?`, options: ['Explore the underlying value driver and ROI metrics before exploring customized packaging or terms', 'Immediately drop the contract price by 70%', 'End the sales discussion immediately', 'Tell the prospect their budget concerns are irrelevant'], correct: 0 },
-    ],
-    'Patient care': [
-      { prompt: `A patient exhibits sudden acute changes in vital signs following medication administration. What is the priority protocol?`, options: ['Conduct immediate rapid assessment, verify airway/breathing/circulation, and notify attending physician with SBAR protocol', 'Wait 4 hours until the next scheduled shift change rounds', 'Leave the patient unattended to search for textbook references', 'Administer unprescribed sedatives without consultation'], correct: 0 },
-    ],
-    'Supply chain management': [
-      { prompt: `A primary overseas supplier suffers a port strike causing a 4-week supply disruption. What is the resilient supply chain response?`, options: ['Activate pre-qualified secondary local supplier agreements and prioritize safety stock for critical SKUs', 'Halt all customer order fulfillment without mitigation', 'Triple all end-product prices overnight', 'Ignore delivery schedules until the strike concludes'], correct: 0 },
-    ],
+  }
+
+  // Real-world dynamic question generator for custom skills or when additional questions are needed:
+  // Generates 10 distinct, non-repeating scenario questions with 4 unique, domain-relevant options per question!
+  function generateDynamicRealWorldQuestions(skillName, neededCount) {
+    const cleanSkill = (skillName || 'Official Statistics').trim()
+    const scenarioArchetypes = [
+      {
+        prompt: `In an official review of departmental workflows, an audit reveals inconsistent field standards in ${cleanSkill}. What is the primary corrective protocol?`,
+        options: [
+          `Establish a harmonized standard operating procedure (SOP), mandate peer-review checklists, and maintain an immutable decision log for ${cleanSkill}`,
+          `Instruct field officers to bypass documentation and resolve discrepancies informally`,
+          `Delete discrepant historical records from the database to present a clean compliance audit`,
+          `Suspend all operational activities indefinitely without root-cause assessment`,
+        ],
+        correct: 0,
+      },
+      {
+        prompt: `When integrating administrative register feeds from multiple decentralized jurisdictions under ${cleanSkill}, what validation step is mandatory before synthesis?`,
+        options: [
+          `Execute automated schema harmonization, verify primary key integrity, and apply probabilistic linkage rules for ${cleanSkill}`,
+          `Concatenate raw feeds directly into production registers without checking variable definitions`,
+          `Manually overwrite conflicting regional values with arbitrary central averages`,
+          `Omit rural administrative feeds to prevent column misalignment in tabular outputs`,
+        ],
+        correct: 0,
+      },
+      {
+        prompt: `Under statutory compliance guidelines (such as DPDP Act and official statistics norms), how must sensitive microdata records be handled in ${cleanSkill}?`,
+        options: [
+          `Apply cryptographic pseudonymization, k-anonymity masking thresholds, and role-based access control (RBAC) to protect respondent confidentiality in ${cleanSkill}`,
+          `Distribute unmasked microdata spreadsheets freely via unencrypted public messaging groups`,
+          `Permanently delete all master data records immediately after survey completion`,
+          `Disable access controls so that all internal contractors have unrestricted root permissions`,
+        ],
+        correct: 0,
+      },
+      {
+        prompt: `During seasonal peak operations in ${cleanSkill}, anomalous variance spikes by over 25% in quarterly indicator trends. What is the standard diagnostic procedure?`,
+        options: [
+          `Perform decomposed variance analysis to isolate genuine seasonal shifts from non-sampling measurement errors in ${cleanSkill}`,
+          `Retroactively adjust benchmark formulas until quarterly volatility appears smooth`,
+          `Conceal the variance spike from leadership to avoid scrutiny`,
+          `Discard the latest quarter's survey wave and republish the prior year's numbers`,
+        ],
+        correct: 0,
+      },
+      {
+        prompt: `When presenting complex technical findings and policy implications derived from ${cleanSkill} to ministry leadership, what is the best reporting structure?`,
+        options: [
+          `Lead with the Bottom-Line Up Front (BLUF), executive summary of trade-offs, confidence bounds, and actionable policy options for ${cleanSkill}`,
+          `Present 120 unformatted raw data tables in chronological order without narrative interpretation`,
+          `Exclude all uncertainty ranges and methodology limitations to present an oversimplified picture`,
+          `Use highly esoteric jargon and withhold underlying data sources from leadership`,
+        ],
+        correct: 0,
+      },
+      {
+        prompt: `When upgrading legacy computing scripts or database tables supporting ${cleanSkill}, what rollout strategy guarantees zero disruption?`,
+        options: [
+          `Implement dual-run parallel execution, compare regression outputs across both environments, and execute staged migration with rollback capability for ${cleanSkill}`,
+          `Terminate legacy systems immediately on a weekday morning and launch unvalidated scripts directly in production`,
+          `Disable system backup routines to accelerate database migration speeds`,
+          `Delegate deployment verification entirely to untrained end users after launch`,
+        ],
+        correct: 0,
+      },
+      {
+        prompt: `In an evaluation of statistical quality dimensions under National Quality Assurance Frameworks (NQAF), how is accuracy measured in ${cleanSkill}?`,
+        options: [
+          `Assessing proximity between calculated estimates and true population values via sampling error and non-sampling error audits in ${cleanSkill}`,
+          `Measuring how quickly survey reports are printed regardless of data verification`,
+          `Surveying internal office staff opinions on whether the results feel plausible`,
+          `Counting the total page length of published statistical bulletins`,
+        ],
+        correct: 0,
+      },
+      {
+        prompt: `When field enumerators report non-response in high-density strata for ${cleanSkill}, what is the approved statistical remedy?`,
+        options: [
+          `Apply calibrated post-stratification non-response adjustments using verified census baseline auxiliary data for ${cleanSkill}`,
+          `Fabricate responses using intuition to meet target sample size quotas`,
+          `Drop the high-density stratum completely from regional estimations`,
+          `Multiply existing respondent values by arbitrary integer multipliers`,
+        ],
+        correct: 0,
+      },
+      {
+        prompt: `What is the most effective approach to cross-cadre coordination between field teams and central analytics officers in ${cleanSkill}?`,
+        options: [
+          `Establish standardized data-dictionary definitions, bi-weekly calibration syncs, and real-time validation error alerts for ${cleanSkill}`,
+          `Restrict all communication to annual official gazette circulars without interactive feedback`,
+          `Allow each cadre to define its own variable nomenclature independently`,
+          `Prevent field teams from reviewing analytical findings derived from their data`,
+        ],
+        correct: 0,
+      },
+      {
+        prompt: `Before final publication of national and state indicators in ${cleanSkill}, which clearance milestone must be satisfied?`,
+        options: [
+          `Complete multi-tier quality sign-off, verify reproducible compilation scripts, and confirm adherence to the pre-announced release calendar for ${cleanSkill}`,
+          `Publish immediately on social media prior to formal departmental verification`,
+          `Alter indicator methodologies without publishing revision policy notices`,
+          `Release contradictory preliminary tables to different agencies simultaneously`,
+        ],
+        correct: 0,
+      },
+    ]
+
+    return scenarioArchetypes.slice(0, neededCount)
   }
 
   const generatedQuestions = []
   const questionCount = skills.length * 10
   const questionPlan = skills.flatMap((skill) => Array.from({ length: 10 }, () => skill))
+
+  // Shuffle question plan order
   for (let i = questionPlan.length - 1; i > 0; i--) {
     const randomIndex = Math.floor(Math.random() * (i + 1))
     ;[questionPlan[i], questionPlan[randomIndex]] = [questionPlan[randomIndex], questionPlan[i]]
   }
+
   const skillQuestionCounts = {}
 
   for (let i = 0; i < questionCount; i++) {
@@ -2725,71 +2805,29 @@ function buildScenarioQuestions(profile, t, userSkills, quizMode = 'standard', n
       })
     } else {
       const diff = getQuestionDifficulty(skillQuestionIndex, 10)
-      const bankItems = scenarioBank[currentSkill]
-      const itemIndex = bankItems ? skillQuestionIndex : -1
-      let item = bankItems && itemIndex < bankItems.length ? bankItems[itemIndex] : null
 
-      if (!item) {
-        const tieredPrompts = {
-          1: [ // Foundational
-            `[Foundational] What is the core baseline principle and syntax standard governing ${currentSkill}?`,
-            `[Foundational] When standardizing ${currentSkill} across a team with ${exp} experience, which step prevents baseline execution errors?`,
-            `[Foundational] Which baseline definition accurately captures the operational scope of ${currentSkill}?`,
-          ],
-          2: [ // Intermediate
-            `[Intermediate] How should a team validate a new ${currentSkill} workflow and integrate it into active production?`,
-            `[Intermediate] Which KPI and monitoring control best demonstrates reliable daily application of ${currentSkill}?`,
-            `[Intermediate] When cross-functional requirements conflict around ${currentSkill}, what is the ideal collaborative reconciliation process?`,
-          ],
-          3: [ // Advanced
-            `[Advanced] An edge-case risk or performance bottleneck is detected in ${currentSkill}. How should corrective action be isolated and validated?`,
-            `[Advanced] When a high-scale dependency in ${currentSkill} degrades, which defensive mitigation pattern preserves data integrity?`,
-          ],
-          4: [ // Expert Challenge
-            `[Expert Challenge] A critical system handover or high-stakes audit exposes vulnerability in ${currentSkill}. Which governance artifact and remediation protocol must lead the response?`,
-            `[Expert Challenge] When executive leadership demands a rapid trade-off under strict regulatory compliance in ${currentSkill}, how should the architectural decision be structured?`,
-          ],
-        }
-
-        const tieredOptions = {
-          1: [
-            `Establish structured validation checkpoints, verify documented evidence, and apply baseline ${currentSkill} principles`,
-            `Proceed without peer review or documentation to save immediate initialization time`,
-            `Rely strictly on intuition without verifying operational standards or metrics`,
-            `Delegate the entire responsibility without guidance, training, or quality standards`,
-          ],
-          2: [
-            `Create a versioned workflow, test representative edge-cases, and monitor real-time telemetry for ${currentSkill}`,
-            `Deploy modifications directly to production without staging validation because changes appear minor`,
-            `Remove ongoing monitoring alerts to artificially reduce operational workload`,
-            `Accept intermittent execution failures as normal operational noise without root cause investigation`,
-          ],
-          3: [
-            `Deploy bounded triage buffers with backpressure isolation, defensive assertions, and audit logging for ${currentSkill}`,
-            `Expand operational concurrency unboundedly without measuring capacity thresholds`,
-            `Suppress error telemetry to prevent alerts from escalating to senior management`,
-            `Ignore conflicting data signals and force processing completion without validation`,
-          ],
-          4: [
-            `Enforce transactional rollback boundaries, execute write-ahead event audit journaling, and align governance stakeholders on verified evidence for ${currentSkill}`,
-            `Force uncoordinated system restarts without checkpointing active state records`,
-            `Bypass compliance reviews to rush unvalidated fixes into mission-critical environments`,
-            `Truncate audit ledgers and delete conflicting records to force synthetic compliance`,
-          ],
-        }
-
-        const pList = tieredPrompts[diff.level] || tieredPrompts[1]
-        const promptTemplate = pList[skillQuestionIndex % pList.length]
-        const optList = tieredOptions[diff.level] || tieredOptions[1]
-
-        item = {
-          prompt: promptTemplate,
-          options: [...optList],
-          correct: 0,
-        }
+      // Find matching bank items using flexible keyword matching
+      const normSkill = currentSkill.toLowerCase()
+      let bankKey = Object.keys(scenarioBank).find((k) => k.toLowerCase() === normSkill)
+      if (!bankKey) {
+        bankKey = Object.keys(scenarioBank).find((k) => normSkill.includes(k.toLowerCase()) || k.toLowerCase().includes(normSkill))
       }
 
-      const rawOptions = (item.options && item.options.length >= 4) ? [...item.options] : getDistinctChoiceOptions(currentSkill, skillQuestionIndex + 1)
+      const bankItems = bankKey ? scenarioBank[bankKey] : null
+      let item = null
+
+      if (bankItems && skillQuestionIndex < bankItems.length) {
+        item = bankItems[skillQuestionIndex]
+      } else {
+        // Generate a rich, non-repeating real-world scenario
+        const dynamicList = generateDynamicRealWorldQuestions(currentSkill, 10)
+        item = dynamicList[skillQuestionIndex % dynamicList.length]
+      }
+
+      const rawOptions = (item.options && item.options.length >= 4)
+        ? [...item.options]
+        : getDistinctChoiceOptions(currentSkill, skillQuestionIndex + 1)
+
       generatedQuestions.push(shuffleQuestionOptions({
         type: 'choice',
         skill: currentSkill,
@@ -2811,7 +2849,9 @@ function buildScenarioQuestions(profile, t, userSkills, quizMode = 'standard', n
 
 function getSkillSpecificQuestions(profile, t, skillList) {
   const questions = buildScenarioQuestions(profile, t, skillList, 'standard')
-  return questions.filter((question) => skillList.includes(question.skill))
+  const normSkills = new Set((skillList || []).map((s) => String(s || '').toLowerCase().trim()))
+  const filtered = questions.filter((question) => normSkills.has(String(question.skill || '').toLowerCase().trim()))
+  return filtered.length > 0 ? filtered : questions
 }
 
 const choiceOptionVariants = [
@@ -2876,23 +2916,95 @@ function shuffleQuestionOptions(question, questionNumber = 0) {
 }
 
 function ensureQuestionOptionsAreDistinct(questions) {
-  const seen = new Set()
-  return questions.map((question, index) => {
+  const alternativeDistractors = [
+    'Execute post-stratification weighting against benchmark administrative records',
+    'Perform dual-pass consistency audit and outlier winsorization before tabulation',
+    'Enforce differential privacy boundaries and cell-suppression threshold protocols',
+    'Adopt multistage probability proportional to size (PPS) sampling allocation',
+    'Establish automated ingestion schema validation with rollback checkpoints',
+    'Apply seasonal ARIMA decomposition with calendar trading-day adjustments',
+    'Implement dual-key cryptographic access controls and audit logging',
+    'Calculate design effect (DEFF) and recalibrate confidence intervals accordingly',
+    'Mandate independent supervisory sign-off and methodology disclosure report',
+    'Conduct split-sample cross-validation to prevent model overfitting'
+  ]
+
+  const seenSignatures = new Set()
+
+  return questions.map((question, qIdx) => {
     if (question.type === 'code' || !Array.isArray(question.options)) return question
-    const signature = question.options.map((option) => String(option).trim().toLowerCase()).join('|')
-    if (!seen.has(signature)) {
-      seen.add(signature)
-      return question
+
+    const correctIdx = typeof question.correctIndex === 'number'
+      ? question.correctIndex
+      : typeof question.answerIndex === 'number'
+      ? question.answerIndex
+      : 0
+    const correctText = question.options[correctIdx] || question.options[0]
+
+    // 1. Ensure all 4 options within THIS question are completely distinct
+    const uniqueOptions = []
+    const seenInQuestion = new Set()
+
+    question.options.forEach((opt) => {
+      const trimmed = String(opt || '').trim()
+      const key = trimmed.toLowerCase()
+      if (!seenInQuestion.has(key) && trimmed.length > 0) {
+        seenInQuestion.add(key)
+        uniqueOptions.push(trimmed)
+      } else {
+        // Find an alternative distractor that isn't yet in this question
+        const alt = alternativeDistractors.find(
+          (cand) => !seenInQuestion.has(cand.toLowerCase())
+        ) || `${trimmed} (Secondary validation protocol)`
+        seenInQuestion.add(alt.toLowerCase())
+        uniqueOptions.push(alt)
+      }
+    })
+
+    // Ensure question has at least 4 options
+    while (uniqueOptions.length < 4) {
+      const fallback = alternativeDistractors[uniqueOptions.length % alternativeDistractors.length]
+      uniqueOptions.push(fallback)
     }
-    const suffix = ` Scenario ${index + 1}`
-    const options = question.options.map((option) => `${option}${suffix}`)
-    seen.add(options.map((option) => option.toLowerCase()).join('|'))
-    return { ...question, options }
+
+    // Preserve the correct answer's exact index
+    let newCorrectIdx = uniqueOptions.findIndex((opt) => opt.toLowerCase() === String(correctText).trim().toLowerCase())
+    if (newCorrectIdx === -1) {
+      newCorrectIdx = Math.min(correctIdx, uniqueOptions.length - 1)
+      uniqueOptions[newCorrectIdx] = correctText
+    }
+
+    // 2. Ensure option set across questions is not identical
+    const signature = uniqueOptions.map((o) => o.toLowerCase()).sort().join('|')
+    if (seenSignatures.has(signature)) {
+      // Swap out one distractor (non-correct) with an alternative
+      const distractorIdx = (newCorrectIdx + 1) % uniqueOptions.length
+      const replacement = alternativeDistractors[(qIdx + 3) % alternativeDistractors.length]
+      uniqueOptions[distractorIdx] = replacement
+      const newSignature = uniqueOptions.map((o) => o.toLowerCase()).sort().join('|')
+      seenSignatures.add(newSignature)
+    } else {
+      seenSignatures.add(signature)
+    }
+
+    return {
+      ...question,
+      options: uniqueOptions,
+      correctIndex: newCorrectIdx,
+      answerIndex: newCorrectIdx,
+    }
   })
 }
 
 function ensureQuestionPromptsAreDistinct(questions) {
   const seen = new Set()
+  const variations = [
+    'In a high-scrutiny national statutory audit, which standard governs the decision?',
+    'Under strict regulatory reporting deadlines, which procedure takes precedence?',
+    'When integrating heterogeneous administrative data across ministries, what protocol is required?',
+    'To eliminate non-sampling error and bias in this evaluation, what is the mandatory action?'
+  ]
+
   return questions.map((question, index) => {
     const basePrompt = String(question.prompt || '').trim().replace(/\s+/g, ' ')
     const promptKey = basePrompt.toLowerCase()
@@ -2900,7 +3012,8 @@ function ensureQuestionPromptsAreDistinct(questions) {
       seen.add(promptKey)
       return question
     }
-    const prompt = `${basePrompt} Consider scenario ${index + 1} with a different dataset, constraint, or stakeholder outcome.`
+    const varText = variations[index % variations.length]
+    const prompt = `${basePrompt} (${varText})`
     seen.add(prompt.toLowerCase())
     return { ...question, prompt }
   })
@@ -2996,216 +3109,303 @@ function isSkillRelatedToRole(skill, role, designation) {
   return Boolean(matchingDomain?.skills.some((item) => item.toLowerCase() === normalizedSkill))
 }
 
-function getCourseCurriculum(course) {
+const DOMAIN_VIDEO_LIBRARIES = {
+  health: [
+    'https://www.youtube-nocookie.com/embed/8b51Bf7hU8M', // Epidemiology, Clinical Registries & Health Information Systems
+    'https://www.youtube-nocookie.com/embed/Q4Q-vC-7cK4', // Clinical Biostatistics, Trial Protocols & Public Health Survey Design
+    'https://www.youtube-nocookie.com/embed/3y_K_fJ9c-8', // Public Health Data Systems & Field Registries
+    'https://www.youtube-nocookie.com/embed/rfscVS0vtbw', // Health Informatics & Data Processing
+    'https://www.youtube-nocookie.com/embed/z1Xo3s8y1vU', // Health Quality Assurance & Metrics
+  ],
+  agri: [
+    'https://www.youtube-nocookie.com/embed/3y_K_fJ9c-8', // Crop Yield Modeling, Sampling & Agro-Statistics
+    'https://www.youtube-nocookie.com/embed/5kL_6Fp3z9s', // Geospatial Remote Sensing in Agricultural Enumeration
+    'https://www.youtube-nocookie.com/embed/rfscVS0vtbw', // Automated Agri-Data Pipelines
+    'https://www.youtube-nocookie.com/embed/L13_9z9K438', // Field Enumeration & Sample Surveys
+    'https://www.youtube-nocookie.com/embed/z1Xo3s8y1vU', // Agricultural Statistics Verification
+  ],
+  tech: [
+    'https://www.youtube-nocookie.com/embed/rfscVS0vtbw', // Python & Automated Data Engineering for Civil Services
+    'https://www.youtube-nocookie.com/embed/GwIo3gDZCVQ', // Machine Learning & Predictive Modeling for Public Policy
+    'https://www.youtube-nocookie.com/embed/5kL_6Fp3z9s', // Geospatial Analytics & Big Data Systems
+    'https://www.youtube-nocookie.com/embed/z1Xo3s8y1vU', // Data Pipeline Validation & Testing
+    'https://www.youtube-nocookie.com/embed/8b51Bf7hU8M', // System Architecture & Cloud Engineering
+  ],
+  price: [
+    'https://www.youtube-nocookie.com/embed/4UCX3D26y3M', // Consumer Price Index (CPI) Compilation & Laspeyres Indexation
+    'https://www.youtube-nocookie.com/embed/jZ8uQfC435U', // Macroeconomic Indicators & National Accounts Statistics (NAS)
+    'https://www.youtube-nocookie.com/embed/z1Xo3s8y1vU', // Price Index Quality Auditing
+    'https://www.youtube-nocookie.com/embed/L13_9z9K438', // Market Price Enumeration & Field Validation
+    'https://www.youtube-nocookie.com/embed/rfscVS0vtbw', // Automated Price Aggregation Pipelines
+  ],
+  labour: [
+    'https://www.youtube-nocookie.com/embed/fW4oRj1_5m4', // Periodic Labour Force Survey (PLFS) Methodology & Sampling Design
+    'https://www.youtube-nocookie.com/embed/e_p3a_pYx3M', // Informal Sector Employment & Wage Index Estimation
+    'https://www.youtube-nocookie.com/embed/L13_9z9K438', // Workforce Field Survey Operations
+    'https://www.youtube-nocookie.com/embed/z1Xo3s8y1vU', // Labour Statistics Reconciliation
+    'https://www.youtube-nocookie.com/embed/4UCX3D26y3M', // Wage & Cost-of-Living Indexing
+  ],
+  nso: [
+    'https://www.youtube-nocookie.com/embed/z1Xo3s8y1vU', // National Quality Assurance Framework (NQAF) & Statistical Audit
+    'https://www.youtube-nocookie.com/embed/L13_9z9K438', // Survey Operations, Field Enumeration & Tabulation Standards
+    'https://www.youtube-nocookie.com/embed/4UCX3D26y3M', // Statistical Compilation & Data Analysis
+    'https://www.youtube-nocookie.com/embed/rfscVS0vtbw', // Automated Data Processing
+    'https://www.youtube-nocookie.com/embed/GwIo3gDZCVQ', // Decision Analytics & Public Reporting
+  ],
+}
+
+function normalizeEmbedUrl(url) {
+  if (!url) return ''
+  const trimmed = String(url).trim()
+  if (trimmed.includes('youtube-nocookie.com/embed/') || trimmed.includes('youtube.com/embed/')) {
+    return trimmed
+  }
+  const match = trimmed.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/)
+  if (match && match[1]) {
+    return `https://www.youtube-nocookie.com/embed/${match[1]}`
+  }
+  return trimmed
+}
+
+function getCourseCurriculum(course, userProfile = null) {
   const courseId = course?.id || 'crs-default'
   const title = course?.title || course?.name || 'Domain Competency'
   const competency = course?.competency || 'Official Statistics'
+  const department = course?.department || userProfile?.department || 'Official Statistics'
+  const roleName = course?.role || userProfile?.role || userProfile?.designation || 'Statistical Officer'
+
+  // Determine domain category
+  const textBlob = `${department} ${competency} ${title} ${roleName}`.toLowerCase()
+  let domainKey = 'nso'
+  if (textBlob.includes('health') || textBlob.includes('medic') || textBlob.includes('biostat') || textBlob.includes('clinic') || textBlob.includes('epidemiolog')) {
+    domainKey = 'health'
+  } else if (textBlob.includes('agri') || textBlob.includes('crop') || textBlob.includes('farmer') || textBlob.includes('yield') || textBlob.includes('soil')) {
+    domainKey = 'agri'
+  } else if (textBlob.includes('tech') || textBlob.includes('ai') || textBlob.includes('data science') || textBlob.includes('python') || textBlob.includes('machine learning') || textBlob.includes('programming')) {
+    domainKey = 'tech'
+  } else if (textBlob.includes('price') || textBlob.includes('consumer') || textBlob.includes('cpi') || textBlob.includes('inflation') || textBlob.includes('wpi') || textBlob.includes('economic')) {
+    domainKey = 'price'
+  } else if (textBlob.includes('labour') || textBlob.includes('labor') || textBlob.includes('employ') || textBlob.includes('workforce') || textBlob.includes('plfs')) {
+    domainKey = 'labour'
+  }
+
+  const domainVideos = DOMAIN_VIDEO_LIBRARIES[domainKey] || DOMAIN_VIDEO_LIBRARIES.nso
+  const rawVideo = course?.videoUrl ? normalizeEmbedUrl(course.videoUrl) : ''
+  const validCourseVideo = rawVideo && !rawVideo.includes('dQw4w9WgXcQ') ? rawVideo : null
+
+  const getVideoForTopic = (mIndex, tIndex) => {
+    if (mIndex === 1 && tIndex === 1 && validCourseVideo) {
+      return validCourseVideo
+    }
+    const idx = (mIndex * 5 + tIndex - 6) % domainVideos.length
+    return domainVideos[Math.abs(idx)] || domainVideos[0]
+  }
 
   return [
     {
       index: 1,
-      title: 'Core Principles & Departmental Guidelines',
-      desc: `Foundational statutory principles, institutional mandates, and administrative frameworks for ${title}.`,
+      title: `Core Principles & Statutory Architecture (${competency})`,
+      desc: `Foundational statutory principles, legislative frameworks, and institutional mandates governing ${title} in public administration.`,
       topics: [
         {
           id: `${courseId}-m1-t1`,
           index: 1,
-          title: 'Institutional Mandates, Legal Acts & System Architecture',
+          title: `Statutory Mandates, Legal Directives & Hierarchy for ${competency}`,
           duration: '10 min',
           format: 'Video',
-          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
-          description: `Comprehensive orientation on statutory rules, legislative frameworks, and institutional hierarchy governing ${competency} in public administration.`,
+          videoUrl: getVideoForTopic(1, 1),
+          description: `Orientation on statutory rules, legislative frameworks, and institutional hierarchy governing ${competency} under ${department}.`,
         },
         {
           id: `${courseId}-m1-t2`,
           index: 2,
-          title: 'National Standards, Classifications & Taxonomy Systems',
+          title: `National Classifications, Coding Standards & ${competency} Taxonomy`,
           duration: '12 min',
           format: 'Video',
-          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
-          description: `Detailed exploration of standardized nomenclature, metadata protocols, and harmonized categorization codes applied across official statistical registries.`,
+          videoUrl: getVideoForTopic(1, 2),
+          description: `Standardized nomenclature, metadata protocols, and harmonized categorization codes applied across official registries.`,
         },
         {
           id: `${courseId}-m1-t3`,
           index: 3,
-          title: 'Administrative Sourcing & Inter-Agency Coordination Protocols',
-          duration: '8 min',
+          title: `Administrative Sourcing, Field Protocols & Inter-Agency Coordination`,
+          duration: '9 min',
           format: 'Video',
-          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
-          description: `Procedures for secure inter-departmental data exchanges, memoranda of understanding, and cross-cadre synchronization standards.`,
+          videoUrl: getVideoForTopic(1, 3),
+          description: `Procedures for secure inter-departmental data exchanges, field memoranda, and cross-cadre synchronization standards for ${roleName}.`,
         },
         {
           id: `${courseId}-m1-t4`,
           index: 4,
-          title: 'Data Governance Norms, Anonymization & Confidentiality',
+          title: `Data Governance Norms, Anonymization & DPDP Compliance`,
           duration: '11 min',
           format: 'Video',
-          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
-          description: `Statutory guidelines under DPDP Act and official statistics frameworks for respondent privacy, cryptographic masking, and disclosure risk control.`,
+          videoUrl: getVideoForTopic(1, 4),
+          description: `Statutory guidelines under DPDP Act and official frameworks for respondent privacy, cryptographic masking, and disclosure risk control.`,
         },
         {
           id: `${courseId}-m1-t5`,
           index: 5,
-          title: 'Foundational Review & Operational Concept Check',
+          title: `Foundational Review & Operational Concept Evaluation`,
           duration: '10 min',
           format: 'Video',
-          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          videoUrl: getVideoForTopic(1, 5),
           description: `Formative evaluation covering governance mandates, procedural milestones, and institutional risk mitigation strategies.`,
         },
       ],
     },
     {
       index: 2,
-      title: 'Applied Workflows & Empirical Data Pipelines',
-      desc: `Implementation methodologies, automated data transformations, and domain-specific pipelines.`,
+      title: `Applied Methodologies & Technical Pipelines (${competency})`,
+      desc: `Hands-on implementation pipelines, automated data transformations, and domain-specific analytical models.`,
       topics: [
         {
           id: `${courseId}-m2-t1`,
           index: 1,
-          title: 'Data Ingestion Architecture & Initial Register Validation',
+          title: `Data Ingestion Architecture & Initial Register Validation`,
           duration: '12 min',
           format: 'Video',
-          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
-          description: `Setup of automated ingestion scripts, schema validation checks, and integrity verification on raw administrative feeds.`,
+          videoUrl: getVideoForTopic(2, 1),
+          description: `Setup of automated ingestion scripts, schema validation checks, and integrity verification on administrative feeds.`,
         },
         {
           id: `${courseId}-m2-t2`,
           index: 2,
-          title: 'Standardized Cleaning Protocols & Algorithmic Filters',
+          title: `Standardized Cleaning Protocols, Algorithmic Filters & Outlier Detection`,
           duration: '14 min',
           format: 'Video',
-          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
-          description: `Practical application of rule-based outlier detectors, duplicate suppression routines, and format normalization rules.`,
+          videoUrl: getVideoForTopic(2, 2),
+          description: `Practical application of rule-based outlier detectors, duplicate suppression routines, and format normalization rules for ${competency}.`,
         },
         {
           id: `${courseId}-m2-t3`,
           index: 3,
-          title: 'Computational Transformations & Aggregation Standards',
+          title: `Computational Transformations & Aggregation Formulas for ${roleName}`,
           duration: '15 min',
           format: 'Video',
-          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          videoUrl: getVideoForTopic(2, 3),
           description: `Advanced derivation of composite indices, weighted domain aggregates, and time-series normalization techniques.`,
         },
         {
           id: `${courseId}-m2-t4`,
           index: 4,
-          title: 'Analytical Modeling & Domain-Specific Estimation Models',
+          title: `Analytical Modeling & Domain-Specific Estimation Workflows`,
           duration: '13 min',
           format: 'Video',
-          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
-          description: `Execution of econometric, spatial, or sampling estimation models directly tied to ${competency} workflows.`,
+          videoUrl: getVideoForTopic(2, 4),
+          description: `Execution of econometric, spatial, or sampling estimation models directly tied to ${title} workflows.`,
         },
         {
           id: `${courseId}-m2-t5`,
           index: 5,
-          title: 'Automated Output Generation & Pipeline Reproducibility',
+          title: `Automated Output Generation, Artefact Logs & Reproducibility`,
           duration: '10 min',
           format: 'Video',
-          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          videoUrl: getVideoForTopic(2, 5),
           description: `Compilation of reproducible execution logs, output data cubes, and version-controlled analytical artifacts.`,
         },
       ],
     },
     {
       index: 3,
-      title: 'Quality Verification & Error Imputation Standards',
+      title: `Quality Assurance, Reconciliation & Audit (${competency})`,
       desc: `Field-tested quality frameworks, statistical reconciliation, and compliance checklists.`,
       topics: [
         {
           id: `${courseId}-m3-t1`,
           index: 1,
-          title: 'National Quality Assurance Framework (NQAF) Standards',
+          title: `National Quality Assurance Framework (NQAF) Standards Alignment`,
           duration: '11 min',
           format: 'Video',
-          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          videoUrl: getVideoForTopic(3, 1),
           description: `Benchmarking procedures against national and international quality dimensions including accuracy, timeliness, and coherence.`,
         },
         {
           id: `${courseId}-m3-t2`,
           index: 2,
-          title: 'Statistical Error Detection, Imputation & Cold-Deck Methods',
+          title: `Error Detection, Non-Sampling Variance & Imputation Methods`,
           duration: '14 min',
           format: 'Video',
-          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          videoUrl: getVideoForTopic(3, 2),
           description: `Scientific methodologies for identifying non-sampling errors, hot/cold deck imputations, and variance adjustments.`,
         },
         {
           id: `${courseId}-m3-t3`,
           index: 3,
-          title: 'Audit Trails, Metadata Tracking & Provenance Records',
+          title: `Audit Trails, Metadata Tracking & Provenance Registers`,
           duration: '9 min',
           format: 'Video',
-          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          videoUrl: getVideoForTopic(3, 3),
           description: `Establishment of immutable audit logs, transformation histories, and standardized metadata registers for public accountability.`,
         },
         {
           id: `${courseId}-m3-t4`,
           index: 4,
-          title: 'Cross-Departmental Discrepancy Reconciliation Checks',
+          title: `Cross-Departmental Discrepancy Reconciliation & Quality Checklists`,
           duration: '12 min',
           format: 'Video',
-          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
-          description: `Practical resolution workflows when reconciling central, state, and subordinate agency statistical variances.`,
+          videoUrl: getVideoForTopic(3, 4),
+          description: `Practical resolution workflows when reconciling central, state, and subordinate agency variances.`,
         },
         {
           id: `${courseId}-m3-t5`,
           index: 5,
-          title: 'Quality Assurance Sign-Off & Verification Checklists',
+          title: `Quality Assurance Sign-Off & Verification Protocols`,
           duration: '10 min',
           format: 'Video',
-          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          videoUrl: getVideoForTopic(3, 5),
           description: `Official sign-off protocols, pre-publication validation matrices, and senior officer clearance checklists.`,
         },
       ],
     },
     {
       index: 4,
-      title: 'Competency Benchmark & Assessment Preparation',
-      desc: `Hands-on scenario evaluations, applied case studies, and certification readiness.`,
+      title: `Competency Benchmark & Applied Scenario Evaluation (${roleName})`,
+      desc: `Hands-on scenario evaluations, applied case studies, and certification readiness for ${roleName}.`,
       topics: [
         {
           id: `${courseId}-m4-t1`,
           index: 1,
-          title: 'Applied Public Sector Case Study: Real-World Scenario',
+          title: `Applied Public Sector Case Scenario: ${title}`,
           duration: '15 min',
           format: 'Video',
-          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          videoUrl: getVideoForTopic(4, 1),
           description: `Deep-dive case study replicating a major ministry dataset challenge with real-world complexities and operational constraints.`,
         },
         {
           id: `${courseId}-m4-t2`,
           index: 2,
-          title: 'Diagnostic Problem Solving & Edge Case Remediation',
+          title: `Diagnostic Problem Solving & Operational Edge Case Remediation`,
           duration: '12 min',
           format: 'Video',
-          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          videoUrl: getVideoForTopic(4, 2),
           description: `Walkthrough of unexpected survey anomalies, system outages, and sudden policy indicator recalibrations.`,
         },
         {
           id: `${courseId}-m4-t3`,
           index: 3,
-          title: 'Policy Brief Synthesis & Executive Presentation Standards',
+          title: `Synthesizing Executive Policy Briefs & Decision Dashboards`,
           duration: '14 min',
           format: 'Video',
-          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
-          description: `Translating complex technical indicators into high-impact executive summaries, dashboards, and decision memos for leadership.`,
+          videoUrl: getVideoForTopic(4, 3),
+          description: `Translating complex technical indicators into high-impact executive summaries, dashboards, and decision memos for ${department} leadership.`,
         },
         {
           id: `${courseId}-m4-t4`,
           index: 4,
-          title: 'Pre-Assessment Practical Walkthrough & Sample Questions',
+          title: `Pre-Assessment Practical Simulation & Question Rubrics`,
           duration: '10 min',
           format: 'Video',
-          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          videoUrl: getVideoForTopic(4, 4),
           description: `Detailed examination of benchmark assessment rubrics, scoring criteria, and simulated exam questions.`,
         },
         {
           id: `${courseId}-m4-t5`,
           index: 5,
-          title: 'Capstone Evaluation & Final Competency Certification',
+          title: `Capstone Competency Evaluation & Role Certification Readiness`,
           duration: '15 min',
           format: 'Video',
-          videoUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+          videoUrl: getVideoForTopic(4, 5),
           description: `Final synthesis capstone qualifying you for verified certification and official promotion screening eligibility.`,
         },
       ],
@@ -3251,6 +3451,20 @@ function App() {
     previousIGOT: '', previousNSSTA: '', externalTraining: '', certifications: '',
   })
   const [profileDraft, setProfileDraft] = useState({})
+  const [adminSyncTick, setAdminSyncTick] = useState(0)
+
+  useEffect(() => {
+    const handleAdminUpdate = () => {
+      setAdminSyncTick((prev) => prev + 1)
+    }
+    window.addEventListener('skillstat_admin_update', handleAdminUpdate)
+    window.addEventListener('storage', handleAdminUpdate)
+    return () => {
+      window.removeEventListener('skillstat_admin_update', handleAdminUpdate)
+      window.removeEventListener('storage', handleAdminUpdate)
+    }
+  }, [])
+
   const isAdmin = isAllowedAdmin(profile?.email)
 
   useEffect(() => {
@@ -3349,7 +3563,7 @@ function App() {
     const currentKey = activeLessonView.topic.id
     setCompletedTopics((prev) => ({ ...prev, [currentKey]: true }))
 
-    const curriculum = getCourseCurriculum(activeLessonView.course)
+    const curriculum = getCourseCurriculum(activeLessonView.course, profile)
     const mIdx = activeLessonView.moduleIndex
     const tIdx = activeLessonView.topicIndex
 
@@ -3374,7 +3588,7 @@ function App() {
 
   const handlePreviousTopic = () => {
     if (!activeLessonView?.topic) return
-    const curriculum = getCourseCurriculum(activeLessonView.course)
+    const curriculum = getCourseCurriculum(activeLessonView.course, profile)
     const mIdx = activeLessonView.moduleIndex
     const tIdx = activeLessonView.topicIndex
 
@@ -3397,7 +3611,7 @@ function App() {
 
   const handleSkipForNow = () => {
     if (!activeLessonView?.topic) return
-    const curriculum = getCourseCurriculum(activeLessonView.course)
+    const curriculum = getCourseCurriculum(activeLessonView.course, profile)
     const mIdx = activeLessonView.moduleIndex
     const tIdx = activeLessonView.topicIndex
 
@@ -3570,10 +3784,10 @@ function App() {
 
   // Load initial recommendation data
   useEffect(() => {
-    if (selectedSkillForRec && !recommendationData) {
+    if (selectedSkillForRec) {
       getRecommendations(profile, selectedSkillForRec).then(setRecommendationData)
     }
-  }, [profile, selectedSkillForRec, recommendationData])
+  }, [profile, selectedSkillForRec, adminSyncTick])
 
   useEffect(() => {
     if (!profile.role || selectedSkillList.length === 0) return
@@ -3587,7 +3801,7 @@ function App() {
       })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [profile, selectedSkillList, competencyGaps])
+  }, [profile, selectedSkillList, competencyGaps, adminSyncTick])
 
   // Handler for viewing recommendation for a specific competency gap
   const handleViewRecommendation = useCallback(async (gapItem) => {
@@ -3666,23 +3880,8 @@ function App() {
   const startQuiz = (quizMode = 'standard', specificSkill = '') => {
     setActiveQuizType(quizMode)
     setCurrentQuizSkill(specificSkill)
-    if (!specificSkill && selectedSkillList.length === 0) {
-      setStep('skills')
-      return
-    }
-    const skillList = specificSkill
-      ? [specificSkill]
-      : selectedSkillList
-    const hasCoding = skillList.some((s) => codingLanguages.includes(s))
-    const chosenLang = hasCoding ? skillList.filter(isCodingSkill).join(', ') : ''
 
-    if (quizMode === 'standard' && !specificSkill) {
-      if (skillList.length === 0) {
-        setStep('skills')
-        return
-      }
-    }
-
+    // Mode 1: Document Studio AI Notes Quiz (does not require skillList)
     if (quizMode === 'notes') {
       const clean = cleanExtractedText(uploadedNotesText)
       const val = validateDocumentText(clean)
@@ -3690,23 +3889,75 @@ function App() {
         setDocExtractionError(val.error || 'Unable to read the uploaded material correctly. Please upload the document again or use a text-readable PDF.')
         return
       }
-      const noteQs = buildScenarioQuestions(profile, t, skillList, 'notes', clean)
-      if (!noteQs || noteQs.length === 0) {
-        setDocExtractionError('Unable to read the uploaded material correctly. Please upload the document again or use a text-readable PDF.')
-        return
-      }
-      setQuestions(noteQs)
-      setQuestionIndex(0)
-      setAnswer('')
-      setCodeAnswer('')
-      setQuestionResults([])
-      setStep('test')
+
+      fetch('/api/questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          role: profile.role || profile.designation,
+          quizMode: 'notes',
+          notesContent: clean,
+        }),
+      })
+        .then((res) => (res.ok ? res.json() : Promise.reject(new Error('AI fallback'))))
+        .then((data) => {
+          if (Array.isArray(data.questions) && data.questions.length >= 5) {
+            const validated = validateAndCleanQuiz(data.questions, 'Document Notes')
+            const distinct = ensureQuestionPromptsAreDistinct(ensureQuestionOptionsAreDistinct(validated))
+            setQuestions(distinct.map((q, idx) => shuffleQuestionOptions(q, idx)))
+          } else {
+            throw new Error('Local extraction fallback')
+          }
+        })
+        .catch(() => {
+          const noteQs = buildScenarioQuestions(profile, t, [], 'notes', clean)
+          if (!noteQs || noteQs.length === 0) {
+            setDocExtractionError('Unable to extract sufficient quiz questions from this document. Please ensure the document contains descriptive paragraphs or procedures.')
+            return
+          }
+          const distinct = ensureQuestionPromptsAreDistinct(ensureQuestionOptionsAreDistinct(noteQs))
+          setQuestions(distinct.map((q, idx) => shuffleQuestionOptions(q, idx)))
+        })
+        .finally(() => {
+          setQuestionIndex(0)
+          setAnswer('')
+          setCodeAnswer('')
+          setQuestionResults([])
+          setStep('test')
+        })
       return
     }
 
+    // Auto-resolve skills if selectedSkillList is empty
+    let skillList = specificSkill ? [specificSkill] : [...selectedSkillList]
+    if (skillList.length === 0) {
+      if (profile.skills) {
+        const fromProfile = profile.skills.split(',').map((s) => s.trim()).filter(Boolean)
+        if (fromProfile.length > 0) skillList = fromProfile
+      }
+      if (skillList.length === 0 && competencyGaps && competencyGaps.length > 0) {
+        const fromGaps = competencyGaps.map((g) => g.skill || g.name).filter(Boolean)
+        if (fromGaps.length > 0) skillList = fromGaps.slice(0, 3)
+      }
+      if (skillList.length === 0) {
+        const roleSkills = getRoleSkillCategories(profile.role, profile.designation)
+        if (Array.isArray(roleSkills) && roleSkills.length > 0) {
+          skillList = roleSkills.slice(0, 3)
+        } else {
+          skillList = ['Official Statistics & Survey Methodology', 'Public Sector Data Governance', 'Statistical Data Analysis']
+        }
+      }
+      setSelectedSkillList(skillList)
+    }
+
+    const hasCoding = skillList.some((s) => codingLanguages.includes(s))
+    const chosenLang = hasCoding ? skillList.filter(isCodingSkill).join(', ') : ''
+
+    // Mode 2: Weekend Challenge
     if (quizMode === 'weekend') {
       const weekendQs = buildScenarioQuestions(profile, t, skillList, 'weekend')
-      setQuestions(weekendQs)
+      const distinct = ensureQuestionPromptsAreDistinct(ensureQuestionOptionsAreDistinct(weekendQs))
+      setQuestions(distinct.map((q, idx) => shuffleQuestionOptions(q, idx)))
       setQuestionIndex(0)
       setAnswer('')
       setCodeAnswer('')
@@ -3715,9 +3966,11 @@ function App() {
       return
     }
 
+    // Mode 3: Specific Single Skill (from course recommendation or competency modal)
     if (specificSkill) {
       const targetedQs = buildScenarioQuestions(profile, t, [specificSkill], 'standard', '', specificSkill)
-      setQuestions(targetedQs)
+      const distinct = ensureQuestionPromptsAreDistinct(ensureQuestionOptionsAreDistinct(targetedQs))
+      setQuestions(distinct.map((q, idx) => shuffleQuestionOptions(q, idx)))
       setQuestionIndex(0)
       setAnswer('')
       setCodeAnswer('')
@@ -3726,7 +3979,7 @@ function App() {
       return
     }
 
-    // Standard Skill Assessment
+    // Mode 4: Standard Skill Assessment
     fetch('/api/questions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -3739,8 +3992,8 @@ function App() {
     })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error('AI fallback'))))
       .then((data) => {
-          const expectedQuestionCount = skillList.length * 10
-          if (Array.isArray(data.questions) && data.questions.length >= expectedQuestionCount) {
+        const expectedQuestionCount = skillList.length * 10
+        if (Array.isArray(data.questions) && data.questions.length >= expectedQuestionCount) {
           const validated = validateAndCleanQuiz(data.questions, skillList[0])
           const normalizedQuestions = validated.map((question) => (
             question.type === 'code'
@@ -3767,10 +4020,14 @@ function App() {
             return
           }
         }
-        setQuestions(getSkillSpecificQuestions(profile, t, skillList))
+        const fallbackQs = getSkillSpecificQuestions(profile, t, skillList)
+        const distinct = ensureQuestionPromptsAreDistinct(ensureQuestionOptionsAreDistinct(fallbackQs))
+        setQuestions(distinct.map((q, idx) => shuffleQuestionOptions(q, idx)))
       })
       .catch(() => {
-        setQuestions(getSkillSpecificQuestions(profile, t, skillList))
+        const fallbackQs = getSkillSpecificQuestions(profile, t, skillList)
+        const distinct = ensureQuestionPromptsAreDistinct(ensureQuestionOptionsAreDistinct(fallbackQs))
+        setQuestions(distinct.map((q, idx) => shuffleQuestionOptions(q, idx)))
       })
       .finally(() => {
         setQuestionIndex(0)
@@ -4581,7 +4838,7 @@ function App() {
 
   if (step === 'profile') {
     const selectedDepartment = getDepartmentDetails(profile.department)
-    const filteredDepartments = governmentDepartments.filter(({ name }) => name.toLowerCase().includes(departmentSearch.toLowerCase()))
+    const filteredDepartments = getEffectiveDepartments().filter(({ name }) => name.toLowerCase().includes(departmentSearch.toLowerCase()))
     return (
       <div className="simple-page">
         <div className="page-centered-container selection-page">
@@ -5500,7 +5757,10 @@ function App() {
       <main className="dashboard-body">
         {dashboardView === 'admin' && isAdmin && (
           <AdminPortal
-            onReturnToLearner={() => setDashboardView('dashboard')}
+            onReturnToLearner={() => {
+              setDashboardView('dashboard')
+              setAdminSyncTick((prev) => prev + 1)
+            }}
             adminUser={profile}
           />
         )}
@@ -5882,6 +6142,43 @@ function App() {
             </button>
           </div>
         </section>
+
+        {/* Department-Targeted Official Announcements */}
+        {(() => {
+          try {
+            const rawNotifs = localStorage.getItem('skillstat_admin_notifs')
+            if (!rawNotifs) return null
+            const notifs = JSON.parse(rawNotifs)
+            if (!Array.isArray(notifs) || notifs.length === 0) return null
+            const userDept = (profile.department || '').toLowerCase()
+            const matchingNotifs = notifs.filter((n) => {
+              if (!n || !n.title) return false
+              const target = (n.target || 'All Departments').toLowerCase()
+              return target === 'all' || target === 'all departments' || (userDept && (userDept.includes(target) || target.includes(userDept)))
+            })
+            if (matchingNotifs.length === 0) return null
+
+            return (
+              <section className="dashboard-announcements-bar" aria-label="Department Notices">
+                {matchingNotifs.map((n) => (
+                  <div key={n.id} className="dept-announcement-card">
+                    <div className="dept-announcement-header">
+                      <span className="announcement-pill-type">📢 {n.type || 'Notice'}</span>
+                      <span className="announcement-pill-dept">Target: {n.target || 'All Wings'}</span>
+                      {n.date && <span className="announcement-date">{n.date}</span>}
+                    </div>
+                    <div className="dept-announcement-content">
+                      <strong>{n.title}</strong>
+                      <p>{n.message}</p>
+                    </div>
+                  </div>
+                ))}
+              </section>
+            )
+          } catch {
+            return null
+          }
+        })()}
 
         {/* Career Progression & Promotion Milestone Banner */}
         {(() => {
@@ -6631,7 +6928,7 @@ function App() {
 
                 {/* Module Progression, Start → Button, and Expandable Topics Drawer */}
                 {(() => {
-                  const curriculum = getCourseCurriculum(activeCourseModal)
+                  const curriculum = getCourseCurriculum(activeCourseModal, profile)
                   const completedModuleCount = curriculum.filter((mod) =>
                     mod.topics.every((top) => completedTopics[top.id])
                   ).length
@@ -6793,7 +7090,7 @@ function App() {
         {/* Coursera-Style Fullscreen Video Learning Platform Overlay */}
         {activeLessonView && (() => {
           const currentCourse = activeLessonView.course
-          const curriculum = getCourseCurriculum(currentCourse)
+          const curriculum = getCourseCurriculum(currentCourse, profile)
           const currentModule = curriculum[activeLessonView.moduleIndex] || curriculum[0]
           const currentTopic = activeLessonView.topic || currentModule.topics[0]
           const mIdx = activeLessonView.moduleIndex

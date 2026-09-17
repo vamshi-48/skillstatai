@@ -192,6 +192,171 @@ export function extractConceptsFromText(cleanedText, count = 5) {
   }
 
 /**
+ * Extracts rich, authentic question items directly from uploaded document text.
+ * Formulates realistic comprehension, policy, procedural, and metric questions
+ * based on actual sentences and factual assertions in the text.
+ */
+export function extractDocumentQuizItems(cleanedText, count = 10) {
+  if (!cleanedText || typeof cleanedText !== 'string' || cleanedText.trim().length < 20) {
+    return []
+  }
+
+  // 1. Split text into coherent, information-rich sentences
+  const rawSegments = cleanedText
+    .split(/(?<=[.?!])\s+|\n+/)
+    .map((s) => s.replace(/^[\d.)\-\s*•#]+/, '').trim())
+    .filter((s) => {
+      const words = s.split(/\s+/).filter(Boolean)
+      return (
+        s.length >= 35 &&
+        s.length <= 320 &&
+        words.length >= 6 &&
+        !/^table\s*\d+/i.test(s) &&
+        !/^figure\s*\d+/i.test(s) &&
+        !/([^\s])\1{3,}/.test(s)
+      )
+    })
+
+  if (rawSegments.length === 0) {
+    return []
+  }
+
+  // Deduplicate near-identical sentences
+  const uniqueSegments = []
+  const seenPrefixes = new Set()
+  for (const seg of rawSegments) {
+    const prefix = seg.slice(0, 30).toLowerCase()
+    if (!seenPrefixes.has(prefix)) {
+      seenPrefixes.add(prefix)
+      uniqueSegments.push(seg)
+    }
+  }
+
+  // 2. Extract key topic phrase from a sentence
+  function extractKeyTopic(sentence) {
+    const words = sentence.split(/\s+/).filter(Boolean)
+    const stopWords = new Set([
+      'the', 'a', 'an', 'in', 'on', 'at', 'to', 'for', 'of', 'and', 'or', 'is', 'are', 'was', 'were',
+      'that', 'this', 'with', 'from', 'by', 'as', 'it', 'its', 'be', 'been', 'has', 'have', 'had',
+      'will', 'shall', 'should', 'would', 'can', 'could', 'may', 'might', 'must', 'each', 'all',
+      'any', 'such', 'when', 'where', 'which', 'who', 'whom', 'their', 'our', 'these', 'those'
+    ])
+
+    // Find the first sequence of 2-4 content words
+    const contentWords = []
+    for (const w of words) {
+      const clean = w.replace(/^[^\w]+|[^\w]+$/g, '')
+      if (clean && !stopWords.has(clean.toLowerCase())) {
+        contentWords.push(clean)
+        if (contentWords.length >= 3) break
+      } else if (contentWords.length > 0) {
+        if (contentWords.length >= 2) break
+      }
+    }
+
+    if (contentWords.length >= 2) {
+      return contentWords.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+    }
+    return words.slice(0, 3).join(' ').replace(/^[^\w]+|[^\w]+$/g, '')
+  }
+
+  // 3. Build diverse question types based on the sentence
+  const questionGenerators = [
+    // Type A: Direct procedural / standard requirement
+    (topic, sentence) => ({
+      prompt: `According to the uploaded material, what is the established guideline or standard regarding "${topic}"?`,
+      correct: `${sentence.endsWith('.') ? sentence.slice(0, -1) : sentence}.`,
+      distractors: [
+        `The document explicitly advises bypassing ${topic} protocols to avoid procedural delays in reporting.`,
+        `The material recommends delegating ${topic} decisions entirely to unverified external contractors without oversight.`,
+        `The text states that ${topic} should only be recorded if retrospective audit discrepancies are identified.`,
+      ],
+    }),
+    // Type B: Core objective & operational mandate
+    (topic, sentence) => ({
+      prompt: `Based on the provided document, what key principle or operational procedure is highlighted for "${topic}"?`,
+      correct: `${sentence.endsWith('.') ? sentence.slice(0, -1) : sentence}.`,
+      distractors: [
+        `Operational teams are instructed to replace ${topic} guidelines with informal legacy practices.`,
+        `The document considers ${topic} optional and recommends deferring documentation indefinitely.`,
+        `The text directs officers to alter source benchmarks for ${topic} whenever targets are not met.`,
+      ],
+    }),
+    // Type C: Compliance & methodological rigor
+    (topic, sentence) => ({
+      prompt: `In the context of the uploaded document, which statement accurately reflects the required methodology for "${topic}"?`,
+      correct: `${sentence.endsWith('.') ? sentence.slice(0, -1) : sentence}.`,
+      distractors: [
+        `The protocol permits omitting data validation for ${topic} when handling large-scale administrative feeds.`,
+        `The document advises adopting unverified third-party estimates for ${topic} without provenance checks.`,
+        `The text mandates that ${topic} records be discarded if conflicting regional variances are detected.`,
+      ],
+    }),
+    // Type D: Quality control & governance assertion
+    (topic, sentence) => ({
+      prompt: `Which of the following statements is explicitly supported by the uploaded text regarding "${topic}"?`,
+      correct: `${sentence.endsWith('.') ? sentence.slice(0, -1) : sentence}.`,
+      distractors: [
+        `The material recommends silencing exceptions in ${topic} to expedite final clearance.`,
+        `The document suggests standardizing ${topic} by removing historical verification logs.`,
+        `The text states that ${topic} compliance does not require adherence to statutory governance norms.`,
+      ],
+    }),
+  ]
+
+  // Step across the document evenly so questions represent the entire document
+  const stepSize = Math.max(1, Math.floor(uniqueSegments.length / count))
+  const items = []
+
+  for (let i = 0; i < count; i++) {
+    const segIndex = (i * stepSize) % uniqueSegments.length
+    const sentence = uniqueSegments[segIndex]
+    const topic = extractKeyTopic(sentence)
+    const gen = questionGenerators[i % questionGenerators.length]
+    const qData = gen(topic, sentence)
+
+    const difficultyLevels = [
+      { name: 'Foundational', level: 1, label: 'Level 1: Foundational', badgeClass: 'diff-foundational' },
+      { name: 'Foundational', level: 1, label: 'Level 1: Foundational', badgeClass: 'diff-foundational' },
+      { name: 'Intermediate', level: 2, label: 'Level 2: Intermediate', badgeClass: 'diff-intermediate' },
+      { name: 'Intermediate', level: 2, label: 'Level 2: Intermediate', badgeClass: 'diff-intermediate' },
+      { name: 'Intermediate', level: 2, label: 'Level 2: Intermediate', badgeClass: 'diff-intermediate' },
+      { name: 'Advanced', level: 3, label: 'Level 3: Advanced', badgeClass: 'diff-advanced' },
+      { name: 'Advanced', level: 3, label: 'Level 3: Advanced', badgeClass: 'diff-advanced' },
+      { name: 'Advanced', level: 3, label: 'Level 3: Advanced', badgeClass: 'diff-advanced' },
+      { name: 'Expert', level: 4, label: 'Level 4: Expert Challenge', badgeClass: 'diff-expert' },
+      { name: 'Expert', level: 4, label: 'Level 4: Expert Challenge', badgeClass: 'diff-expert' },
+    ]
+    const diff = difficultyLevels[i % difficultyLevels.length]
+
+    // Create 4 distinct options
+    const rawOptions = [
+      qData.correct,
+      qData.distractors[0],
+      qData.distractors[1],
+      qData.distractors[2],
+    ]
+
+    items.push({
+      type: 'choice',
+      skill: topic,
+      label: `Document Question ${i + 1}`,
+      sourceBadge: `Notes • ${topic}`,
+      difficulty: diff.name,
+      difficultyLevel: diff.level,
+      difficultyLabel: diff.label,
+      difficultyBadgeClass: diff.badgeClass,
+      prompt: qData.prompt,
+      options: rawOptions,
+      correctIndex: 0,
+      contextSentence: sentence,
+    })
+  }
+
+  return items
+}
+
+/**
  * Asynchronously extracts text from an uploaded File object.
  * Handles PDF (via pdfjs-dist), TXT, MD, and fallback reading.
  */

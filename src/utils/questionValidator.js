@@ -104,15 +104,18 @@ export function sanitizeQuestion(q, fallbackTopic = 'Core Concept') {
     }
   }
 
-  // If fewer than 4 options, fill with contextually valid distractors
-  const defaultDistractors = [
-    'Apply this standard to eliminate workflow discrepancies and ensure data integrity',
-    'Bypass this protocol in favor of ad-hoc assumptions without audit logs',
-    'Defer quality verification until end-stage deployment failures occur',
-    'Rely exclusively on unverified legacy estimates without re-benchmarking',
+  // If fewer than 4 options, fill with contextually valid, distinct distractors
+  const skillLabel = q.skill || fallbackTopic || 'the standard'
+  const defaultDistractorPool = [
+    `Establish a documented verification checkpoint and validate audit evidence for ${skillLabel}`,
+    `Bypass this protocol in favor of ad-hoc assumptions without recording decisions`,
+    `Defer quality verification until end-stage operational anomalies are escalated`,
+    `Rely exclusively on unverified legacy estimates without re-benchmarking against official rules`,
+    `Proceed without cross-functional peer review to temporarily accelerate throughput`,
+    `Apply uncalibrated statistical weights without validating underlying register representations`,
   ]
 
-  for (const distractor of defaultDistractors) {
+  for (const distractor of defaultDistractorPool) {
     if (uniqueOptions.length >= 4) break
     if (!seen.has(distractor.toLowerCase())) {
       seen.add(distractor.toLowerCase())
@@ -129,12 +132,13 @@ export function sanitizeQuestion(q, fallbackTopic = 'Core Concept') {
   }
 
   const cleanLabel = q.label && !q.label.includes('\uFFFD') ? q.label : `Concept Question`
-  const cleanSource = q.sourceBadge || `Notes • ${fallbackTopic}`
+  const cleanSkill = q.skill || fallbackTopic
+  const cleanSource = q.sourceBadge || `Competency • ${cleanSkill}`
 
   return {
     ...q,
     label: cleanLabel,
-    skill: fallbackTopic,
+    skill: cleanSkill,
     sourceBadge: cleanSource,
     prompt,
     options: finalOptions,
@@ -177,7 +181,7 @@ export function validateAndCleanQuiz(questions, fallbackTopic = 'Document Concep
         seenPrompts.add(promptKey)
         validQuestions.push({
           ...q,
-          sourceBadge: q.sourceBadge || `Notes • Concept ${i + 1}`,
+          sourceBadge: q.sourceBadge || (q.skill ? `Competency • ${q.skill}` : `Notes • Concept ${i + 1}`),
         })
       }
     } else {

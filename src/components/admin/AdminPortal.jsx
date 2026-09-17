@@ -12,19 +12,28 @@ import { isAllowedAdmin } from '../../config/adminConfig'
 export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
   const [activeTab, setActiveTab] = useState('dashboard')
 
-  // Helper to detect if a stored list contains legacy mock demo data
+  // Helper to convert regular YouTube or video links to responsive embed URLs
+  const formatVideoEmbedUrl = (rawUrl) => {
+    if (!rawUrl || typeof rawUrl !== 'string') return ''
+    const trimmed = rawUrl.trim()
+    if (!trimmed) return ''
+    if (trimmed.includes('/embed/')) return trimmed
+    const match = trimmed.match(/(?:youtube\.com\/(?:watch\?.*v=|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i)
+    if (match && match[1]) {
+      return `https://www.youtube-nocookie.com/embed/${match[1]}`
+    }
+    return trimmed
+  }
+
+  // Helper to detect if a stored list contains legacy empty mock demo data
   const isDemoList = (list) => {
     if (!Array.isArray(list) || list.length === 0) return false
     return list.some((item) =>
-      ['emp-101', 'emp-102', 'emp-103', 'emp-104', 'emp-105', 'dept-1', 'dept-2', 'dept-3', 'dept-4', 'dept-5', 'crs-1', 'crs-2', 'crs-3', 'crs-4', 'crs-5', 'notif-1', 'notif-2', 'notif-3'].includes(item.id) ||
-      item.email === 'karshikalamvamshi34@gmail.com' ||
-      item.email === 'pooja.sharma@nic.in' ||
-      item.title === 'Official Data Quality & Audit Frameworks' ||
-      item.skill === 'Data Quality Frameworks'
+      ['emp-101', 'emp-102', 'emp-103', 'emp-104', 'emp-105', 'dept-1', 'dept-2', 'dept-3', 'dept-4', 'dept-5', 'crs-1', 'crs-2', 'crs-3', 'crs-4', 'crs-5'].includes(item.id)
     )
   }
 
-  // Reactive state synced with localStorage
+  // Reactive state synced with localStorage and application event bus
   const [employees, setEmployees] = useState(() => {
     try {
       const saved = localStorage.getItem('skillstat_admin_employees')
@@ -32,9 +41,9 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
         const parsed = JSON.parse(saved)
         if (isDemoList(parsed)) {
           localStorage.removeItem('skillstat_admin_employees')
-          return []
+          return initialEmployees
         }
-        return parsed
+        return parsed.length > 0 ? parsed : initialEmployees
       }
       return initialEmployees
     } catch {
@@ -49,9 +58,9 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
         const parsed = JSON.parse(saved)
         if (isDemoList(parsed)) {
           localStorage.removeItem('skillstat_admin_departments')
-          return []
+          return initialDepartments
         }
-        return parsed
+        return parsed.length > 0 ? parsed : initialDepartments
       }
       return initialDepartments
     } catch {
@@ -66,9 +75,9 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
         const parsed = JSON.parse(saved)
         if (isDemoList(parsed)) {
           localStorage.removeItem('skillstat_admin_courses')
-          return []
+          return initialCourses
         }
-        return parsed
+        return parsed.length > 0 ? parsed : initialCourses
       }
       return initialCourses
     } catch {
@@ -83,9 +92,9 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
         const parsed = JSON.parse(saved)
         if (isDemoList(parsed)) {
           localStorage.removeItem('skillstat_admin_gaps')
-          return []
+          return initialSkillGaps
         }
-        return parsed
+        return parsed.length > 0 ? parsed : initialSkillGaps
       }
       return initialSkillGaps
     } catch {
@@ -98,11 +107,7 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
       const saved = localStorage.getItem('skillstat_admin_notifs')
       if (saved) {
         const parsed = JSON.parse(saved)
-        if (isDemoList(parsed)) {
-          localStorage.removeItem('skillstat_admin_notifs')
-          return []
-        }
-        return parsed
+        return parsed.length > 0 ? parsed : initialNotifications
       }
       return initialNotifications
     } catch {
@@ -111,7 +116,16 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
   })
 
   // Settings State
-  const [passThreshold, setPassThreshold] = useState(75)
+  const [passThreshold, setPassThreshold] = useState(() => {
+    try {
+      const saved = localStorage.getItem('skillstat_admin_settings')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (parsed.passThreshold) return Number(parsed.passThreshold)
+      }
+    } catch {}
+    return 75
+  })
   const [emailAlerts, setEmailAlerts] = useState(true)
   const [adminName, setAdminName] = useState(adminUser?.name || 'Administrator')
   const [adminEmail, setAdminEmail] = useState(adminUser?.email || 'admin@mospi.gov.in')
@@ -122,93 +136,237 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
 
   // Modals State
   const [modalType, setModalType] = useState(null) // 'addEmployee' | 'addCourse' | 'addDepartment' | 'addNotification'
-  const [employeeForm, setEmployeeForm] = useState({ name: '', email: '', employeeId: '', department: initialDepartments[0]?.name || '', designation: '', role: '' })
-  const [courseForm, setCourseForm] = useState({ title: '', provider: 'iGOT Karmayogi', department: 'All Departments', competency: '', duration: '6 Hours' })
-  const [deptForm, setDeptForm] = useState({ name: '', head: '', code: '' })
+  
+  // Form Models
+  const [employeeForm, setEmployeeForm] = useState({ id: null, name: '', email: '', employeeId: '', department: initialDepartments[0]?.name || '', designation: '', role: '' })
+  const [courseForm, setCourseForm] = useState({
+    id: null,
+    title: '',
+    provider: 'iGOT Karmayogi',
+    department: 'All Departments',
+    role: '',
+    competency: '',
+    skills: '',
+    duration: '6 Hours',
+    difficulty: 'Intermediate',
+    videoUrl: '',
+    description: '',
+    outcomes: '',
+  })
+  const [deptForm, setDeptForm] = useState({ id: null, name: '', head: '', code: '', description: '' })
   const [notifForm, setNotifForm] = useState({ title: '', message: '', target: 'All Departments', type: 'Announcement' })
 
   const handleResetAllAdminData = () => {
-    if (window.confirm('Are you sure you want to clear all stored admin data?')) {
-      localStorage.removeItem('skillstat_admin_employees')
-      localStorage.removeItem('skillstat_admin_departments')
-      localStorage.removeItem('skillstat_admin_courses')
-      localStorage.removeItem('skillstat_admin_gaps')
-      localStorage.removeItem('skillstat_admin_notifs')
-      setEmployees([])
-      setDepartments([])
-      setCourses([])
-      setSkillGaps([])
-      setNotifications([])
-      alert('All admin data has been cleared.')
+    if (window.confirm('Reset admin catalog and departments to official system defaults?')) {
+      localStorage.setItem('skillstat_admin_employees', JSON.stringify(initialEmployees))
+      localStorage.setItem('skillstat_admin_departments', JSON.stringify(initialDepartments))
+      localStorage.setItem('skillstat_admin_courses', JSON.stringify(initialCourses))
+      localStorage.setItem('skillstat_admin_gaps', JSON.stringify(initialSkillGaps))
+      localStorage.setItem('skillstat_admin_notifs', JSON.stringify(initialNotifications))
+      setEmployees(initialEmployees)
+      setDepartments(initialDepartments)
+      setCourses(initialCourses)
+      setSkillGaps(initialSkillGaps)
+      setNotifications(initialNotifications)
+      window.dispatchEvent(new CustomEvent('skillstat_admin_update', { detail: { type: 'reset', timestamp: Date.now() } }))
+      window.dispatchEvent(new Event('storage'))
+      alert('Admin data has been restored to default accredited catalog.')
     }
   }
 
-  // Sync to localStorage
+  // Reactive Sync to localStorage & Cross-Tab / Cross-Component Event Bus
   useEffect(() => {
     localStorage.setItem('skillstat_admin_employees', JSON.stringify(employees))
+    window.dispatchEvent(new CustomEvent('skillstat_admin_update', { detail: { type: 'employees', data: employees } }))
+    window.dispatchEvent(new Event('storage'))
   }, [employees])
 
   useEffect(() => {
     localStorage.setItem('skillstat_admin_departments', JSON.stringify(departments))
+    window.dispatchEvent(new CustomEvent('skillstat_admin_update', { detail: { type: 'departments', data: departments } }))
+    window.dispatchEvent(new Event('storage'))
   }, [departments])
 
   useEffect(() => {
     localStorage.setItem('skillstat_admin_courses', JSON.stringify(courses))
+    window.dispatchEvent(new CustomEvent('skillstat_admin_update', { detail: { type: 'courses', data: courses } }))
+    window.dispatchEvent(new Event('storage'))
   }, [courses])
 
   useEffect(() => {
     localStorage.setItem('skillstat_admin_notifs', JSON.stringify(notifications))
+    window.dispatchEvent(new CustomEvent('skillstat_admin_update', { detail: { type: 'notifications', data: notifications } }))
+    window.dispatchEvent(new Event('storage'))
   }, [notifications])
 
-  // Handlers for Add Operations
-  const handleAddEmployee = (e) => {
+  // --- Handlers: Employee CRUD ---
+  const handleOpenAddEmployee = () => {
+    setEmployeeForm({ id: null, name: '', email: '', employeeId: '', department: departments[0]?.name || '', designation: '', role: '' })
+    setModalType('addEmployee')
+  }
+
+  const handleOpenEditEmployee = (emp) => {
+    setEmployeeForm({
+      id: emp.id,
+      name: emp.name || '',
+      email: emp.email || '',
+      employeeId: emp.employeeId || '',
+      department: emp.department || '',
+      designation: emp.designation || '',
+      role: emp.role || emp.designation || '',
+    })
+    setModalType('addEmployee')
+  }
+
+  const handleAddOrEditEmployee = (e) => {
     e.preventDefault()
     if (!employeeForm.name || !employeeForm.email) return
-    const newEmp = {
-      id: `emp-${Date.now()}`,
-      ...employeeForm,
-      role: employeeForm.role || employeeForm.designation,
-      status: 'Active',
-      coursesCompleted: 0,
-      coursesInProgress: 1,
-      avgAssessmentScore: 0,
-      criticalGaps: ['Orientation & Fundamentals'],
-      joinedDate: new Date().toISOString().split('T')[0],
+    if (employeeForm.id) {
+      setEmployees((prev) => prev.map((emp) => emp.id === employeeForm.id ? { ...emp, ...employeeForm, role: employeeForm.role || employeeForm.designation } : emp))
+    } else {
+      const newEmp = {
+        id: `emp-${Date.now()}`,
+        ...employeeForm,
+        role: employeeForm.role || employeeForm.designation,
+        status: 'Active',
+        coursesCompleted: 0,
+        coursesInProgress: 1,
+        avgAssessmentScore: 0,
+        criticalGaps: ['Orientation & Fundamentals'],
+        joinedDate: new Date().toISOString().split('T')[0],
+      }
+      setEmployees((prev) => [newEmp, ...prev])
     }
-    setEmployees((prev) => [newEmp, ...prev])
     setModalType(null)
-    setEmployeeForm({ name: '', email: '', employeeId: '', department: departments[0]?.name || '', designation: '', role: '' })
+    setEmployeeForm({ id: null, name: '', email: '', employeeId: '', department: departments[0]?.name || '', designation: '', role: '' })
   }
 
-  const handleAddCourse = (e) => {
+  const handleDeleteEmployee = (id) => {
+    if (window.confirm('Are you sure you want to delete this employee?')) {
+      setEmployees((prev) => prev.filter((e) => e.id !== id))
+    }
+  }
+
+  // --- Handlers: Course CRUD ---
+  const handleOpenAddCourse = () => {
+    setCourseForm({
+      id: null,
+      title: '',
+      provider: 'iGOT Karmayogi',
+      department: departments[0]?.name || 'All Departments',
+      role: '',
+      competency: '',
+      skills: '',
+      duration: '8 Hours',
+      difficulty: 'Intermediate',
+      videoUrl: '',
+      description: '',
+      outcomes: '',
+    })
+    setModalType('addCourse')
+  }
+
+  const handleOpenEditCourse = (crs) => {
+    setCourseForm({
+      id: crs.id,
+      title: crs.title || '',
+      provider: crs.provider || 'iGOT Karmayogi',
+      department: crs.department || 'All Departments',
+      role: crs.role || '',
+      competency: crs.competency || '',
+      skills: Array.isArray(crs.skills) ? crs.skills.join(', ') : (crs.skills || ''),
+      duration: crs.duration || '8 Hours',
+      difficulty: crs.difficulty || 'Intermediate',
+      videoUrl: crs.videoUrl || '',
+      description: crs.description || '',
+      outcomes: Array.isArray(crs.outcomes) ? crs.outcomes.join('\n') : (crs.outcomes || ''),
+    })
+    setModalType('addCourse')
+  }
+
+  const handleAddOrEditCourse = (e) => {
     e.preventDefault()
     if (!courseForm.title) return
-    const newCrs = {
-      id: `crs-${Date.now()}`,
-      ...courseForm,
-      enrolledCount: 0,
-      completionRate: 0,
-      status: 'Active',
-      rating: 5.0,
+    const formattedVideo = formatVideoEmbedUrl(courseForm.videoUrl)
+    const skillsArray = typeof courseForm.skills === 'string'
+      ? courseForm.skills.split(',').map((s) => s.trim()).filter(Boolean)
+      : Array.isArray(courseForm.skills) ? courseForm.skills : [courseForm.competency || 'General']
+    const outcomesArray = typeof courseForm.outcomes === 'string'
+      ? courseForm.outcomes.split(/[\n,]+/).map((o) => o.trim()).filter(Boolean)
+      : Array.isArray(courseForm.outcomes) ? courseForm.outcomes : ['Attain verified role mastery']
+
+    if (courseForm.id) {
+      setCourses((prev) => prev.map((c) => c.id === courseForm.id ? {
+        ...c,
+        ...courseForm,
+        videoUrl: formattedVideo,
+        skills: skillsArray,
+        outcomes: outcomesArray,
+      } : c))
+    } else {
+      const newCrs = {
+        id: `crs-${Date.now()}`,
+        ...courseForm,
+        videoUrl: formattedVideo,
+        skills: skillsArray,
+        outcomes: outcomesArray,
+        enrolledCount: 0,
+        completionRate: 0,
+        status: 'Active',
+        rating: 5.0,
+      }
+      setCourses((prev) => [newCrs, ...prev])
     }
-    setCourses((prev) => [newCrs, ...prev])
     setModalType(null)
-    setCourseForm({ title: '', provider: 'iGOT Karmayogi', department: 'All Departments', competency: '', duration: '6 Hours' })
   }
 
-  const handleAddDepartment = (e) => {
+  const handleDeleteCourse = (id) => {
+    if (window.confirm('Are you sure you want to delete this course from the catalog?')) {
+      setCourses((prev) => prev.filter((c) => c.id !== id))
+    }
+  }
+
+  // --- Handlers: Department CRUD ---
+  const handleOpenAddDepartment = () => {
+    setDeptForm({ id: null, name: '', head: '', code: '', description: '' })
+    setModalType('addDepartment')
+  }
+
+  const handleOpenEditDepartment = (dept) => {
+    setDeptForm({
+      id: dept.id,
+      name: dept.name || '',
+      head: dept.head || '',
+      code: dept.code || '',
+      description: dept.description || '',
+    })
+    setModalType('addDepartment')
+  }
+
+  const handleAddOrEditDepartment = (e) => {
     e.preventDefault()
     if (!deptForm.name) return
-    const newDept = {
-      id: `dept-${Date.now()}`,
-      ...deptForm,
-      employeeCount: 0,
+    if (deptForm.id) {
+      setDepartments((prev) => prev.map((d) => d.id === deptForm.id ? { ...d, ...deptForm } : d))
+    } else {
+      const newDept = {
+        id: `dept-${Date.now()}`,
+        ...deptForm,
+        employeeCount: 0,
+      }
+      setDepartments((prev) => [...prev, newDept])
     }
-    setDepartments((prev) => [...prev, newDept])
     setModalType(null)
-    setDeptForm({ name: '', head: '', code: '' })
+    setDeptForm({ id: null, name: '', head: '', code: '', description: '' })
   }
 
+  const handleDeleteDepartment = (id) => {
+    if (window.confirm('Are you sure you want to delete this department?')) {
+      setDepartments((prev) => prev.filter((d) => d.id !== id))
+    }
+  }
+
+  // --- Handlers: Notifications ---
   const handleSendNotification = (e) => {
     e.preventDefault()
     if (!notifForm.title || !notifForm.message) return
@@ -223,10 +381,18 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
     setNotifForm({ title: '', message: '', target: 'All Departments', type: 'Announcement' })
   }
 
-  const handleDeleteEmployee = (id) => {
-    if (window.confirm('Are you sure you want to delete this employee?')) {
-      setEmployees((prev) => prev.filter((e) => e.id !== id))
+  const handleDeleteNotification = (id) => {
+    if (window.confirm('Delete this broadcast notification?')) {
+      setNotifications((prev) => prev.filter((n) => n.id !== id))
     }
+  }
+
+  const handleSaveSettings = () => {
+    const settings = { passThreshold, emailAlerts, adminName, adminEmail }
+    localStorage.setItem('skillstat_admin_settings', JSON.stringify(settings))
+    window.dispatchEvent(new CustomEvent('skillstat_admin_update', { detail: { type: 'settings', data: settings } }))
+    window.dispatchEvent(new Event('storage'))
+    alert('Admin configuration settings successfully saved and applied to website!')
   }
 
   // Export Reports to CSV
@@ -460,7 +626,7 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
                     <option value="All">All Departments</option>
                     {departments.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
                   </select>
-                  <button type="button" className="admin-btn-primary" onClick={() => setModalType('addEmployee')}>
+                  <button type="button" className="admin-btn-primary" onClick={handleOpenAddEmployee}>
                     + Add New Employee
                   </button>
                 </div>
@@ -504,13 +670,22 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
                           <td>{emp.coursesCompleted} completed</td>
                           <td><strong>{emp.avgAssessmentScore}%</strong></td>
                           <td>
-                            <button
-                              type="button"
-                              style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
-                              onClick={() => handleDeleteEmployee(emp.id)}
-                            >
-                              Delete
-                            </button>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <button
+                                type="button"
+                                style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
+                                onClick={() => handleOpenEditEmployee(emp)}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
+                                onClick={() => handleDeleteEmployee(emp.id)}
+                              >
+                                Delete
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -526,7 +701,7 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
             <div>
               <div className="admin-toolbar">
                 <h3 style={{ margin: 0 }}>Government Wings & Directorates</h3>
-                <button type="button" className="admin-btn-primary" onClick={() => setModalType('addDepartment')}>
+                <button type="button" className="admin-btn-primary" onClick={handleOpenAddDepartment}>
                   + Add Department
                 </button>
               </div>
@@ -541,10 +716,29 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
                     <div key={dept.id} className="admin-stat-card">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span className="admin-badge blue">{dept.code || 'DEPT'}</span>
-                        <strong style={{ fontSize: '18px' }}>{dept.employeeCount} Staff</strong>
+                        <strong style={{ fontSize: '18px' }}>{dept.employeeCount || 0} Staff</strong>
                       </div>
                       <h3 style={{ margin: '8px 0 4px 0', fontSize: '16px' }}>{dept.name}</h3>
                       <div style={{ fontSize: '13px', color: '#64748b' }}>Head of Office: {dept.head}</div>
+                      {dept.description && (
+                        <p style={{ fontSize: '12.5px', color: '#475569', margin: '8px 0 0 0', lineHeight: 1.4 }}>{dept.description}</p>
+                      )}
+                      <div style={{ display: 'flex', gap: '10px', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #f1f5f9' }}>
+                        <button
+                          type="button"
+                          style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
+                          onClick={() => handleOpenEditDepartment(dept)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
+                          onClick={() => handleDeleteDepartment(dept.id)}
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   ))
                 )}
@@ -610,7 +804,7 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
             <div>
               <div className="admin-toolbar">
                 <h3 style={{ margin: 0 }}>Accredited Training Course Catalog</h3>
-                <button type="button" className="admin-btn-primary" onClick={() => setModalType('addCourse')}>
+                <button type="button" className="admin-btn-primary" onClick={handleOpenAddCourse}>
                   + Add New Course
                 </button>
               </div>
@@ -623,28 +817,56 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
                       <th>Provider</th>
                       <th>Aligned Competency</th>
                       <th>Target Department</th>
+                      <th>Role</th>
                       <th>Duration</th>
-                      <th>Enrolled Staff</th>
-                      <th>Status</th>
+                      <th>Video</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {courses.length === 0 ? (
                       <tr>
-                        <td colSpan={7} style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                        <td colSpan={8} style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
                           No courses in catalog. Click "+ Add New Course" to add training modules.
                         </td>
                       </tr>
                     ) : (
                       courses.map((crs) => (
                         <tr key={crs.id}>
-                          <td><strong>{crs.title}</strong></td>
+                          <td>
+                            <strong>{crs.title}</strong>
+                            {crs.difficulty && <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>{crs.difficulty}</span>}
+                          </td>
                           <td><span className="admin-badge blue">{crs.provider}</span></td>
                           <td>{crs.competency}</td>
-                          <td>{crs.department}</td>
+                          <td><span className="admin-badge amber">{crs.department}</span></td>
+                          <td>{crs.role || 'All Roles'}</td>
                           <td>{crs.duration}</td>
-                          <td><strong>{crs.enrolledCount}</strong></td>
-                          <td><span className="admin-badge green">{crs.status}</span></td>
+                          <td>
+                            {crs.videoUrl ? (
+                              <span className="admin-badge green" title={crs.videoUrl}>▶ Attached</span>
+                            ) : (
+                              <span style={{ fontSize: '12px', color: '#94a3b8' }}>Auto-curated</span>
+                            )}
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <button
+                                type="button"
+                                style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
+                                onClick={() => handleOpenEditCourse(crs)}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
+                                onClick={() => handleDeleteCourse(crs.id)}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))
                     )}
@@ -728,7 +950,7 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
                       </div>
                       <h3 style={{ margin: '10px 0 4px 0', fontSize: '16px' }}>{gap.skill}</h3>
                       <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 14px 0' }}>
-                        Identified {gap.employeesDeficient} officers below required benchmark. Recommended 2 iGOT Karmayogi modules and 1 NSSTA workshop.
+                        Identified {gap.employeesDeficient} officers below required benchmark. Recommended iGOT modules and NSSTA workshops.
                       </p>
                       <button
                         type="button"
@@ -779,8 +1001,8 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
                       departments.map((dept) => (
                         <tr key={dept.id}>
                           <td><strong>{dept.name}</strong></td>
-                          <td>{dept.employeeCount} Officers</td>
-                          <td>{Math.round(dept.employeeCount * 0.72)} Modules Certified</td>
+                          <td>{dept.employeeCount || 0} Officers</td>
+                          <td>{Math.round((dept.employeeCount || 10) * 0.72)} Modules Certified</td>
                           <td><span className="admin-badge green">Healthy (78% Compliance)</span></td>
                         </tr>
                       ))
@@ -811,11 +1033,20 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
                     <div key={notif.id} className="admin-stat-card">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span className="admin-badge blue">{notif.type}</span>
-                        <span style={{ fontSize: '12px', color: '#64748b' }}>{notif.date} · Read by {notif.readCount} officers</span>
+                        <span style={{ fontSize: '12px', color: '#64748b' }}>{notif.date} · Read by {notif.readCount || 0} officers</span>
                       </div>
                       <h3 style={{ margin: '8px 0 4px 0', fontSize: '15.5px' }}>{notif.title}</h3>
                       <p style={{ margin: '0 0 8px 0', fontSize: '13.5px', color: '#475569' }}>{notif.message}</p>
-                      <div style={{ fontSize: '12px', color: '#64748b' }}>Target Audience: <strong>{notif.target}</strong></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
+                        <div style={{ fontSize: '12px', color: '#64748b' }}>Target Audience: <strong>{notif.target}</strong></div>
+                        <button
+                          type="button"
+                          style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}
+                          onClick={() => handleDeleteNotification(notif.id)}
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   ))
                 )}
@@ -866,11 +1097,11 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
                 </div>
 
                 <div style={{ marginTop: '24px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                  <button type="button" className="admin-btn-primary" onClick={() => alert('Admin configuration settings successfully saved!')}>
+                  <button type="button" className="admin-btn-primary" onClick={handleSaveSettings}>
                     Save Preferences
                   </button>
                   <button type="button" className="admin-btn-secondary" style={{ color: '#dc2626', borderColor: '#fca5a5' }} onClick={handleResetAllAdminData}>
-                    🗑️ Clear Stored Admin Data
+                    🗑️ Reset to System Defaults
                   </button>
                 </div>
               </div>
@@ -879,19 +1110,19 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
         </div>
       </main>
 
-      {/* MODAL: Add Employee */}
+      {/* MODAL: Add / Edit Employee */}
       {modalType === 'addEmployee' && (
         <div className="admin-modal-backdrop" onClick={() => setModalType(null)}>
           <div className="admin-modal-dialog" onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ margin: '0 0 16px 0' }}>Add New Employee</h3>
-            <form onSubmit={handleAddEmployee}>
+            <h3 style={{ margin: '0 0 16px 0' }}>{employeeForm.id ? 'Edit Employee Profile' : 'Add New Employee'}</h3>
+            <form onSubmit={handleAddOrEditEmployee}>
               <div className="admin-form-group">
                 <label>Full Name *</label>
-                <input required value={employeeForm.name} onChange={(e) => setEmployeeForm({ ...employeeForm, name: e.target.value })} placeholder="e.g. Ramesh Chandra" />
+                <input required value={employeeForm.name} onChange={(e) => setEmployeeForm({ ...employeeForm, name: e.target.value })} placeholder="e.g. Dr. Anita Joshi" />
               </div>
               <div className="admin-form-group">
                 <label>Work Email *</label>
-                <input required type="email" value={employeeForm.email} onChange={(e) => setEmployeeForm({ ...employeeForm, email: e.target.value })} placeholder="e.g. ramesh.c@nic.in" />
+                <input required type="email" value={employeeForm.email} onChange={(e) => setEmployeeForm({ ...employeeForm, email: e.target.value })} placeholder="e.g. anita.j@nic.in" />
               </div>
               <div className="admin-form-group">
                 <label>Employee ID</label>
@@ -904,66 +1135,117 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
                     {departments.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
                   </select>
                 ) : (
-                  <input value={employeeForm.department} onChange={(e) => setEmployeeForm({ ...employeeForm, department: e.target.value })} placeholder="e.g. Statistical Wing" />
+                  <input value={employeeForm.department} onChange={(e) => setEmployeeForm({ ...employeeForm, department: e.target.value })} placeholder="e.g. Health & Family Welfare Statistics" />
                 )}
               </div>
               <div className="admin-form-group">
                 <label>Designation / Role</label>
-                <input value={employeeForm.designation} onChange={(e) => setEmployeeForm({ ...employeeForm, designation: e.target.value })} placeholder="e.g. Statistical Investigator" />
+                <input value={employeeForm.designation} onChange={(e) => setEmployeeForm({ ...employeeForm, designation: e.target.value, role: e.target.value })} placeholder="e.g. Senior Medical Officer or Doctor" />
               </div>
               <div className="admin-modal-actions">
                 <button type="button" className="admin-btn-secondary" onClick={() => setModalType(null)}>Cancel</button>
-                <button type="submit" className="admin-btn-primary">Add Employee</button>
+                <button type="submit" className="admin-btn-primary">{employeeForm.id ? 'Save Changes' : 'Add Employee'}</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* MODAL: Add Course */}
+      {/* MODAL: Add / Edit Course */}
       {modalType === 'addCourse' && (
         <div className="admin-modal-backdrop" onClick={() => setModalType(null)}>
           <div className="admin-modal-dialog" onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ margin: '0 0 16px 0' }}>Add Course to Catalog</h3>
-            <form onSubmit={handleAddCourse}>
+            <h3 style={{ margin: '0 0 16px 0' }}>{courseForm.id ? 'Edit Course in Catalog' : 'Add Course to Catalog'}</h3>
+            <form onSubmit={handleAddOrEditCourse}>
               <div className="admin-form-group">
                 <label>Course Title *</label>
-                <input required value={courseForm.title} onChange={(e) => setCourseForm({ ...courseForm, title: e.target.value })} placeholder="e.g. Advanced Survey Methodology" />
+                <input required value={courseForm.title} onChange={(e) => setCourseForm({ ...courseForm, title: e.target.value })} placeholder="e.g. Clinical Trial Biostatistics & Protocols" />
               </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="admin-form-group">
+                  <label>Provider</label>
+                  <select value={courseForm.provider} onChange={(e) => setCourseForm({ ...courseForm, provider: e.target.value })}>
+                    <option value="iGOT Karmayogi">iGOT Karmayogi</option>
+                    <option value="NSSTA Workshop">NSSTA Workshop</option>
+                    <option value="MoSPI Academy">MoSPI Academy</option>
+                    <option value="DoPT / CBC">DoPT / CBC</option>
+                    <option value="NIC / MeitY">NIC / MeitY</option>
+                    <option value="External / Accredited">External / Accredited</option>
+                  </select>
+                </div>
+                <div className="admin-form-group">
+                  <label>Duration</label>
+                  <input value={courseForm.duration} onChange={(e) => setCourseForm({ ...courseForm, duration: e.target.value })} placeholder="e.g. 10 Hours" />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="admin-form-group">
+                  <label>Target Department *</label>
+                  <select value={courseForm.department} onChange={(e) => setCourseForm({ ...courseForm, department: e.target.value })}>
+                    <option value="All Departments">All Departments (General)</option>
+                    {departments.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
+                  </select>
+                </div>
+                <div className="admin-form-group">
+                  <label>Target Role (Optional)</label>
+                  <input value={courseForm.role} onChange={(e) => setCourseForm({ ...courseForm, role: e.target.value })} placeholder="e.g. Doctor, Data Scientist, or All" />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="admin-form-group">
+                  <label>Aligned Competency *</label>
+                  <input required value={courseForm.competency} onChange={(e) => setCourseForm({ ...courseForm, competency: e.target.value })} placeholder="e.g. Biostatistics or Sampling" />
+                </div>
+                <div className="admin-form-group">
+                  <label>Difficulty Level</label>
+                  <select value={courseForm.difficulty} onChange={(e) => setCourseForm({ ...courseForm, difficulty: e.target.value })}>
+                    <option value="Foundational">Foundational</option>
+                    <option value="Intermediate">Intermediate</option>
+                    <option value="Advanced">Advanced</option>
+                  </select>
+                </div>
+              </div>
+
               <div className="admin-form-group">
-                <label>Provider</label>
-                <select value={courseForm.provider} onChange={(e) => setCourseForm({ ...courseForm, provider: e.target.value })}>
-                  <option value="iGOT Karmayogi">iGOT Karmayogi</option>
-                  <option value="NSSTA Workshop">NSSTA Workshop</option>
-                  <option value="MoSPI Academy">MoSPI Academy</option>
-                </select>
+                <label>Key Skills Covered (Comma separated)</label>
+                <input value={courseForm.skills} onChange={(e) => setCourseForm({ ...courseForm, skills: e.target.value })} placeholder="e.g. Medical research, Patient care, Clinical trials" />
               </div>
+
               <div className="admin-form-group">
-                <label>Aligned Competency</label>
-                <input value={courseForm.competency} onChange={(e) => setCourseForm({ ...courseForm, competency: e.target.value })} placeholder="e.g. Sampling Techniques" />
+                <label>Video Lesson URL (YouTube embed or video URL)</label>
+                <input value={courseForm.videoUrl} onChange={(e) => setCourseForm({ ...courseForm, videoUrl: e.target.value })} placeholder="e.g. https://www.youtube.com/watch?v=1JZG9x_VOwA" />
+                <span style={{ fontSize: '11.5px', color: '#64748b' }}>
+                  Paste any YouTube URL or embed link. The player will automatically stream this video for this course.
+                </span>
               </div>
+
               <div className="admin-form-group">
-                <label>Target Department</label>
-                <select value={courseForm.department} onChange={(e) => setCourseForm({ ...courseForm, department: e.target.value })}>
-                  <option value="All Departments">All Departments</option>
-                  {departments.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
-                </select>
+                <label>Course Description / Overview</label>
+                <textarea rows={3} value={courseForm.description} onChange={(e) => setCourseForm({ ...courseForm, description: e.target.value })} placeholder="Detailed curriculum description..." />
               </div>
+
+              <div className="admin-form-group">
+                <label>Tangible Learning Outcomes (One per line or comma-separated)</label>
+                <textarea rows={3} value={courseForm.outcomes} onChange={(e) => setCourseForm({ ...courseForm, outcomes: e.target.value })} placeholder="e.g. Calculate clinical statistical power&#10;Design standardized registry workflows" />
+              </div>
+
               <div className="admin-modal-actions">
                 <button type="button" className="admin-btn-secondary" onClick={() => setModalType(null)}>Cancel</button>
-                <button type="submit" className="admin-btn-primary">Add Course</button>
+                <button type="submit" className="admin-btn-primary">{courseForm.id ? 'Save Changes' : 'Save Course to Catalog'}</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* MODAL: Add Department */}
+      {/* MODAL: Add / Edit Department */}
       {modalType === 'addDepartment' && (
         <div className="admin-modal-backdrop" onClick={() => setModalType(null)}>
           <div className="admin-modal-dialog" onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ margin: '0 0 16px 0' }}>Add Government Wing / Directorate</h3>
-            <form onSubmit={handleAddDepartment}>
+            <h3 style={{ margin: '0 0 16px 0' }}>{deptForm.id ? 'Edit Department Details' : 'Add Government Wing / Directorate'}</h3>
+            <form onSubmit={handleAddOrEditDepartment}>
               <div className="admin-form-group">
                 <label>Department Name *</label>
                 <input required value={deptForm.name} onChange={(e) => setDeptForm({ ...deptForm, name: e.target.value })} placeholder="e.g. Consumer Price Index Division" />
@@ -976,9 +1258,13 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
                 <label>Department Code</label>
                 <input value={deptForm.code} onChange={(e) => setDeptForm({ ...deptForm, code: e.target.value })} placeholder="e.g. CPI-DEL" />
               </div>
+              <div className="admin-form-group">
+                <label>Scope & Responsibilities</label>
+                <textarea rows={3} value={deptForm.description} onChange={(e) => setDeptForm({ ...deptForm, description: e.target.value })} placeholder="Overview of wing mandates..." />
+              </div>
               <div className="admin-modal-actions">
                 <button type="button" className="admin-btn-secondary" onClick={() => setModalType(null)}>Cancel</button>
-                <button type="submit" className="admin-btn-primary">Save Department</button>
+                <button type="submit" className="admin-btn-primary">{deptForm.id ? 'Save Changes' : 'Save Department'}</button>
               </div>
             </form>
           </div>
