@@ -3836,6 +3836,7 @@ function App() {
     if (!minLandingElapsed) return
     if (pendingDashboardRef.current) {
       setStep('dashboard')
+      pendingDashboardRef.current = false
     } else if (step === 'loading') {
       if (sessionToken && !onboardingSessionRef.current) {
         setStep('dashboard')
