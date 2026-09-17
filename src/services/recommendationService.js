@@ -45,7 +45,9 @@ export async function getRecommendations(profile = {}, skillGap = {}) {
   const prevNSSTA = profile.previousNSSTA || 'Not yet attended'
 
   let explanation = ''
-  if (gap >= 30) {
+  if (skillGap.isAssessed === false) {
+    explanation = `Your proficiency in ${skill} has not yet been assessed. Take the AI-driven assessment to discover your benchmark score against the required ${targetLevel}% standard for ${roleName}. Preliminary learning resources are provided below.`
+  } else if (gap >= 30) {
     explanation = `Your current competency in ${skill} is ${currentLevel}%, compared to the required benchmark of ${targetLevel}% for ${roleName} (${gap} percentage points gap). Given your ${experience} experience and priority level (${priority}), comprehensive upskilling is recommended through foundational online learning combined with specialized practical training.`
   } else if (gap >= 15) {
     explanation = `Your ${skill} competency is ${currentLevel}%, with a moderate gap of ${gap} points toward the ${targetLevel}% standard for ${roleName}. Focused module practice and scenario review will close this gap effectively.`

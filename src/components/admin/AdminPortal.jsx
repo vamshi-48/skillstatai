@@ -105,6 +105,10 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
       const saved = localStorage.getItem('skillstat_admin_notifs')
       if (saved) {
         const parsed = JSON.parse(saved)
+        if (isDemoList(parsed)) {
+          localStorage.removeItem('skillstat_admin_notifs')
+          return initialNotifications
+        }
         return parsed.length > 0 ? parsed : initialNotifications
       }
       return initialNotifications

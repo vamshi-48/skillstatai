@@ -3674,7 +3674,17 @@ function App() {
           setSelectedSkillList(state.selectedSkillList.filter((skill) => allowedSkills.has(skill)))
         }
         if (state.skillGapData) setSkillGapData(state.skillGapData)
-        if (Array.isArray(state.competencyGaps)) setCompetencyGaps(state.competencyGaps)
+        if (Array.isArray(state.competencyGaps)) {
+          const cleanedGaps = state.competencyGaps.map((g) => {
+            const gapData = state.skillGapData?.[g.skill] || {}
+            const isAssessed = gapData.totalQuestions > 0
+            if (!isAssessed) {
+              return { ...g, current: 0, priority: 'Pending', isAssessed: false }
+            }
+            return { ...g, isAssessed: true }
+          })
+          setCompetencyGaps(cleanedGaps)
+        }
         if (state.recommendationData) setRecommendationData(state.recommendationData)
         if (state.recommendationsBySkill) setRecommendationsBySkill(state.recommendationsBySkill)
         if (Number.isFinite(state.quizzesCompleted)) setQuizzesCompleted(state.quizzesCompleted)
@@ -5258,17 +5268,16 @@ function App() {
                         break
                       }
                     }
-                    const defaultCurrents = [45, 52, 60, 38, 48, 65, 40]
-                    const defaultReqs = [80, 85, 75, 80, 85, 90, 70]
-                    const cur = defaultCurrents[index % defaultCurrents.length]
-                    const req = defaultReqs[index % defaultReqs.length]
+                    const cur = 0
+                    const req = 75
                     const gap = req - cur
                     return {
                       skill: sk,
                       current: cur,
                       required: req,
-                      priority: gap >= 30 ? 'Critical' : gap >= 15 ? 'Moderate' : 'Low',
+                      priority: 'Pending',
                       domain: foundDomain,
+                      isAssessed: false,
                     }
                   })
                   setSkillGapData(initialGaps)
@@ -5918,7 +5927,7 @@ function App() {
                 >
                   {competencyGaps.map((g) => (
                     <option key={g.skill} value={g.skill}>
-                      {g.skill} (Gap: {Math.max(0, g.required - g.current)} points · {g.priority})
+                      {g.skill} ({g.isAssessed ? `Gap: ${Math.max(0, g.required - g.current)} points` : 'Pending Assessment'} · {g.priority})
                     </option>
                   ))}
                 </select>
@@ -5978,9 +5987,9 @@ function App() {
                 </div>
 
                 <div className="comparison-bars">
-                  <label>Current Competency: <b>{selectedSkillForRec.current}%</b></label>
+                  <label>Current Competency: <b>{selectedSkillForRec.isAssessed ? `${selectedSkillForRec.current}%` : 'Pending Assessment'}</b></label>
                   <div className="comparison-track">
-                    <i className="current-bar" style={{ width: `${selectedSkillForRec.current}%` }} />
+                    <i className="current-bar" style={{ width: `${selectedSkillForRec.isAssessed ? selectedSkillForRec.current : 0}%`, background: selectedSkillForRec.isAssessed ? 'var(--primary)' : 'var(--muted)' }} />
                   </div>
                   <label>Required Competency: <b>{selectedSkillForRec.required}%</b></label>
                   <div className="comparison-track">
@@ -5990,11 +5999,11 @@ function App() {
 
                 <div className="rec-gap-stat">
                   <span style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase' }}>Skill Gap</span>
-                  <strong style={{ color: selectedSkillForRec.priority === 'Critical' ? 'var(--red)' : selectedSkillForRec.priority === 'Moderate' ? 'var(--amber)' : 'var(--green)' }}>
-                    {Math.max(0, selectedSkillForRec.required - selectedSkillForRec.current)}%
+                  <strong style={{ color: !selectedSkillForRec.isAssessed ? 'var(--muted)' : selectedSkillForRec.priority === 'Critical' ? 'var(--red)' : selectedSkillForRec.priority === 'Moderate' ? 'var(--amber)' : 'var(--green)' }}>
+                    {selectedSkillForRec.isAssessed ? `${Math.max(0, selectedSkillForRec.required - selectedSkillForRec.current)}%` : 'N/A'}
                   </strong>
-                  <span className={`status-pill ${selectedSkillForRec.priority === 'Critical' ? 'red' : selectedSkillForRec.priority === 'Moderate' ? 'amber' : 'green'}`}>
-                    {selectedSkillForRec.priority} Priority
+                  <span className={`status-pill ${!selectedSkillForRec.isAssessed ? 'gray' : selectedSkillForRec.priority === 'Critical' ? 'red' : selectedSkillForRec.priority === 'Moderate' ? 'amber' : 'green'}`}>
+                    {selectedSkillForRec.isAssessed ? `${selectedSkillForRec.priority} Priority` : 'Pending'}
                   </span>
                 </div>
               </div>
