@@ -3942,7 +3942,7 @@ function App() {
       if (skillList.length === 0) {
         const roleSkills = getRoleSkillCategories(profile.role, profile.designation)
         if (Array.isArray(roleSkills) && roleSkills.length > 0) {
-          skillList = roleSkills.flatMap(([, skills]) => skills).slice(0, 3)
+          skillList = roleSkills.reduce((acc, [, skills]) => acc.concat(skills), []).slice(0, 3)
         } else {
           skillList = ['Official Statistics & Survey Methodology', 'Public Sector Data Governance', 'Statistical Data Analysis']
         }
@@ -3980,9 +3980,14 @@ function App() {
     }
 
     // Mode 4: Standard Skill Assessment
+    setIsParsingDoc(true) // Reuse this generic loading state for standard quiz too
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 3500) // Fast fallback if server hangs
+
     fetch('/api/questions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         role: profile.role,
         skills: skillList.join(', '),
@@ -3990,7 +3995,10 @@ function App() {
         codingLanguage: chosenLang,
       }),
     })
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error('AI fallback'))))
+      .then((res) => {
+        clearTimeout(timeoutId)
+        return res.ok ? res.json() : Promise.reject(new Error('AI fallback'))
+      })
       .then((data) => {
         const expectedQuestionCount = skillList.length * 10
         if (Array.isArray(data.questions) && data.questions.length >= expectedQuestionCount) {
@@ -4030,6 +4038,7 @@ function App() {
         setQuestions(distinct.map((q, idx) => shuffleQuestionOptions(q, idx)))
       })
       .finally(() => {
+        setIsParsingDoc(false)
         setQuestionIndex(0)
         setAnswer('')
         setCodeAnswer('')
@@ -5600,10 +5609,11 @@ function App() {
             <button
               type="button"
               className="sidebar-nav-item sidebar-quiz-action"
+              disabled={isParsingDoc}
               onClick={() => { startQuiz('standard'); setIsMobileSidebarOpen(false) }}
             >
               <span className="nav-icon">⚡</span>
-              <span className="nav-label">{navText[language]?.[3] || navText.en[3]}</span>
+              <span className="nav-label">{isParsingDoc ? 'Loading...' : (navText[language]?.[3] || navText.en[3])}</span>
               <span className="sidebar-pill-badge">Quiz</span>
             </button>
 
@@ -5703,9 +5713,10 @@ function App() {
             <button
               type="button"
               className="quick-quiz-header-cta"
+              disabled={isParsingDoc}
               onClick={() => startQuiz('standard')}
             >
-              <span>⚡</span> {quizzesCompleted > 0 ? t.retakeQuiz : t.takeQuiz}
+              <span>⚡</span> {isParsingDoc ? 'Loading...' : (quizzesCompleted > 0 ? t.retakeQuiz : t.takeQuiz)}
             </button>
 
             <div className="language-badge">
@@ -6137,8 +6148,8 @@ function App() {
           </div>
 
           <div className="hero-action-buttons">
-            <button className="primary-action action-btn-quiz" onClick={() => startQuiz('standard')}>
-              ⚡ {quizzesCompleted > 0 ? t.retakeQuiz : t.takeQuiz}
+            <button className="primary-action action-btn-quiz" disabled={isParsingDoc} onClick={() => startQuiz('standard')}>
+              ⚡ {isParsingDoc ? 'Loading...' : (quizzesCompleted > 0 ? t.retakeQuiz : t.takeQuiz)}
             </button>
           </div>
         </section>
@@ -6308,8 +6319,8 @@ function App() {
                     Real-time gap evaluation and benchmark recommendations for each selected skill.
                   </p>
                 </div>
-                <button className="secondary-action btn-sm" onClick={() => startQuiz('standard')}>
-                  {quizzesCompleted > 0 ? 'Re-evaluate Skills' : 'Start Assessment'}
+                <button className="secondary-action btn-sm" disabled={isParsingDoc} onClick={() => startQuiz('standard')}>
+                  {isParsingDoc ? 'Loading...' : (quizzesCompleted > 0 ? 'Re-evaluate Skills' : 'Start Assessment')}
                 </button>
               </div>
 
