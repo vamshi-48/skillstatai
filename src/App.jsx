@@ -3218,6 +3218,8 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [step, setStep] = useState('loading')
   const [dashboardView, setDashboardView] = useState('dashboard')
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [ssoLoading, setSsoLoading] = useState(false)
   const [isSsoRegistrationOpen, setIsSsoRegistrationOpen] = useState(false)
@@ -5269,128 +5271,216 @@ function App() {
   // VIEW: Complete User Dashboard with Weekend Quiz & PDF Notes
   // -------------------------------------------------------------
   return (
-    <div className="dashboard-page-container">
-      {/* Top Header with Primary Navigation */}
-      <header className="dashboard-top-nav">
-        <div className="nav-left">
+    <div className={`dashboard-app-layout ${isSidebarCollapsed ? 'sidebar-collapsed' : ''} ${isMobileSidebarOpen ? 'mobile-sidebar-open' : ''}`}>
+      {/* Mobile Drawer Backdrop */}
+      {isMobileSidebarOpen && (
+        <div
+          className="dashboard-sidebar-backdrop"
+          onClick={() => setIsMobileSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Modern Left Navigation Sidebar */}
+      <aside className="dashboard-sidebar" aria-label="Sidebar Navigation">
+        <div className="sidebar-header">
           <Brand />
+          <button
+            type="button"
+            className="sidebar-collapse-toggle"
+            onClick={() => setIsSidebarCollapsed((collapsed) => !collapsed)}
+            title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label="Toggle sidebar width"
+          >
+            {isSidebarCollapsed ? '»' : '«'}
+          </button>
         </div>
 
-        <nav className="header-nav-links" aria-label="Main Navigation">
-          <button
-            type="button"
-            className={`header-nav-item ${dashboardView === 'dashboard' ? 'active' : ''}`}
-            onClick={() => setDashboardView('dashboard')}
-          >
-            <span className="nav-icon">▦</span>
-            <span>{navText[language]?.[0] || navText.en[0]}</span>
-          </button>
-
-          <button
-            type="button"
-            className={`header-nav-item ${dashboardView === 'recommendations' ? 'active' : ''}`}
-            onClick={() => setDashboardView('recommendations')}
-          >
-            <span className="nav-icon">✦</span>
-            <span>{navText[language]?.[1] || navText.en[1]}</span>
-          </button>
-
-          <button
-            type="button"
-            className={`header-nav-item ${dashboardView === 'weekend' ? 'active' : ''}`}
-            onClick={() => setDashboardView('weekend')}
-          >
-            <span className="nav-icon">🏆</span>
-            <span>{navText[language]?.[2] || navText.en[2]}</span>
-          </button>
-
-          <button
-            type="button"
-            className="header-nav-item"
-            onClick={() => startQuiz('standard')}
-          >
-            <span className="nav-icon">⚡</span>
-            <span>{navText[language]?.[3] || navText.en[3]}</span>
-          </button>
-
-          <button
-            type="button"
-            className={`header-nav-item ${dashboardView === 'notes' ? 'active' : ''}`}
-            onClick={() => setDashboardView('notes')}
-          >
-            <span className="nav-icon">📄</span>
-            <span>{navText[language]?.[4] || navText.en[4]}</span>
-          </button>
-
-          <button
-            type="button"
-            className={`header-nav-item ${dashboardView === 'promotions' ? 'active' : ''}`}
-            onClick={() => setDashboardView('promotions')}
-          >
-            <span className="nav-icon">🎖️</span>
-            <span>{navText[language]?.[5] || navText.en[5]}</span>
-          </button>
-
-          <button
-            type="button"
-            className={`header-nav-item ${dashboardView === 'admin' ? 'active' : ''}`}
-            onClick={() => setDashboardView('admin')}
-          >
-            <span className="nav-icon">🛡️</span>
-            <span>Admin Portal</span>
-          </button>
-
-        </nav>
-
-        <div className="nav-right">
-          <div className="language-badge">
-            <span className="lang-icon">🌐</span>
-            <select
-              className="lang-select"
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-            >
-              {supportedLanguages.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
-          </div>
-
-          <div className="profile-menu-wrapper">
+        <div className="sidebar-nav-container">
+          <div className="sidebar-section-label">LEARNING HUB</div>
+          <nav className="sidebar-nav-group" aria-label="Learning Hub">
             <button
-              className="profile-menu-trigger"
               type="button"
-              aria-expanded={isProfileMenuOpen}
-              onClick={() => setIsProfileMenuOpen((open) => !open)}
+              className={`sidebar-nav-item ${dashboardView === 'dashboard' ? 'active' : ''}`}
+              onClick={() => { setDashboardView('dashboard'); setIsMobileSidebarOpen(false) }}
             >
-              <span className="profile-menu-avatar">
-                {getUserInitial(profile.name)}
-              </span>
-              <span>{(profile.name ? profile.name.split(' ')[0] : ((profile.role && profile.role.trim()) || (profile.designation && profile.designation.trim()) || 'User'))}</span>
-              <span className="profile-menu-chevron">⌄</span>
+              <span className="nav-icon">▦</span>
+              <span className="nav-label">{navText[language]?.[0] || navText.en[0]}</span>
             </button>
-            {isProfileMenuOpen && (
-              <div className="profile-menu" role="menu">
-                <button type="button" role="menuitem" onClick={() => { setDashboardView('profile'); setIsProfileMenuOpen(false) }}>{t.myProfile}</button>
-                <button type="button" role="menuitem" onClick={() => {
-                  setDashboardView('promotions')
-                  setIsProfileMenuOpen(false)
-                }}>🎖️ {navText[language]?.[5] || navText.en[5]}</button>
-                <button type="button" role="menuitem" onClick={() => {
-                  setDashboardView('admin')
-                  setIsProfileMenuOpen(false)
-                }}>🛡️ Admin Portal</button>
-                <button type="button" role="menuitem" onClick={() => setIsSettingsOpen((open) => !open)}>{t.settings}</button>
-                {isSettingsOpen && (
-                  <div className="theme-settings" role="group" aria-label={t.settings}>
-                    <button type="button" className={!isDarkMode ? 'theme-choice active' : 'theme-choice'} onClick={() => setIsDarkMode(false)}>{t.lightMode}</button>
-                    <button type="button" className={isDarkMode ? 'theme-choice active' : 'theme-choice'} onClick={() => setIsDarkMode(true)}>{t.darkMode}</button>
-                  </div>
-                )}
-                <button type="button" role="menuitem" onClick={clearSession}>{t.logout}</button>
-              </div>
-            )}
+
+            <button
+              type="button"
+              className={`sidebar-nav-item ${dashboardView === 'recommendations' ? 'active' : ''}`}
+              onClick={() => { setDashboardView('recommendations'); setIsMobileSidebarOpen(false) }}
+            >
+              <span className="nav-icon">✦</span>
+              <span className="nav-label">{navText[language]?.[1] || navText.en[1]}</span>
+            </button>
+
+            <button
+              type="button"
+              className={`sidebar-nav-item ${dashboardView === 'promotions' ? 'active' : ''}`}
+              onClick={() => { setDashboardView('promotions'); setIsMobileSidebarOpen(false) }}
+            >
+              <span className="nav-icon">🎖️</span>
+              <span className="nav-label">{navText[language]?.[5] || navText.en[5]}</span>
+            </button>
+          </nav>
+
+          <div className="sidebar-section-label">ASSESSMENTS & LABS</div>
+          <nav className="sidebar-nav-group" aria-label="Assessments">
+            <button
+              type="button"
+              className="sidebar-nav-item sidebar-quiz-action"
+              onClick={() => { startQuiz('standard'); setIsMobileSidebarOpen(false) }}
+            >
+              <span className="nav-icon">⚡</span>
+              <span className="nav-label">{navText[language]?.[3] || navText.en[3]}</span>
+              <span className="sidebar-pill-badge">Quiz</span>
+            </button>
+
+            <button
+              type="button"
+              className={`sidebar-nav-item ${dashboardView === 'weekend' ? 'active' : ''}`}
+              onClick={() => { setDashboardView('weekend'); setIsMobileSidebarOpen(false) }}
+            >
+              <span className="nav-icon">🏆</span>
+              <span className="nav-label">{navText[language]?.[2] || navText.en[2]}</span>
+            </button>
+
+            <button
+              type="button"
+              className={`sidebar-nav-item ${dashboardView === 'notes' ? 'active' : ''}`}
+              onClick={() => { setDashboardView('notes'); setIsMobileSidebarOpen(false) }}
+            >
+              <span className="nav-icon">📄</span>
+              <span className="nav-label">{navText[language]?.[4] || navText.en[4]}</span>
+            </button>
+          </nav>
+
+          <div className="sidebar-section-label">MANAGEMENT</div>
+          <nav className="sidebar-nav-group" aria-label="Management">
+            <button
+              type="button"
+              className={`sidebar-nav-item admin-portal-btn ${dashboardView === 'admin' ? 'active' : ''}`}
+              onClick={() => { setDashboardView('admin'); setIsMobileSidebarOpen(false) }}
+            >
+              <span className="nav-icon">🛡️</span>
+              <span className="nav-label">Admin Portal</span>
+              <span className="sidebar-pill-badge admin">Portal</span>
+            </button>
+          </nav>
+        </div>
+
+        {/* Sidebar Footer User Card */}
+        <div className="sidebar-user-footer">
+          <div
+            className="sidebar-user-card"
+            onClick={() => { setDashboardView('profile'); setIsMobileSidebarOpen(false) }}
+            role="button"
+            tabIndex={0}
+            title="View Profile"
+          >
+            <div className="sidebar-user-avatar">
+              {getUserInitial(profile.name)}
+            </div>
+            <div className="sidebar-user-info">
+              <span className="sidebar-user-name">
+                {profile.name ? profile.name.split(' ')[0] : 'User'}
+              </span>
+              <span className="sidebar-user-role">
+                {(profile.role && profile.role.trim()) || (profile.designation && profile.designation.trim()) || 'Employee'}
+              </span>
+            </div>
           </div>
         </div>
-      </header>
+      </aside>
+
+      {/* Main Viewport */}
+      <div className="dashboard-main-viewport">
+        {/* Streamlined Executive Header */}
+        <header className="dashboard-top-nav">
+          <div className="top-nav-left">
+            <button
+              type="button"
+              className="mobile-hamburger-btn"
+              onClick={() => setIsMobileSidebarOpen((open) => !open)}
+              aria-label="Open sidebar navigation"
+            >
+              ☰
+            </button>
+            <div className="header-breadcrumbs">
+              <span className="crumb-kicker">Skillstat AI</span>
+              <span className="crumb-divider">/</span>
+              <h1 className="crumb-title">
+                {dashboardView === 'dashboard' && (navText[language]?.[0] || 'Dashboard')}
+                {dashboardView === 'recommendations' && (navText[language]?.[1] || 'Recommendations')}
+                {dashboardView === 'weekend' && (navText[language]?.[2] || 'Weekend Challenge')}
+                {dashboardView === 'notes' && (navText[language]?.[4] || 'Document Studio')}
+                {dashboardView === 'promotions' && (navText[language]?.[5] || 'Career & Promotions')}
+                {dashboardView === 'profile' && 'My Profile'}
+                {dashboardView === 'admin' && 'Admin Portal'}
+              </h1>
+            </div>
+          </div>
+
+          <div className="nav-right">
+            <button
+              type="button"
+              className="quick-quiz-header-cta"
+              onClick={() => startQuiz('standard')}
+            >
+              <span>⚡</span> {quizzesCompleted > 0 ? t.retakeQuiz : t.takeQuiz}
+            </button>
+
+            <div className="language-badge">
+              <span className="lang-icon">🌐</span>
+              <select
+                className="lang-select"
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+              >
+                {supportedLanguages.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </div>
+
+            <div className="profile-menu-wrapper">
+              <button
+                className="profile-menu-trigger"
+                type="button"
+                aria-expanded={isProfileMenuOpen}
+                onClick={() => setIsProfileMenuOpen((open) => !open)}
+              >
+                <span className="profile-menu-avatar">
+                  {getUserInitial(profile.name)}
+                </span>
+                <span>{(profile.name ? profile.name.split(' ')[0] : ((profile.role && profile.role.trim()) || (profile.designation && profile.designation.trim()) || 'User'))}</span>
+                <span className="profile-menu-chevron">⌄</span>
+              </button>
+              {isProfileMenuOpen && (
+                <div className="profile-menu" role="menu">
+                  <button type="button" role="menuitem" onClick={() => { setDashboardView('profile'); setIsProfileMenuOpen(false) }}>{t.myProfile}</button>
+                  <button type="button" role="menuitem" onClick={() => {
+                    setDashboardView('promotions')
+                    setIsProfileMenuOpen(false)
+                  }}>🎖️ {navText[language]?.[5] || navText.en[5]}</button>
+                  <button type="button" role="menuitem" onClick={() => {
+                    setDashboardView('admin')
+                    setIsProfileMenuOpen(false)
+                  }}>🛡️ Admin Portal</button>
+                  <button type="button" role="menuitem" onClick={() => setIsSettingsOpen((open) => !open)}>{t.settings}</button>
+                  {isSettingsOpen && (
+                    <div className="theme-settings" role="group" aria-label={t.settings}>
+                      <button type="button" className={!isDarkMode ? 'theme-choice active' : 'theme-choice'} onClick={() => setIsDarkMode(false)}>{t.lightMode}</button>
+                      <button type="button" className={isDarkMode ? 'theme-choice active' : 'theme-choice'} onClick={() => setIsDarkMode(true)}>{t.darkMode}</button>
+                    </div>
+                  )}
+                  <button type="button" role="menuitem" onClick={clearSession}>{t.logout}</button>
+                </div>
+              )}
+            </div>
+          </div>
+        </header>
 
       {/* Main Body */}
       <main className="dashboard-body">
@@ -6858,6 +6948,7 @@ function App() {
           )
         })()}
       </main>
+      </div> {/* .dashboard-main-viewport */}
 
       {/* Floating Skillstat AI Copilot Assistant */}
       <ChatBot
