@@ -5440,8 +5440,19 @@ h4 {
     padding-right: 14px;
   }
 
-  .dashboard-top-nav .nav-right .nav-btn-secondary {
+  .dashboard-top-nav .nav-right .nav-btn-secondary,
+  .quick-quiz-header-cta,
+  .crumb-kicker,
+  .crumb-divider {
     display: none;
+  }
+  
+  .dashboard-top-nav .nav-right {
+    gap: 8px;
+  }
+  
+  .crumb-title {
+    font-size: 15px;
   }
 
   .dashboard-body {
