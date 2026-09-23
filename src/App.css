@@ -2058,8 +2058,15 @@ h4 {
   .dashboard-top-nav .nav-right .nav-btn-secondary,
   .quick-quiz-header-cta,
   .crumb-kicker,
-  .crumb-divider {
+  .crumb-divider,
+  .dashboard-top-nav .language-badge,
+  .profile-menu-trigger span:nth-child(2),
+  .profile-menu-trigger .profile-menu-chevron {
     display: none !important;
+  }
+  
+  .profile-menu-trigger {
+    padding: 0;
   }
   
   .dashboard-top-nav .nav-right {
