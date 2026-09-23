@@ -176,6 +176,38 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
     }
   }
 
+  // Fetch real users from backend
+  useEffect(() => {
+    const token = localStorage.getItem('skillstat_session')
+    if (!token) return
+
+    fetch('/api/admin/users', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch users')
+        return res.json()
+      })
+      .then(data => {
+        if (data && data.users) {
+          const mappedUsers = data.users.map((u, i) => ({
+            id: u.id,
+            name: u.profile?.name || u.email.split('@')[0],
+            role: u.profile?.role || 'Learner',
+            department: 'General',
+            email: u.email,
+            status: 'Active',
+            progress: u.overallScore || 0,
+            lastActive: 'Recently'
+          }))
+          setEmployees(mappedUsers)
+        }
+      })
+      .catch(err => console.error('[Admin] Failed to load real users:', err))
+  }, [])
+
   // Reactive Sync to localStorage & Cross-Tab / Cross-Component Event Bus
   useEffect(() => {
     localStorage.setItem('skillstat_admin_employees', JSON.stringify(employees))

@@ -4,6 +4,7 @@ import {
   getUserByIdentityOrEmail,
   getUserBySessionToken,
   upsertUser,
+  getAllUsers,
 } from '../lib/db.js'
 
 function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
@@ -253,6 +254,7 @@ export default async function handler(request, response) {
     '/api/auth/parichay',
     '/api/auth/logout',
     '/api/state',
+    '/api/admin/users',
   ]
 
   if (!['POST', 'GET'].includes(request.method) || !validRoutes.includes(pathname)) {
@@ -564,6 +566,33 @@ export default async function handler(request, response) {
       user.state = state
       await upsertUser(user)
       sendJson(response, 200, { saved: true })
+      return
+    }
+
+    // ---------------- ADMIN ENDPOINTS ----------------
+    if (pathname === '/api/admin/users' && request.method === 'GET') {
+      const user = await getAuthenticatedUser(request)
+      if (!user) {
+        sendJson(response, 401, { error: 'Authentication required.' })
+        return
+      }
+      
+      const allowedAdmins = (process.env.VITE_ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase())
+      if (!allowedAdmins.includes(user.email.toLowerCase())) {
+        sendJson(response, 403, { error: 'Forbidden. Admin access required.' })
+        return
+      }
+      
+      const allUsers = await getAllUsers()
+      sendJson(response, 200, {
+        users: allUsers.map(u => ({
+          id: u.id,
+          email: u.email,
+          profile: u.state?.profile || {},
+          overallScore: u.state?.overallScore || 0,
+          updatedAt: u.updatedAt || new Date().toISOString()
+        }))
+      })
       return
     }
 

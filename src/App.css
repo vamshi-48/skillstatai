@@ -2054,6 +2054,21 @@ h4 {
   .dashboard-top-nav {
     padding: 10px 16px;
   }
+  
+  .dashboard-top-nav .nav-right .nav-btn-secondary,
+  .quick-quiz-header-cta,
+  .crumb-kicker,
+  .crumb-divider {
+    display: none !important;
+  }
+  
+  .dashboard-top-nav .nav-right {
+    gap: 8px;
+  }
+  
+  .crumb-title {
+    font-size: 15px;
+  }
 }
 
 /* Dark Theme Sidebar & Header Styling */
@@ -5440,20 +5455,7 @@ h4 {
     padding-right: 14px;
   }
 
-  .dashboard-top-nav .nav-right .nav-btn-secondary,
-  .quick-quiz-header-cta,
-  .crumb-kicker,
-  .crumb-divider {
-    display: none;
-  }
-  
-  .dashboard-top-nav .nav-right {
-    gap: 8px;
-  }
-  
-  .crumb-title {
-    font-size: 15px;
-  }
+
 
   .dashboard-body {
     padding: 16px 14px 28px;
@@ -5517,6 +5519,13 @@ h4 {
   .quiz-skill-tag {
     max-width: 150px;
     font-size: 11px;
+  }
+}
+
+@media (max-width: 560px) {
+  .kpi-grid,
+  .dashboard-main-grid {
+    grid-template-columns: 1fr;
   }
 }
 
