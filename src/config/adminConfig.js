@@ -8,9 +8,10 @@
 
 export const ALLOWED_ADMIN_EMAILS = [
   'karshikalamvamshi48@gmail.com',
-  'karshikalamvamshi48',
   'karshikalamvamshi34@gmail.com',
-  'admin@mospi.gov.in',
+  'sathvika846@gmail.com',
+  'vivekchaitanyasambu@gmail.com',
+  'harinchedam@gmail.com',
 ]
 
 /**
