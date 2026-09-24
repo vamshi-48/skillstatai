@@ -279,7 +279,6 @@ export default function ChatBot({
           aria-label="Open Skillstat AI Assistant"
         >
           <span className="fab-icon">💬</span>
-          <span className="fab-label">Skillstat AI</span>
           <span className="fab-pulse-dot" />
         </button>
       )}

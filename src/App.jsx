@@ -3469,14 +3469,7 @@ function App() {
 
   const isAdmin = isAllowedAdmin(profile?.email)
 
-  useEffect(() => {
-    if (dashboardView === 'admin' && !isAdmin) {
-      const timer = setTimeout(() => {
-        setDashboardView('dashboard')
-      }, 0)
-      return () => clearTimeout(timer)
-    }
-  }, [dashboardView, isAdmin])
+  // (Admin redirect logic moved down to wait for state load)
   const [isProfileEditing, setIsProfileEditing] = useState(false)
   const [customRole, setCustomRole] = useState('')
   const [customSkill, setCustomSkill] = useState('')
@@ -3654,6 +3647,15 @@ function App() {
   const [isStateLoaded, setIsStateLoaded] = useState(false)
   const [chatHistory, setChatHistory] = useState([])
   const onboardingSessionRef = useRef(localStorage.getItem('skillstat_onboarding') === '1')
+
+  useEffect(() => {
+    if (dashboardView === 'admin' && !isAdmin && isStateLoaded) {
+      const timer = setTimeout(() => {
+        setDashboardView('dashboard')
+      }, 0)
+      return () => clearTimeout(timer)
+    }
+  }, [dashboardView, isAdmin, isStateLoaded])
 
   const t = text[language] || extendedText[language] || text.en
   const tx = (key) => uiText[language]?.[key] || uiText.en[key] || key
@@ -3910,6 +3912,7 @@ function App() {
           role: profile.role || profile.designation,
           quizMode: 'notes',
           notesContent: clean,
+          uiLanguage: language,
         }),
       })
         .then((res) => (res.ok ? res.json() : Promise.reject(new Error('AI fallback'))))
@@ -4006,6 +4009,7 @@ function App() {
         skills: skillList.join(', '),
         experience: profile.experience,
         codingLanguage: chosenLang,
+        uiLanguage: language,
       }),
     })
       .then((res) => {
@@ -4410,7 +4414,12 @@ function App() {
                   <input name="identity" type="text" placeholder="you@company.com or EMP-24018" autoComplete="username" required />
                 </label>
                 <label className="auth-form-field">
-                  <span>{t.password}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>{t.password}</span>
+                    <button type="button" className="text-button" style={{ fontSize: '13px', color: 'var(--primary, var(--green))', padding: 0 }} onClick={() => setAuthModal('forgot-password')}>
+                      Forgot password?
+                    </button>
+                  </div>
                   <input name="password" type="password" placeholder="••••••••" required />
                 </label>
                 {signupError && <p className="form-error" role="alert">{signupError}</p>}
@@ -4468,6 +4477,64 @@ function App() {
                   Create an account
                 </button>
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* Forgot Password Modal */}
+        {authModal === 'forgot-password' && (
+          <div className="auth-modal-backdrop" onClick={() => setAuthModal('login')} role="dialog" aria-modal="true">
+            <div className="auth-modal-dialog" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                className="auth-modal-close"
+                onClick={() => setAuthModal('login')}
+                aria-label="Close"
+              >
+                ✕
+              </button>
+              <Brand />
+              <h2 style={{ fontSize: '24px', fontWeight: 700, margin: '16px 0 6px' }}>Reset password</h2>
+              <p className="helper">Enter your email and we will send you a reset link.</p>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  setSignupError('')
+                  const email = e.currentTarget.elements.email.value.trim()
+                  apiRequest('/api/auth/forgot-password', {
+                    method: 'POST',
+                    body: JSON.stringify({ email }),
+                  }).then((res) => {
+                    setSignupError('If an account matches, a reset link has been sent.')
+                  }).catch((error) => {
+                    setSignupError(error.message)
+                  })
+                }}
+              >
+                <label className="auth-form-field" style={{ marginTop: '16px' }}>
+                  <span>Work email</span>
+                  <input name="email" type="email" placeholder="you@company.com" required />
+                </label>
+                {signupError && <p className={signupError.includes('sent') ? 'form-success' : 'form-error'} role="alert" style={{ marginTop: '8px', color: signupError.includes('sent') ? 'var(--primary, var(--green))' : 'var(--red)' }}>{signupError}</p>}
+
+                <button type="submit" className="primary-action" style={{ width: '100%', justifyContent: 'center', marginTop: '16px' }}>
+                  Send reset link <span>→</span>
+                </button>
+              </form>
+
+              <div style={{ marginTop: '16px', textAlign: 'center' }}>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => {
+                    setSignupError('')
+                    setAuthModal('login')
+                  }}
+                >
+                  Back to Sign In
+                </button>
+              </div>
             </div>
           </div>
         )}
