@@ -5626,6 +5626,17 @@ function App() {
   // -------------------------------------------------------------
   // VIEW: Complete User Dashboard with Weekend Quiz & PDF Notes
   // -------------------------------------------------------------
+  if (dashboardView === 'admin' && isAdmin) {
+    return (
+      <AdminPortal
+        onReturnToLearner={() => {
+          setDashboardView('dashboard')
+          setAdminSyncTick((prev) => prev + 1)
+        }}
+        adminUser={profile}
+      />
+    )
+  }
   return (
     <div className={`dashboard-app-layout ${isSidebarCollapsed ? 'sidebar-collapsed' : ''} ${isMobileSidebarOpen ? 'mobile-sidebar-open' : ''}`}>
       {/* Mobile Drawer Backdrop */}
@@ -5726,7 +5737,7 @@ function App() {
                   type="button"
                   className={`sidebar-nav-item admin-portal-btn ${dashboardView === 'admin' ? 'active' : ''}`}
                   onClick={() => { 
-                    window.open('?view=admin', '_blank');
+                    setDashboardView('admin');
                     setIsMobileSidebarOpen(false);
                   }}
                 >
@@ -5848,15 +5859,7 @@ function App() {
 
       {/* Main Body */}
       <main className="dashboard-body">
-        {dashboardView === 'admin' && isAdmin && (
-          <AdminPortal
-            onReturnToLearner={() => {
-              setDashboardView('dashboard')
-              setAdminSyncTick((prev) => prev + 1)
-            }}
-            adminUser={profile}
-          />
-        )}
+
         {dashboardView === 'profile' && (
           <section className="dashboard-panel official-profile-view">
             <div className="panel-head">
