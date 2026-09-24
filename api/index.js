@@ -321,6 +321,7 @@ export default async function handler(request, response) {
       }
 
       await upsertUser(user)
+          await syncToSupabaseAuth(user, 'DefaultAuthPass!23')
       sendJson(response, 200, { token: user.sessionToken, user: publicUser(user), state: user.state })
       return
     }
@@ -391,6 +392,7 @@ export default async function handler(request, response) {
       }
 
       await upsertUser(user)
+          await syncToSupabaseAuth(user, 'DefaultAuthPass!23')
 
       sendJson(response, 200, {
         requiresVerification: true,
@@ -419,6 +421,7 @@ export default async function handler(request, response) {
       if (user.isEmailVerified !== false) {
         user.sessionToken = user.sessionToken || crypto.randomBytes(32).toString('hex')
         await upsertUser(user)
+          await syncToSupabaseAuth(user, 'DefaultAuthPass!23')
         sendJson(response, 200, { token: user.sessionToken, user: publicUser(user), state: user.state })
         return
       }
@@ -455,6 +458,7 @@ export default async function handler(request, response) {
       }
       user.sessionToken = crypto.randomBytes(32).toString('hex')
       await upsertUser(user)
+          await syncToSupabaseAuth(user, 'DefaultAuthPass!23')
 
       sendJson(response, 200, { token: user.sessionToken, user: publicUser(user), state: user.state })
       return
@@ -508,6 +512,7 @@ export default async function handler(request, response) {
       }
 
       await upsertUser(user)
+          await syncToSupabaseAuth(user, 'DefaultAuthPass!23')
       sendJson(response, 200, { sent: true })
       return
     }
@@ -545,6 +550,7 @@ export default async function handler(request, response) {
 
       user.sessionToken = crypto.randomBytes(32).toString('hex')
       await upsertUser(user)
+          await syncToSupabaseAuth(user, 'DefaultAuthPass!23')
       sendJson(response, 200, { token: user.sessionToken, user: publicUser(user), state: user.state })
       return
     }
@@ -565,6 +571,7 @@ export default async function handler(request, response) {
       const state = await readJson(request)
       user.state = state
       await upsertUser(user)
+          await syncToSupabaseAuth(user, 'DefaultAuthPass!23')
       sendJson(response, 200, { saved: true })
       return
     }
@@ -615,6 +622,7 @@ export default async function handler(request, response) {
       if (user) {
         user.sessionToken = ''
         await upsertUser(user)
+          await syncToSupabaseAuth(user, 'DefaultAuthPass!23')
       }
       sendJson(response, 200, { loggedOut: true })
       return
@@ -906,3 +914,5 @@ Return valid JSON strictly in this format:
     sendJson(response, 502, { error: error.message || 'Internal server error' })
   }
 }
+
+
