@@ -12,6 +12,8 @@ export const ALLOWED_ADMIN_EMAILS = [
   'sathvika846@gmail.com',
   'vivekchaitanyasambu@gmail.com',
   'harinchedam@gmail.com',
+  'vundhyalaakshaya@gmail.com',
+  'varshithgotur30@gmail.com',
 ]
 
 /**

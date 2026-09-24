@@ -3418,7 +3418,9 @@ function App() {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [step, setStep] = useState('loading')
-  const [dashboardView, setDashboardView] = useState('dashboard')
+  const [dashboardView, setDashboardView] = useState(() => {
+    return new URLSearchParams(window.location.search).get('view') || 'dashboard';
+  })
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(false)
@@ -5656,7 +5658,10 @@ function App() {
                 <button
                   type="button"
                   className={`sidebar-nav-item admin-portal-btn ${dashboardView === 'admin' ? 'active' : ''}`}
-                  onClick={() => { setDashboardView('admin'); setIsMobileSidebarOpen(false) }}
+                  onClick={() => { 
+                    window.open('?view=admin', '_blank');
+                    setIsMobileSidebarOpen(false);
+                  }}
                 >
                   <span className="nav-icon">🛡️</span>
                   <span className="nav-label">Admin Portal</span>

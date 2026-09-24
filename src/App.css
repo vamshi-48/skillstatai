@@ -4,17 +4,17 @@
    CSS VARIABLES
    ===================================================== */
 :root {
-  --ink: #19211c;
-  --ink-secondary: #4a5750;
-  --muted: #728076;
-  --line: #d8e2da;
-  --line-light: #e8efe9;
-  --paper: #f4f7f4;
+  --ink: #191c21;
+  --ink-secondary: #4a5057;
+  --muted: #727680;
+  --line: #d8dae2;
+  --line-light: #e8e9ef;
+  --paper: #f4f4f7;
   --surface: #ffffff;
-  --green: #2e7d4c;
-  --green-hover: #25663e;
-  --green-soft: #eaf4ed;
-  --green-border: #bfe0ca;
+  --green: #003688;
+  --green-hover: #002866;
+  --green-soft: #e6f0fa;
+  --green-border: #b3cce6;
   --blue: #3b66db;
   --blue-soft: #edf2fc;
   --amber: #c27d19;
@@ -99,7 +99,7 @@ h4 {
   width: 32px;
   height: 32px;
   border-radius: 9px;
-  background: linear-gradient(135deg, #1d402b, #2e7d4c);
+  background: linear-gradient(135deg, #0c1324, #003688);
   color: #fff;
   display: grid;
   place-items: center;
@@ -221,14 +221,14 @@ h4 {
   height: 52px;
   border-radius: 50%;
   border: 3px solid rgba(46, 125, 76, 0.3);
-  border-top-color: #2e7d4c;
+  border-top-color: #003688;
   display: grid;
   place-items: center;
   animation: spin 1s linear infinite;
   font-family: 'Outfit', serif;
   font-size: 20px;
   font-weight: 700;
-  color: #2e7d4c;
+  color: #003688;
 }
 
 @keyframes spin {
@@ -1782,7 +1782,7 @@ h4 {
   padding: 2px 7px;
   border-radius: 999px;
   background: rgba(16, 185, 129, 0.14);
-  color: #059669;
+  color: #002866;
   letter-spacing: 0.02em;
 }
 
@@ -1836,7 +1836,7 @@ h4 {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: linear-gradient(135deg, #003688 0%, #002866 100%);
   color: #fff;
   font-size: 13px;
   font-weight: 700;
@@ -2008,7 +2008,7 @@ h4 {
   border-radius: 8px;
   font-size: 12.5px;
   font-weight: 700;
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: linear-gradient(135deg, #003688 0%, #002866 100%);
   color: #fff;
   border: none;
   cursor: pointer;
@@ -2314,7 +2314,7 @@ h4 {
 
 /* Welcome banner */
 .dashboard-welcome-banner {
-  background: linear-gradient(135deg, #1d402b 0%, #2e7d4c 100%);
+  background: linear-gradient(135deg, #0c1324 0%, #003688 100%);
   border-radius: var(--radius-lg);
   padding: 24px 28px;
   color: #fff;
@@ -3732,7 +3732,7 @@ h4 {
 
 .comparison-track {
   height: 8px;
-  background: #e8efe9;
+  background: #e8e9ef;
   border-radius: 99px;
   overflow: hidden;
   min-width: 60px;
@@ -4137,9 +4137,9 @@ h4 {
 
 /* Level 1: Foundational - Emerald */
 .difficulty-badge.diff-foundational {
-  background: #ecfdf5;
+  background: #e6f0fa;
   color: #047857;
-  border: 1px solid #a7f3d0;
+  border: 1px solid #b3cce6;
 }
 
 .theme-dark .difficulty-badge.diff-foundational {
@@ -5555,10 +5555,10 @@ h4 {
   --line-light: #e9eef4;
   --paper: #f5f7fa;
   --surface: #ffffff;
-  --green: #10b981;
-  --green-hover: #059669;
-  --green-soft: #ecfdf5;
-  --green-border: #a7f3d0;
+  --green: #003688;
+  --green-hover: #002866;
+  --green-soft: #e6f0fa;
+  --green-border: #b3cce6;
   --blue: #4f46e5;
   --blue-soft: #eef2ff;
   --amber: #f59e0b;
@@ -5628,9 +5628,9 @@ h4 {
 }
 
 .status-pill.green {
-  background: #ecfdf5;
+  background: #e6f0fa;
   color: #047857;
-  border-color: #a7f3d0;
+  border-color: #b3cce6;
 }
 
 .status-pill.amber {
@@ -5641,7 +5641,7 @@ h4 {
 
 .progress-fill,
 .progress-bar-fill {
-  background: linear-gradient(90deg, #4f46e5, #10b981);
+  background: linear-gradient(90deg, #4f46e5, #003688);
 }
 
 .learning-path-section {
@@ -5774,10 +5774,10 @@ h4 {
   --line-light: #e8f0eb;
   --paper: #eef4f0;
   --surface: #ffffff;
-  --green: #087f5b;
-  --green-hover: #066847;
-  --green-soft: #e5f4ed;
-  --green-border: #b8dfcc;
+  --green: #003688;
+  --green-hover: #002866;
+  --green-soft: #e6f0fa;
+  --green-border: #b3cce6;
   --blue: #3264c8;
   --amber: #bd7616;
   --shadow-sm: 0 4px 14px rgba(23, 54, 38, .06);
@@ -5859,7 +5859,7 @@ body {
 }
 
 .choice-card.selected {
-  background: linear-gradient(135deg, #087f5b, #0b9a6e);
+  background: linear-gradient(135deg, #003688, #0b9a6e);
 }
 
 .selection-actions {
@@ -5900,7 +5900,7 @@ body {
 .dashboard-welcome-banner {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(120deg, #123b2d 0%, #087f5b 66%, #15926f 100%);
+  background: linear-gradient(120deg, #123b2d 0%, #003688 66%, #15926f 100%);
   border-radius: 24px;
   padding: 30px 34px;
   box-shadow: 0 20px 38px rgba(8, 75, 52, .2);
@@ -6017,10 +6017,10 @@ body {
   --muted: #94ad9b;
   --line: #2c4b37;
   --line-light: #223d2c;
-  --green: #54c98f;
-  --green-hover: #72d9a2;
-  --green-soft: #173a29;
-  --green-border: #2d6848;
+  --green: #003688;
+  --green-hover: #002866;
+  --green-soft: #e6f0fa;
+  --green-border: #b3cce6;
   --paper: #0d1b14;
 }
 
@@ -6123,14 +6123,14 @@ body {
   letter-spacing: 0.5px;
   padding: 4px 10px;
   border-radius: 100px;
-  background: #ecfdf5;
+  background: #e6f0fa;
   color: #065f46;
-  border: 1px solid #a7f3d0;
+  border: 1px solid #b3cce6;
 }
 
 .promo-pill-cadre {
   font-size: 12px;
-  color: #059669;
+  color: #002866;
   font-weight: 600;
 }
 
@@ -6142,7 +6142,7 @@ body {
 }
 
 .promo-target-role-text {
-  color: #059669;
+  color: #002866;
 }
 
 .promo-target-sub {
@@ -6185,8 +6185,8 @@ body {
   width: 76px;
   height: 76px;
   border-radius: 50%;
-  border: 4px solid #10b981;
-  background: #ecfdf5;
+  border: 4px solid #003688;
+  background: #e6f0fa;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -6204,14 +6204,14 @@ body {
 .promo-gauge-sub {
   font-size: 10px;
   text-transform: uppercase;
-  color: #059669;
+  color: #002866;
   letter-spacing: 0.5px;
   margin-top: 2px;
 }
 
 .promo-explore-btn {
   white-space: nowrap;
-  background: linear-gradient(135deg, #10b981, #059669) !important;
+  background: linear-gradient(135deg, #003688, #002866) !important;
   box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35) !important;
   font-weight: 600 !important;
   padding: 10px 18px !important;
@@ -6505,12 +6505,12 @@ body {
 }
 
 .promo-meter-fill.complete {
-  background: linear-gradient(90deg, #10b981, #059669);
+  background: linear-gradient(90deg, #003688, #002866);
   box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
 }
 
 .promo-meter-fill.progressing {
-  background: linear-gradient(90deg, #3b82f6, #10b981);
+  background: linear-gradient(90deg, #3b82f6, #003688);
 }
 
 .benchmark-target-marker {
@@ -6543,7 +6543,7 @@ body {
 }
 
 .caption-text.success {
-  color: #059669;
+  color: #002866;
 }
 
 .caption-text.neutral {
@@ -6589,8 +6589,8 @@ body {
   font-size: 13.5px;
   font-weight: 700;
   color: #065f46;
-  background: #ecfdf5;
-  border: 1px solid #a7f3d0;
+  background: #e6f0fa;
+  border: 1px solid #b3cce6;
   padding: 12px 14px;
   border-radius: 10px;
   line-height: 1.45;
@@ -6659,7 +6659,7 @@ body {
 }
 
 .criteria-item.cleared .criteria-check {
-  color: #10b981;
+  color: #003688;
 }
 
 .criteria-item.pending .criteria-check {
@@ -6790,7 +6790,7 @@ body {
   background: #d1fae5;
   padding: 3px 10px;
   border-radius: 100px;
-  border: 1px solid #a7f3d0;
+  border: 1px solid #b3cce6;
 }
 
 .promo-course-title {
@@ -6861,7 +6861,7 @@ body {
 }
 
 .outcome-check {
-  color: #10b981;
+  color: #003688;
   font-weight: 800;
   line-height: 1;
 }
@@ -6927,8 +6927,8 @@ body {
 
 /* 5. Course Modal Promotion Callout & Outcomes */
 .course-modal-promo-banner {
-  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
-  border: 1px solid #a7f3d0;
+  background: linear-gradient(135deg, #e6f0fa, #d1fae5);
+  border: 1px solid #b3cce6;
   border-radius: 12px;
   padding: 14px 18px;
   margin-top: 14px;
@@ -7029,7 +7029,7 @@ body {
 
 .theme-dark .dashboard-promo-preview-banner .promo-readiness-circle {
   background: rgba(16, 185, 129, 0.12);
-  border-color: #10b981;
+  border-color: #003688;
 }
 
 .theme-dark .dashboard-promo-preview-banner .promo-gauge-pct {
@@ -7076,7 +7076,7 @@ body {
 
 .theme-dark .readiness-status-badge.eligible {
   background: rgba(16, 185, 129, 0.2);
-  color: #a7f3d0;
+  color: #b3cce6;
 }
 
 .theme-dark .readiness-status-badge.in-progress {
@@ -7092,7 +7092,7 @@ body {
 .theme-dark .promo-callout-badge,
 .theme-dark .promo-callout-text,
 .theme-dark .promo-callout-cert {
-  color: #a7f3d0;
+  color: #b3cce6;
 }
 
 .theme-dark .promo-callout-impact {
@@ -7284,7 +7284,7 @@ body {
 }
 
 .coil-dot {
-  fill: #10b981;
+  fill: #003688;
   filter: drop-shadow(0 0 3px rgba(16, 185, 129, 0.6));
 }
 
@@ -7308,7 +7308,7 @@ body {
   font-size: 11.5px;
   font-weight: 700;
   letter-spacing: normal;
-  fill: #059669;
+  fill: #002866;
   text-transform: uppercase;
   user-select: none;
 }
@@ -7392,7 +7392,7 @@ body {
   align-items: center;
   gap: 8px;
   padding: 13px 30px;
-  background: linear-gradient(135deg, #10b981, #059669);
+  background: linear-gradient(135deg, #003688, #002866);
   color: #ffffff;
   font-weight: 700;
   font-size: 14.5px;
@@ -7404,7 +7404,7 @@ body {
 }
 
 .landing-primary-btn:hover {
-  background: linear-gradient(135deg, #059669, #047857);
+  background: linear-gradient(135deg, #002866, #047857);
   transform: translateY(-2px);
   box-shadow: 0 7px 22px rgba(16, 185, 129, 0.42);
 }
@@ -7746,7 +7746,7 @@ body.theme-dark .auth-modal-close:hover {
 
 .landing-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #10b981, #06b6d4, #3b82f6);
+  background: linear-gradient(90deg, #003688, #06b6d4, #3b82f6);
   border-radius: 99px;
   animation: fillProgress5s 5s linear forwards;
 }

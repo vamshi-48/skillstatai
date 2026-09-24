@@ -49,9 +49,9 @@
 }
 
 .admin-badge-tag {
-  background: #f0fdf4;
-  color: #166534;
-  border: 1px solid #bbf7d0;
+  background: #e6f0fa;
+  color: #003688;
+  border: 1px solid #e6f0fa;
   font-size: 11px;
   font-weight: 700;
   padding: 2px 8px;
@@ -62,7 +62,7 @@
 
 .theme-dark .admin-badge-tag {
   background: rgba(34, 197, 94, 0.15);
-  color: #4ade80;
+  color: #b3cce6;
   border-color: rgba(34, 197, 94, 0.3);
 }
 
@@ -108,14 +108,14 @@
 }
 
 .admin-nav-item.active {
-  background: #f0fdf4;
-  color: #15803d;
+  background: #e6f0fa;
+  color: #003688;
   font-weight: 600;
 }
 
 .theme-dark .admin-nav-item.active {
   background: rgba(34, 197, 94, 0.12);
-  color: #4ade80;
+  color: #b3cce6;
 }
 
 .admin-nav-item .nav-icon {
@@ -278,7 +278,7 @@
 }
 
 .stat-card-sub.positive {
-  color: #16a34a;
+  color: #002866;
 }
 
 /* 4. Controls: Search, Filter & Action Bar */
@@ -325,7 +325,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: #15803d;
+  background: #003688;
   color: #ffffff;
   border: none;
   padding: 9px 16px;
@@ -337,7 +337,7 @@
 }
 
 .admin-btn-primary:hover {
-  background: #166534;
+  background: #003688;
 }
 
 .admin-btn-secondary {
@@ -426,8 +426,8 @@
 }
 
 .admin-badge.green {
-  background: #f0fdf4;
-  color: #166534;
+  background: #e6f0fa;
+  color: #003688;
 }
 
 .admin-badge.amber {
