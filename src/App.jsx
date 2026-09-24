@@ -2131,9 +2131,6 @@ function Brand() {
 function RotatingCoil({ logoSrc = '/logo.png' }) {
   return (
     <div className="coil-container">
-      <div className="coil-ripple coil-ripple-1" />
-      <div className="coil-ripple coil-ripple-2" />
-
       <svg className="coil-svg" viewBox="0 0 500 500">
         <defs>
           <path
@@ -2142,15 +2139,7 @@ function RotatingCoil({ logoSrc = '/logo.png' }) {
           />
         </defs>
 
-        {/* Orbit track ring */}
-        <circle cx="250" cy="250" r="190" className="coil-track-line" />
 
-        {/* Outer decorative ring with accent dots separated from text path */}
-        <circle cx="250" cy="250" r="218" className="coil-outer-track" />
-        <circle cx="250" cy="32" r="3" className="coil-dot" />
-        <circle cx="250" cy="468" r="3" className="coil-dot" />
-        <circle cx="32" cy="250" r="3" className="coil-dot" />
-        <circle cx="468" cy="250" r="3" className="coil-dot" />
 
         {/* Rotating Circular Text: EMPLOYEE TRAINING MARKETPLACE (Guaranteed Zero Overlap) */}
         <g className="coil-text-group">
@@ -3423,7 +3412,7 @@ function App() {
   })
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
-  const [isDarkMode, setIsDarkMode] = useState(false)
+  const isDarkMode = false;
   const [ssoLoading, setSsoLoading] = useState(false)
   const [isSsoRegistrationOpen, setIsSsoRegistrationOpen] = useState(false)
   const [signupError, setSignupError] = useState('')
@@ -4294,15 +4283,6 @@ function App() {
 
             <button
               type="button"
-              className="theme-toggle"
-              onClick={() => setIsDarkMode((value) => !value)}
-              title="Toggle Theme"
-            >
-              {isDarkMode ? '☀ Light' : '◐ Dark'}
-            </button>
-
-            <button
-              type="button"
               className="landing-secondary-btn"
               onClick={() => setAuthModal('login')}
             >
@@ -4723,10 +4703,7 @@ function App() {
             </button>
           </form>
           <p className="signup-prompt">Already have an account? <button type="button" className="text-button" onClick={() => { setSignupError(''); setStep('login') }}>Sign in</button></p>
-          <button type="button" className="theme-toggle" onClick={() => setIsDarkMode((value) => !value)}>
-            {isDarkMode ? '☀ Light theme' : '◐ Dark theme'}
-          </button>
-        </section>
+          </section>
       </div>
     )
   }
@@ -4926,10 +4903,7 @@ function App() {
             </button>
           </div>
 
-          <button type="button" className="theme-toggle" onClick={() => setIsDarkMode((value) => !value)}>
-            {isDarkMode ? '☀ Light theme' : '◐ Dark theme'}
-          </button>
-        </section>
+          </section>
       </div>
     )
   }
@@ -5858,9 +5832,7 @@ function App() {
                   <button type="button" role="menuitem" onClick={() => setIsSettingsOpen((open) => !open)}>{t.settings}</button>
                   {isSettingsOpen && (
                     <div className="theme-settings" role="group" aria-label={t.settings}>
-                      <button type="button" className={!isDarkMode ? 'theme-choice active' : 'theme-choice'} onClick={() => setIsDarkMode(false)}>{t.lightMode}</button>
-                      <button type="button" className={isDarkMode ? 'theme-choice active' : 'theme-choice'} onClick={() => setIsDarkMode(true)}>{t.darkMode}</button>
-                    </div>
+                      </div>
                   )}
                   <button type="button" role="menuitem" onClick={clearSession}>{t.logout}</button>
                 </div>

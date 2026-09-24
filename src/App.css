@@ -7162,8 +7162,6 @@ body {
   align-items: center;
   justify-content: space-between;
   background-color: #fcfdfe;
-  background-image: radial-gradient(rgba(148, 163, 184, 0.28) 1.2px, transparent 1.2px);
-  background-size: 26px 26px;
   position: relative;
   overflow-x: hidden;
   box-sizing: border-box;
