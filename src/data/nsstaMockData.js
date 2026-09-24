@@ -1,1 +1,46 @@
-export const NSSTA_CATALOGUE = []
+﻿export const NSSTA_CATALOGUE = [
+  {
+    id: 'nssta-01',
+    name: 'Advanced Time Series & Econometrics',
+    type: 'In-Person Workshop',
+    duration: '5 Days',
+    location: 'NSSTA Campus, Greater Noida',
+    skill: 'Economic Statistics',
+    skills: ['Time Series', 'Econometrics', 'Forecasting'],
+    role: 'Senior Statistical Officer',
+    matchReason: 'Highly relevant specialised statistical training for economics and forecasting.',
+  },
+  {
+    id: 'nssta-02',
+    name: 'Large Scale Sample Surveys',
+    type: 'Classroom Training',
+    duration: '2 Weeks',
+    location: 'NSSTA Campus, Greater Noida',
+    skill: 'Survey Methodology',
+    skills: ['Sampling', 'NSSO', 'Survey Design'],
+    role: 'Statistical Investigator',
+    matchReason: 'Core curriculum for NSSO field officers conducting national sample surveys.',
+  },
+  {
+    id: 'nssta-03',
+    name: 'Agricultural Survey & Crop Cutting Experiments',
+    type: 'Field Training',
+    duration: '1 Week',
+    location: 'Regional Hub',
+    skill: 'Agricultural Statistics',
+    skills: ['Crop Yield', 'Agriculture', 'Field Work'],
+    role: 'Agriculture Statistics Officer',
+    matchReason: 'Hands-on field training for crop cutting and agricultural yield estimation.',
+  },
+  {
+    id: 'nssta-04',
+    name: 'Data Science & Big Data in Official Statistics',
+    type: 'Hybrid Training',
+    duration: '3 Weeks',
+    location: 'NSSTA Campus, Greater Noida',
+    skill: 'Technology',
+    skills: ['Python', 'Machine Learning', 'Big Data', 'R'],
+    role: 'Data Scientist',
+    matchReason: 'Intensive technology upskilling for modernizing official statistics using AI/ML.',
+  }
+];
