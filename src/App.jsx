@@ -2798,7 +2798,7 @@ function buildScenarioQuestions(profile, t, userSkills, quizMode = 'standard', n
         skill: currentSkill,
         label: `${t.question} ${i + 1}`,
         experienceLevel: exp,
-        prompt: `Challenge ${skillQuestionIndex + 1}: ${challenge.prompt} Include a production-ready edge-case check for scenario ${skillQuestionIndex + 1}.`,
+        prompt: `${challenge.prompt} Include a production-ready edge-case check for scenario ${skillQuestionIndex + 1}.`,
         language: challenge.language || lang,
         starter: challenge.starter,
         checks: ensureCodeChecks(challenge.checks),
@@ -2837,7 +2837,7 @@ function buildScenarioQuestions(profile, t, userSkills, quizMode = 'standard', n
         difficultyLabel: diff.label,
         difficultyBadgeClass: diff.badgeClass,
         experienceLevel: exp,
-        prompt: `Question ${skillQuestionIndex + 1}: ${item.prompt}`,
+        prompt: item.prompt,
         options: rawOptions,
         correctIndex: item.correct ?? 0,
       }, i))
@@ -3075,7 +3075,7 @@ function createAdaptiveQuestion(profile, t, skill, questionNumber, targetLevel =
   }
 
   const tList = templates[diff.level] || templates[3]
-  const prompt = `${t.question} ${questionNumber}: ${tList[(questionNumber - 1) % tList.length]}`
+  const prompt = tList[(questionNumber - 1) % tList.length]
   const rawOptions = optionsByLevel[diff.level] || optionsByLevel[3]
 
   return shuffleQuestionOptions({
@@ -3478,6 +3478,7 @@ function App() {
   const [answer, setAnswer] = useState('')
   const [codeAnswer, setCodeAnswer] = useState('')
   const [questionIndex, setQuestionIndex] = useState(0)
+  const [timeLeft, setTimeLeft] = useState(60)
   const [questions, setQuestions] = useState([])
   const [questionResults, setQuestionResults] = useState([])
   const [activeQuizType, setActiveQuizType] = useState('standard') // 'standard' | 'weekend' | 'notes'
@@ -3969,36 +3970,12 @@ function App() {
     const hasCoding = skillList.some((s) => codingLanguages.includes(s))
     const chosenLang = hasCoding ? skillList.filter(isCodingSkill).join(', ') : ''
 
-    // Mode 2: Weekend Challenge
-    if (quizMode === 'weekend') {
-      const weekendQs = buildScenarioQuestions(profile, t, skillList, 'weekend')
-      const distinct = ensureQuestionPromptsAreDistinct(ensureQuestionOptionsAreDistinct(weekendQs))
-      setQuestions(distinct.map((q, idx) => shuffleQuestionOptions(q, idx)))
-      setQuestionIndex(0)
-      setAnswer('')
-      setCodeAnswer('')
-      setQuestionResults([])
-      setStep('test')
-      return
-    }
-
-    // Mode 3: Specific Single Skill (from course recommendation or competency modal)
-    if (specificSkill) {
-      const targetedQs = buildScenarioQuestions(profile, t, [specificSkill], 'standard', '', specificSkill)
-      const distinct = ensureQuestionPromptsAreDistinct(ensureQuestionOptionsAreDistinct(targetedQs))
-      setQuestions(distinct.map((q, idx) => shuffleQuestionOptions(q, idx)))
-      setQuestionIndex(0)
-      setAnswer('')
-      setCodeAnswer('')
-      setQuestionResults([])
-      setStep('test')
-      return
-    }
+    // Mode 2 & Mode 3 fall through to Mode 4 for unified Gemini API fetch
 
     // Mode 4: Standard Skill Assessment
     setIsParsingDoc(true) // Reuse this generic loading state for standard quiz too
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 3500) // Fast fallback if server hangs
+    const timeoutId = setTimeout(() => controller.abort(), 25000) // Give Gemini enough time
 
     fetch('/api/questions', {
       method: 'POST',
@@ -4045,12 +4022,26 @@ function App() {
             return
           }
         }
-        const fallbackQs = getSkillSpecificQuestions(profile, t, skillList)
+        let fallbackQs = [];
+        if (quizMode === 'weekend') {
+          fallbackQs = buildScenarioQuestions(profile, t, skillList, 'weekend');
+        } else if (specificSkill) {
+          fallbackQs = buildScenarioQuestions(profile, t, [specificSkill], 'standard', '', specificSkill);
+        } else {
+          fallbackQs = getSkillSpecificQuestions(profile, t, skillList);
+        }
         const distinct = ensureQuestionPromptsAreDistinct(ensureQuestionOptionsAreDistinct(fallbackQs))
         setQuestions(distinct.map((q, idx) => shuffleQuestionOptions(q, idx)))
       })
       .catch(() => {
-        const fallbackQs = getSkillSpecificQuestions(profile, t, skillList)
+        let fallbackQs = [];
+        if (quizMode === 'weekend') {
+          fallbackQs = buildScenarioQuestions(profile, t, skillList, 'weekend');
+        } else if (specificSkill) {
+          fallbackQs = buildScenarioQuestions(profile, t, [specificSkill], 'standard', '', specificSkill);
+        } else {
+          fallbackQs = getSkillSpecificQuestions(profile, t, skillList);
+        }
         const distinct = ensureQuestionPromptsAreDistinct(ensureQuestionOptionsAreDistinct(fallbackQs))
         setQuestions(distinct.map((q, idx) => shuffleQuestionOptions(q, idx)))
       })
@@ -4063,6 +4054,24 @@ function App() {
         setStep('test')
       })
   }
+
+  useEffect(() => {
+    if (step !== 'test') return;
+    const timer = setInterval(() => {
+      setTimeLeft(prev => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [step, questionIndex]);
+
+  useEffect(() => {
+    if (step === 'test' && timeLeft <= 0) {
+      handleAnswerSubmit();
+    }
+  }, [timeLeft, step]);
+
+  useEffect(() => {
+    setTimeLeft(60);
+  }, [questionIndex]);
 
   // Answer Submission & Verified Competency Update
   const handleAnswerSubmit = () => {
@@ -5423,6 +5432,9 @@ function App() {
                   {t.question} {questionIndex + 1} of {questions.length}
                 </span>
                 <span>{Math.round((questionIndex / questions.length) * 100)}% Complete</span>
+              </div>
+              <div style={{ color: timeLeft <= 10 ? 'red' : 'inherit', fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '8px', textAlign: 'right' }}>
+                ⏱ Time Left: {timeLeft}s
               </div>
               <div className="progress-track">
                 <div
