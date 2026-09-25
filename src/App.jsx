@@ -5712,6 +5712,15 @@ function App() {
 
             <button
               type="button"
+              className={`sidebar-nav-item ${dashboardView === 'dashboard' ? 'active' : ''}`}
+              onClick={() => { setDashboardView('dashboard'); setIsMobileSidebarOpen(false) }}
+            >
+              <span className="nav-icon">▦</span>
+              <span className="nav-label">{navText[language]?.[0] || navText.en[0]}</span>
+            </button>
+
+            <button
+              type="button"
               className={`sidebar-nav-item ${dashboardView === 'ai-interview' ? 'active' : ''}`}
               onClick={() => { setDashboardView('ai-interview'); setIsMobileSidebarOpen(false) }}
             >
@@ -5735,14 +5744,7 @@ function App() {
               <span className="nav-label">Learning Path</span>
             </button>
     
-            <button
-              type="button"
-              className={`sidebar-nav-item ${dashboardView === 'dashboard' ? 'active' : ''}`}
-              onClick={() => { setDashboardView('dashboard'); setIsMobileSidebarOpen(false) }}
-            >
-              <span className="nav-icon">▦</span>
-              <span className="nav-label">{navText[language]?.[0] || navText.en[0]}</span>
-            </button>
+
 
             <button
               type="button"
