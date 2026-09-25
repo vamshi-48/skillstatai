@@ -7561,6 +7561,88 @@ function App() {
         initialHistory={chatHistory}
         onHistoryChange={setChatHistory}
       />
+
+      {/* AI Interview Overlay Mockup */}
+      {showInterviewOverlay && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#fff', width: '90%', maxWidth: '800px', height: '80vh', borderRadius: '12px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: '20px', background: '#007bff', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ margin: 0 }}>Live AI Competency Interview</h3>
+                <button onClick={() => setShowInterviewOverlay(false)} style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '24px', cursor: 'pointer' }}>&times;</button>
+            </div>
+            <div style={{ flex: 1, padding: '20px', overflowY: 'auto', background: '#f8f9fa' }}>
+                <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#007bff', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>AI</div>
+                    <div style={{ background: '#fff', padding: '15px', borderRadius: '12px', borderTopLeftRadius: 0, boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
+                        <p style={{ margin: 0 }}>Hello! Let's evaluate your understanding of stratified sampling. Can you describe a scenario in your department where stratified sampling would be preferable to simple random sampling?</p>
+                    </div>
+                </div>
+                
+                <div style={{ display: 'flex', gap: '15px', marginBottom: '20px', flexDirection: 'row-reverse' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#28a745', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>U</div>
+                    <div style={{ background: '#e8f5e9', padding: '15px', borderRadius: '12px', borderTopRightRadius: 0, boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
+                        <p style={{ margin: 0 }}>If we are surveying government hospitals across districts, we'd want to stratify by hospital size (large vs small) to ensure smaller clinics aren't underrepresented.</p>
+                    </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#007bff', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>AI</div>
+                    <div style={{ background: '#fff', padding: '15px', borderRadius: '12px', borderTopLeftRadius: 0, boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
+                        <p style={{ margin: 0 }}>Excellent practical example. Now, how would you determine the sample size for each stratum?</p>
+                    </div>
+                </div>
+            </div>
+            <div style={{ padding: '15px', background: '#fff', borderTop: '1px solid #eee', display: 'flex', gap: '10px' }}>
+                <input type="text" placeholder="Type your response or use voice input..." style={{ flex: 1, padding: '12px', borderRadius: '24px', border: '1px solid #ddd' }} />
+                <button style={{ padding: '0 20px', borderRadius: '24px', background: '#007bff', color: '#fff', border: 'none', fontWeight: 'bold' }}>Send</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Learning Path Module Overlay Mockup */}
+      {showLearningOverlay && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#fff', width: '95%', maxWidth: '1000px', height: '85vh', borderRadius: '12px', display: 'flex', overflow: 'hidden' }}>
+            <div style={{ flex: 3, display: 'flex', flexDirection: 'column' }}>
+                <div style={{ background: '#000', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+                    <div style={{ textAlign: 'center' }}>
+                        <h1 style={{ fontSize: '48px', margin: '0 0 20px 0' }}>▶</h1>
+                        <p>Interactive Video Module Player</p>
+                    </div>
+                </div>
+                <div style={{ padding: '20px', background: '#fff', borderTop: '1px solid #eee' }}>
+                    <h2 style={{ margin: '0 0 10px 0' }}>Module 1: Fundamentals</h2>
+                    <p style={{ margin: 0, color: '#666' }}>Learn the core concepts required to close your identified competency gap.</p>
+                </div>
+            </div>
+            <div style={{ flex: 1, background: '#f8f9fa', borderLeft: '1px solid #e0e0e0', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ padding: '20px', borderBottom: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h3 style={{ margin: 0 }}>Course Content</h3>
+                    <button onClick={() => setShowLearningOverlay(false)} style={{ background: 'transparent', border: 'none', fontSize: '24px', cursor: 'pointer' }}>&times;</button>
+                </div>
+                <div style={{ padding: '20px', overflowY: 'auto' }}>
+                    <div style={{ padding: '15px', background: '#e8f0fe', borderRadius: '8px', marginBottom: '10px', borderLeft: '4px solid #1a73e8' }}>
+                        <strong style={{ display: 'block', marginBottom: '5px' }}>1. Introduction to Concepts</strong>
+                        <span style={{ fontSize: '12px', color: '#666' }}>Video • 12 mins</span>
+                    </div>
+                    <div style={{ padding: '15px', background: '#fff', borderRadius: '8px', marginBottom: '10px', border: '1px solid #eee' }}>
+                        <strong style={{ display: 'block', marginBottom: '5px', color: '#666' }}>2. Hands-on Practice Sandbox</strong>
+                        <span style={{ fontSize: '12px', color: '#999' }}>Interactive • 30 mins</span>
+                    </div>
+                    <div style={{ padding: '15px', background: '#fff', borderRadius: '8px', marginBottom: '10px', border: '1px solid #eee' }}>
+                        <strong style={{ display: 'block', marginBottom: '5px', color: '#666' }}>3. Module Assessment</strong>
+                        <span style={{ fontSize: '12px', color: '#999' }}>Quiz • 15 mins</span>
+                    </div>
+                </div>
+                <div style={{ padding: '20px', marginTop: 'auto', borderTop: '1px solid #e0e0e0' }}>
+                    <button onClick={() => { setShowLearningOverlay(false); setDashboardView('passport'); }} style={{ width: '100%', padding: '12px', background: '#28a745', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>Complete Module</button>
+                </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
