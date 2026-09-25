@@ -577,7 +577,7 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
                 
                 <div style={{ display: 'flex', gap: '10px' }}>
                     <input type="text" style={{ flex: 1, padding: '12px 16px', borderRadius: '24px', border: '1px solid #ccc' }} placeholder="Ask a question about workforce data..." />
-                    <button className="primary-btn" style={{ borderRadius: '24px', padding: '0 20px' }}>Ask</button>
+                    <button className="primary-btn" style={{ borderRadius: '24px', padding: '0 20px' }} onClick={() => alert("Copilot is analyzing workforce data... (Prototype)")}>Ask</button>
                 </div>
             </div>
           </div>
@@ -619,7 +619,7 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
                         <option>Select Target Role</option>
                     </select>
 
-                    <button className="primary-btn" style={{ width: '100%' }}>Calculate Scenario</button>
+                    <button className="primary-btn" style={{ width: '100%' }} onClick={() => alert("Running Monte Carlo workforce simulation... (Prototype)")}>Calculate Scenario</button>
                 </div>
 
                 <div style={{ flex: 2, padding: '40px', background: '#fff', borderRadius: '8px', border: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

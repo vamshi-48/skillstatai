@@ -6300,7 +6300,7 @@ function App() {
             
             <div style={{ marginTop: '20px', padding: '20px', textAlign: 'center', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
                 <p style={{ color: '#666', marginBottom: '20px' }}>Ready to start your adaptive interview session?</p>
-                <button className="primary-action">Start Interview Session</button>
+                <button className="primary-action" onClick={() => startQuiz('standard')}>Start Interview Session</button>
             </div>
           </div>
         )}
@@ -6312,7 +6312,7 @@ function App() {
                     <h2>My Competency Passport</h2>
                     <p style={{ margin: '5px 0' }}>A portable, evidence-backed profile showing verified learning.</p>
                 </div>
-                <button className="primary-action" disabled={!competencyGaps || competencyGaps.length === 0}>Export as PDF</button>
+                <button className="primary-action" disabled={!competencyGaps || competencyGaps.length === 0} onClick={() => window.print()}>Export as PDF</button>
             </div>
             
             <div style={{ marginTop: '20px', padding: '20px', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '12px' }}>
@@ -6387,7 +6387,7 @@ function App() {
                                  {isComplete ? (
                                     <span className="status-pill blue" style={{ fontSize: '11px' }}>Skipped: Already Proficient</span>
                                  ) : (
-                                    <button className="primary-action btn-sm">Start Learning</button>
+                                    <button className="primary-action btn-sm" onClick={() => setDashboardView('recommendations')}>Start Learning</button>
                                  )}
                               </div>
                             </div>
