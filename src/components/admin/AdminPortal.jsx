@@ -571,22 +571,8 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
                     <button style={{ padding: '6px 12px', background: '#f1f3f5', border: 'none', borderRadius: '16px', fontSize: '13px', cursor: 'pointer' }}>Compare departments</button>
                 </div>
                 
-                <div style={{ marginBottom: '20px', display: 'flex', gap: '15px' }}>
-                    <div style={{ background: '#f8f9fa', padding: '15px', borderRadius: '8px', flex: 1 }}>
-                        <p style={{ margin: '0 0 5px 0', fontWeight: 'bold' }}>Admin:</p>
-                        <p style={{ margin: 0 }}>Which departments have the highest Sampling gap?</p>
-                    </div>
-                </div>
-                
-                <div style={{ marginBottom: '20px', display: 'flex', gap: '15px', flexDirection: 'row-reverse' }}>
-                    <div style={{ background: '#e8f0fe', padding: '15px', borderRadius: '8px', flex: 1 }}>
-                        <p style={{ margin: '0 0 5px 0', fontWeight: 'bold', color: '#1a73e8' }}>SkillStat AI:</p>
-                        <p style={{ margin: '0 0 10px 0' }}>Based on the current competency records, Department A has the highest average gap. 42 employees are below the role threshold.</p>
-                        <div style={{ fontSize: '12px', color: '#5f6368', background: '#fff', padding: '10px', borderRadius: '6px' }}>
-                            <p style={{ margin: '0 0 5px 0' }}><strong>Data Scope:</strong> Past 30 Days | Authorized Platform Data</p>
-                            <p style={{ margin: 0 }}><strong>Actions:</strong> <a href="#" style={{ color: '#1a73e8' }}>View Employees</a> • <a href="#" style={{ color: '#1a73e8' }}>View Required Skills</a> • <a href="#" style={{ color: '#1a73e8' }}>Recommend Training</a></p>
-                        </div>
-                    </div>
+                <div style={{ padding: '40px 20px', textAlign: 'center', color: '#666' }}>
+                    <p>Ask a question about the {employees?.length || 0} employees currently in the system.</p>
                 </div>
                 
                 <div style={{ display: 'flex', gap: '10px' }}>
@@ -604,50 +590,9 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
             </div>
             <p>Measure whether training changes competency instead of only reporting course completion.</p>
             
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', marginTop: '20px' }}>
-                <div style={{ padding: '20px', background: '#fff', borderRadius: '8px', border: '1px solid #e0e0e0', textAlign: 'center', boxShadow: '0 2px 5px rgba(0,0,0,0.02)' }}>
-                    <h3 style={{ fontSize: '28px', color: '#28a745', margin: '0 0 5px 0' }}>+23%</h3>
-                    <p style={{ margin: 0, color: '#666', fontSize: '14px', fontWeight: 'bold' }}>Competency Improvement</p>
-                    <p style={{ margin: '5px 0 0 0', color: '#999', fontSize: '11px' }}>Average after training</p>
-                </div>
-                <div style={{ padding: '20px', background: '#fff', borderRadius: '8px', border: '1px solid #e0e0e0', textAlign: 'center', boxShadow: '0 2px 5px rgba(0,0,0,0.02)' }}>
-                    <h3 style={{ fontSize: '28px', color: '#28a745', margin: '0 0 5px 0' }}>41%</h3>
-                    <p style={{ margin: 0, color: '#666', fontSize: '14px', fontWeight: 'bold' }}>Skill Gaps Closed</p>
-                    <p style={{ margin: '5px 0 0 0', color: '#999', fontSize: '11px' }}>Across all departments</p>
-                </div>
-                <div style={{ padding: '20px', background: '#fff', borderRadius: '8px', border: '1px solid #e0e0e0', textAlign: 'center', boxShadow: '0 2px 5px rgba(0,0,0,0.02)' }}>
-                    <h3 style={{ fontSize: '28px', color: '#007bff', margin: '0 0 5px 0' }}>87%</h3>
-                    <p style={{ margin: 0, color: '#666', fontSize: '14px', fontWeight: 'bold' }}>Training Completion</p>
-                    <p style={{ margin: '5px 0 0 0', color: '#999', fontSize: '11px' }}>Course completion rate</p>
-                </div>
-                <div style={{ padding: '20px', background: '#fff', borderRadius: '8px', border: '1px solid #e0e0e0', textAlign: 'center', boxShadow: '0 2px 5px rgba(0,0,0,0.02)' }}>
-                    <h3 style={{ fontSize: '28px', color: '#28a745', margin: '0 0 5px 0' }}>+18 pts</h3>
-                    <p style={{ margin: 0, color: '#666', fontSize: '14px', fontWeight: 'bold' }}>Assessment Improvement</p>
-                    <p style={{ margin: '5px 0 0 0', color: '#999', fontSize: '11px' }}>Post-training assessments</p>
-                </div>
-            </div>
-
-            <div style={{ marginTop: '20px', padding: '20px', background: '#fff', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
-                <h4>Before vs After Competency (Sample)</h4>
-                <div style={{ marginTop: '15px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
-                        <div style={{ width: '150px', fontWeight: 'bold', fontSize: '13px' }}>Python</div>
-                        <div style={{ flex: 1, background: '#e9ecef', height: '16px', borderRadius: '8px', position: 'relative' }}>
-                            <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '65%', background: '#ffc107', borderRadius: '8px 0 0 8px', opacity: 0.7 }} title="Before Training (65%)"></div>
-                            <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '82%', background: '#28a745', borderRadius: '8px' }} title="After Training (82%)"></div>
-                        </div>
-                        <div style={{ width: '50px', textAlign: 'right', fontSize: '13px', color: '#28a745', fontWeight: 'bold' }}>+17%</div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
-                        <div style={{ width: '150px', fontWeight: 'bold', fontSize: '13px' }}>Data Analysis</div>
-                        <div style={{ flex: 1, background: '#e9ecef', height: '16px', borderRadius: '8px', position: 'relative' }}>
-                            <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '50%', background: '#ffc107', borderRadius: '8px 0 0 8px', opacity: 0.7 }} title="Before Training (50%)"></div>
-                            <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '75%', background: '#28a745', borderRadius: '8px' }} title="After Training (75%)"></div>
-                        </div>
-                        <div style={{ width: '50px', textAlign: 'right', fontSize: '13px', color: '#28a745', fontWeight: 'bold' }}>+25%</div>
-                    </div>
-                </div>
-                <p style={{ fontSize: '12px', color: '#666', marginTop: '15px', fontStyle: 'italic' }}>Note: Outcome Analytics are based on measurable competency outcomes (Assessments, Interviews, Tasks) rather than estimated monetary ROI.</p>
+            <div style={{ padding: '40px', background: '#fff', borderRadius: '8px', border: '1px solid #e0e0e0', textAlign: 'center', marginTop: '20px' }}>
+                <h3 style={{ margin: '0 0 10px 0', color: '#666' }}>Not Enough Data</h3>
+                <p style={{ margin: 0, color: '#999', fontSize: '14px' }}>There are currently no completed training programs to analyze impact.</p>
             </div>
           </div>
         )}
@@ -666,68 +611,21 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
                     <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Department / Workforce Group</label>
                     <select style={{ width: '100%', padding: '8px', marginBottom: '15px', borderRadius: '4px', border: '1px solid #ccc' }}>
                         <option>All Departments</option>
-                        <option>Analytics</option>
-                        <option>Engineering</option>
+                        {departments?.map(d => <option key={d.code || d.name}>{d.name}</option>)}
                     </select>
                     
                     <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Target Role / Future Capability</label>
                     <select style={{ width: '100%', padding: '8px', marginBottom: '15px', borderRadius: '4px', border: '1px solid #ccc' }}>
-                        <option>AI/ML Engineer</option>
-                        <option>Data Scientist</option>
+                        <option>Select Target Role</option>
                     </select>
-
-                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Target Competency Level</label>
-                    <input type="range" min="0" max="100" defaultValue="75" style={{ width: '100%', marginBottom: '15px' }} />
-
-                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Target Date</label>
-                    <input type="date" defaultValue="2027-09-25" style={{ width: '100%', padding: '8px', marginBottom: '15px', borderRadius: '4px', border: '1px solid #ccc' }} />
-
-                    <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: 'bold' }}>Required Skills</label>
-                    <div style={{ background: '#fff', padding: '10px', borderRadius: '4px', border: '1px solid #ccc', marginBottom: '15px' }}>
-                        <label style={{ display: 'block' }}><input type="checkbox" defaultChecked /> Machine Learning</label>
-                        <label style={{ display: 'block' }}><input type="checkbox" defaultChecked /> Deep Learning</label>
-                        <label style={{ display: 'block' }}><input type="checkbox" defaultChecked /> Python</label>
-                    </div>
 
                     <button className="primary-btn" style={{ width: '100%' }}>Calculate Scenario</button>
                 </div>
 
-                <div style={{ flex: 2, padding: '20px', background: '#fff', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
-                    <h3 style={{ margin: '0 0 15px 0', fontSize: '16px' }}>Simulation Output</h3>
-                    
-                    <div style={{ background: '#e8f0fe', padding: '15px', borderRadius: '6px', marginBottom: '20px', borderLeft: '4px solid #1a73e8' }}>
-                        <strong>Scenario:</strong> Need 100 employees with AI/ML competency above 75% within 12 months.
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
-                        <div style={{ padding: '15px', background: '#f8f9fa', borderRadius: '8px', textAlign: 'center' }}>
-                            <p style={{ margin: '0 0 5px 0', fontSize: '13px', color: '#666' }}>Current Qualified Employees</p>
-                            <h2 style={{ margin: 0, color: '#333' }}>42</h2>
-                        </div>
-                        <div style={{ padding: '15px', background: '#fff3cd', borderRadius: '8px', textAlign: 'center' }}>
-                            <p style={{ margin: '0 0 5px 0', fontSize: '13px', color: '#666' }}>Employees Requiring Upskilling (Gap)</p>
-                            <h2 style={{ margin: 0, color: '#856404' }}>58</h2>
-                        </div>
-                    </div>
-
-                    <h4 style={{ margin: '0 0 10px 0', fontSize: '14px' }}>Training Demand by Skill</h4>
-                    <div style={{ marginBottom: '10px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                            <span>Deep Learning</span>
-                            <span>High Demand (45 employees)</span>
-                        </div>
-                        <div style={{ width: '100%', background: '#e9ecef', borderRadius: '4px', height: '8px' }}>
-                            <div style={{ width: '77%', background: '#dc3545', height: '100%', borderRadius: '4px' }}></div>
-                        </div>
-                    </div>
-                    <div style={{ marginBottom: '10px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                            <span>Machine Learning</span>
-                            <span>Medium Demand (28 employees)</span>
-                        </div>
-                        <div style={{ width: '100%', background: '#e9ecef', borderRadius: '4px', height: '8px' }}>
-                            <div style={{ width: '48%', background: '#ffc107', height: '100%', borderRadius: '4px' }}></div>
-                        </div>
+                <div style={{ flex: 2, padding: '40px', background: '#fff', borderRadius: '8px', border: '1px solid #e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ textAlign: 'center', color: '#666' }}>
+                        <p>Configure a scenario on the left to simulate workforce gaps.</p>
+                        <p style={{ fontSize: '12px', color: '#999' }}>Analyzes {employees?.length || 0} employee records.</p>
                     </div>
                 </div>
             </div>

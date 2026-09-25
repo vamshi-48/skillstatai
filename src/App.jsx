@@ -6296,41 +6296,9 @@ function App() {
             </div>
             <p>A conversational assessment that evaluates conceptual understanding and practical reasoning.</p>
             
-            <div style={{ marginTop: '20px', padding: '20px', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#007bff', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>AI</div>
-                    <div style={{ background: '#f1f3f5', padding: '12px 16px', borderRadius: '12px', borderTopLeftRadius: '0' }}>
-                        <p style={{ margin: 0 }}>Explain stratified sampling and give one situation where it is useful.</p>
-                    </div>
-                </div>
-                
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px', flexDirection: 'row-reverse' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#2ecc71', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>U</div>
-                    <div style={{ background: '#e8f5e9', padding: '12px 16px', borderRadius: '12px', borderTopRightRadius: '0' }}>
-                        <p style={{ margin: 0 }}>Stratified sampling divides a population into subgroups (strata) and samples from each. It is useful when analyzing survey results across different age groups to ensure every age group is properly represented.</p>
-                    </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#007bff', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>AI</div>
-                    <div style={{ background: '#f8f9fa', padding: '12px 16px', borderRadius: '12px', borderTopLeftRadius: '0', border: '1px solid #e9ecef', width: '100%' }}>
-                        <p style={{ margin: '0 0 10px 0', fontWeight: 'bold', color: '#495057' }}>Evaluation Rubric Result:</p>
-                        <ul style={{ margin: 0, paddingLeft: '20px', color: '#666', fontSize: '14px' }}>
-                            <li><strong>Concept understanding:</strong> 82%</li>
-                            <li><strong>Application:</strong> 61% (Could provide a more detailed practical scenario)</li>
-                            <li><strong>Completeness:</strong> 74%</li>
-                        </ul>
-                        <p style={{ margin: '10px 0 0 0', color: '#28a745', fontWeight: 'bold' }}>Result: Sampling competency updated (+4 points). Recommendation engine received new evidence.</p>
-                    </div>
-                </div>
-
-                <div style={{ borderTop: '1px solid #eee', paddingTop: '15px' }}>
-                    <textarea style={{ width: '100%', height: '80px', padding: '12px', border: '1px solid #ccc', borderRadius: '8px', resize: 'none' }} placeholder="Type your answer to the next question here..."></textarea>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
-                        <button className="secondary-action" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>🎤 Voice Answer (Speech-to-Text)</button>
-                        <button className="primary-action">Submit Answer</button>
-                    </div>
-                </div>
+            <div style={{ marginTop: '20px', padding: '20px', textAlign: 'center', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+                <p style={{ color: '#666', marginBottom: '20px' }}>Ready to start your adaptive interview session?</p>
+                <button className="primary-action">Start Interview Session</button>
             </div>
           </div>
         )}
@@ -6342,18 +6310,18 @@ function App() {
                     <h2>My Competency Passport</h2>
                     <p style={{ margin: '5px 0' }}>A portable, evidence-backed profile showing verified learning.</p>
                 </div>
-                <button className="primary-action">Export as PDF</button>
+                <button className="primary-action" disabled={!competencyGaps || competencyGaps.length === 0}>Export as PDF</button>
             </div>
             
             <div style={{ marginTop: '20px', padding: '20px', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '12px' }}>
                 <div style={{ display: 'flex', gap: '20px', borderBottom: '1px solid #eee', paddingBottom: '20px', marginBottom: '20px' }}>
                     <div style={{ flex: 1 }}>
                         <p style={{ margin: '0 0 5px 0', color: '#666' }}>Role</p>
-                        <h3 style={{ margin: 0 }}>{(profile?.role && profile.role.trim()) || (profile?.designation && profile.designation.trim()) || 'Data Analyst'}</h3>
+                        <h3 style={{ margin: 0 }}>{(profile?.role && profile.role.trim()) || (profile?.designation && profile.designation.trim()) || 'Not Specified'}</h3>
                     </div>
                     <div style={{ flex: 1 }}>
                         <p style={{ margin: '0 0 5px 0', color: '#666' }}>Department</p>
-                        <h3 style={{ margin: 0 }}>{profile?.department || 'Analytics'}</h3>
+                        <h3 style={{ margin: 0 }}>{profile?.department || 'Not Specified'}</h3>
                     </div>
                     <div style={{ flex: 1 }}>
                         <p style={{ margin: '0 0 5px 0', color: '#666' }}>Last Updated</p>
@@ -6362,70 +6330,27 @@ function App() {
                 </div>
 
                 <h4>Verified Competencies</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginTop: '15px' }}>
-                    <div style={{ padding: '15px', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                            <strong style={{ fontSize: '16px' }}>Python</strong>
-                            <span className="status-pill green">✓ Verified</span>
-                        </div>
-                        <div style={{ width: '100%', background: '#e9ecef', borderRadius: '4px', height: '8px', marginBottom: '10px' }}>
-                            <div style={{ width: '78%', background: '#28a745', height: '100%', borderRadius: '4px' }}></div>
-                        </div>
-                        <p style={{ margin: '0 0 5px 0', fontSize: '13px', color: '#555' }}>Score: 78%</p>
-                        <div style={{ fontSize: '12px', color: '#777' }}>
-                            <p style={{ margin: '2px 0' }}>• AI Interview: 82%</p>
-                            <p style={{ margin: '2px 0' }}>• Assessment: 75%</p>
-                            <p style={{ margin: '2px 0' }}>• Completed Training: 2 courses</p>
-                        </div>
+                {(!competencyGaps || competencyGaps.length === 0) ? (
+                    <div style={{ padding: '20px', textAlign: 'center', color: '#666', background: '#f8f9fa', borderRadius: '8px', marginTop: '15px' }}>
+                        <p>No verified competencies found.</p>
+                        <p style={{ fontSize: '12px' }}>Complete an AI Interview or an Assessment to generate your passport data.</p>
                     </div>
-
-                    <div style={{ padding: '15px', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                            <strong style={{ fontSize: '16px' }}>Statistical Analysis</strong>
-                            <span className="status-pill green">✓ Verified</span>
-                        </div>
-                        <div style={{ width: '100%', background: '#e9ecef', borderRadius: '4px', height: '8px', marginBottom: '10px' }}>
-                            <div style={{ width: '86%', background: '#28a745', height: '100%', borderRadius: '4px' }}></div>
-                        </div>
-                        <p style={{ margin: '0 0 5px 0', fontSize: '13px', color: '#555' }}>Score: 86%</p>
-                        <div style={{ fontSize: '12px', color: '#777' }}>
-                            <p style={{ margin: '2px 0' }}>• AI Interview: 88%</p>
-                            <p style={{ margin: '2px 0' }}>• Assessment: 85%</p>
-                            <p style={{ margin: '2px 0' }}>• Practical Task: Passed</p>
-                        </div>
+                ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginTop: '15px' }}>
+                        {competencyGaps.map(gap => (
+                            <div key={gap.skill} style={{ padding: '15px', background: gap.current >= gap.required ? '#f8f9fa' : '#fff3cd', borderRadius: '8px', border: `1px solid ${gap.current >= gap.required ? '#e9ecef' : '#ffeeba'}` }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                                    <strong style={{ fontSize: '16px' }}>{gap.skill}</strong>
+                                    <span className={`status-pill ${gap.current >= gap.required ? 'green' : ''}`} style={gap.current < gap.required ? { background: '#ffc107', color: '#333' } : {}}>{gap.current >= gap.required ? '✓ Verified' : 'Developing'}</span>
+                                </div>
+                                <div style={{ width: '100%', background: gap.current >= gap.required ? '#e9ecef' : '#ffeeba', borderRadius: '4px', height: '8px', marginBottom: '10px' }}>
+                                    <div style={{ width: `${Math.min(100, gap.current)}%`, background: gap.current >= gap.required ? '#28a745' : '#ffc107', height: '100%', borderRadius: '4px' }}></div>
+                                </div>
+                                <p style={{ margin: '0 0 5px 0', fontSize: '13px', color: '#555' }}>Score: {gap.current}% (Required: {gap.required}%)</p>
+                            </div>
+                        ))}
                     </div>
-
-                    <div style={{ padding: '15px', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                            <strong style={{ fontSize: '16px' }}>Sampling</strong>
-                            <span className="status-pill green">✓ Verified</span>
-                        </div>
-                        <div style={{ width: '100%', background: '#e9ecef', borderRadius: '4px', height: '8px', marginBottom: '10px' }}>
-                            <div style={{ width: '82%', background: '#28a745', height: '100%', borderRadius: '4px' }}></div>
-                        </div>
-                        <p style={{ margin: '0 0 5px 0', fontSize: '13px', color: '#555' }}>Score: 82%</p>
-                        <div style={{ fontSize: '12px', color: '#777' }}>
-                            <p style={{ margin: '2px 0' }}>• AI Interview: 74%</p>
-                            <p style={{ margin: '2px 0' }}>• Assessment: 90%</p>
-                        </div>
-                    </div>
-
-                    <div style={{ padding: '15px', background: '#fff3cd', borderRadius: '8px', border: '1px solid #ffeeba' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                            <strong style={{ fontSize: '16px' }}>GIS</strong>
-                            <span className="status-pill" style={{ background: '#ffc107', color: '#333' }}>Developing</span>
-                        </div>
-                        <div style={{ width: '100%', background: '#ffeeba', borderRadius: '4px', height: '8px', marginBottom: '10px' }}>
-                            <div style={{ width: '64%', background: '#ffc107', height: '100%', borderRadius: '4px' }}></div>
-                        </div>
-                        <p style={{ margin: '0 0 5px 0', fontSize: '13px', color: '#555' }}>Score: 64%</p>
-                        <div style={{ fontSize: '12px', color: '#777' }}>
-                            <p style={{ margin: '2px 0' }}>• AI Interview: Pending</p>
-                            <p style={{ margin: '2px 0' }}>• Assessment: 64%</p>
-                            <p style={{ margin: '2px 0' }}><em>Evidence threshold not met for verification.</em></p>
-                        </div>
-                    </div>
-                </div>
+                )}
             </div>
           </div>
         )}
@@ -6433,58 +6358,45 @@ function App() {
         {dashboardView === 'learning-path' && (
           <div className="dashboard-panel">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2>AI Learning Path Generator (30-Day Plan)</h2>
+              <h2>AI Learning Path Generator</h2>
               <span className="status-pill green">Adaptive Mode Active</span>
             </div>
             <p>Your personalized learning sequence based on your current competencies and role targets.</p>
             
-            <div style={{ marginTop: '20px', display: 'flex', gap: '20px' }}>
-              <div style={{ flex: 1, borderLeft: '4px solid #007bff', paddingLeft: '15px' }}>
-                <h4 style={{ color: '#007bff', marginBottom: '10px' }}>Week 1: Fundamentals</h4>
-                <div style={{ padding: '15px', background: '#fff', border: '1px solid #eee', marginBottom: '10px', borderRadius: '8px' }}>
-                  <strong>Python Basics</strong><br/>
-                  <span style={{ fontSize: '12px', color: '#666' }}>Module • 4 hours • Role Prerequisite</span>
-                  <div style={{ marginTop: '10px' }}>
-                     <span className="status-pill blue" style={{ fontSize: '11px' }}>Skipped: Learner scored high in diagnostics</span>
-                  </div>
+            {(!selectedSkillList || selectedSkillList.length === 0) ? (
+                <div style={{ padding: '20px', textAlign: 'center', color: '#666', background: '#f8f9fa', borderRadius: '8px', marginTop: '20px' }}>
+                    <p>No learning paths generated yet.</p>
+                    <p style={{ fontSize: '12px' }}>Please select a target role or skills to generate your path.</p>
                 </div>
-              </div>
-              
-              <div style={{ flex: 1, borderLeft: '4px solid #f39c12', paddingLeft: '15px' }}>
-                <h4 style={{ color: '#f39c12', marginBottom: '10px' }}>Week 2: Practice</h4>
-                <div style={{ padding: '15px', background: '#fff', border: '1px solid #eee', marginBottom: '10px', borderRadius: '8px' }}>
-                  <strong>Data Analysis with Pandas</strong><br/>
-                  <span style={{ fontSize: '12px', color: '#666' }}>Practice Task • 6 hours • Priority Gap</span>
-                  <div style={{ marginTop: '10px' }}>
-                     <button className="primary-action btn-sm">Start Task</button>
-                  </div>
+            ) : (
+                <div style={{ marginTop: '20px', display: 'flex', gap: '20px', overflowX: 'auto', paddingBottom: '10px' }}>
+                  {selectedSkillList.map((skill, index) => {
+                      const gap = competencyGaps.find(g => g.skill === skill) || { current: 0, required: 70 };
+                      const isComplete = gap.current >= gap.required;
+                      const colors = ['#007bff', '#f39c12', '#e74c3c', '#2ecc71', '#9b59b6', '#34495e'];
+                      const color = colors[index % colors.length];
+                      return (
+                          <div key={skill} style={{ minWidth: '250px', flex: 1, borderLeft: `4px solid ${color}`, paddingLeft: '15px' }}>
+                            <h4 style={{ color: color, marginBottom: '10px' }}>Module {index + 1}: {skill}</h4>
+                            <div style={{ padding: '15px', background: '#fff', border: '1px solid #eee', marginBottom: '10px', borderRadius: '8px' }}>
+                              <strong>{skill} Fundamentals</strong><br/>
+                              <span style={{ fontSize: '12px', color: '#666' }}>Target Score: {gap.required}%</span>
+                              <div style={{ marginTop: '10px' }}>
+                                 {isComplete ? (
+                                    <span className="status-pill blue" style={{ fontSize: '11px' }}>Skipped: Already Proficient</span>
+                                 ) : (
+                                    <button className="primary-action btn-sm">Start Learning</button>
+                                 )}
+                              </div>
+                            </div>
+                          </div>
+                      );
+                  })}
                 </div>
-              </div>
-              
-              <div style={{ flex: 1, borderLeft: '4px solid #e74c3c', paddingLeft: '15px' }}>
-                <h4 style={{ color: '#e74c3c', marginBottom: '10px' }}>Week 3: Assessment</h4>
-                <div style={{ padding: '15px', background: '#fff', border: '1px solid #eee', marginBottom: '10px', borderRadius: '8px' }}>
-                  <strong>Statistical Programming</strong><br/>
-                  <span style={{ fontSize: '12px', color: '#666' }}>Checkpoint Quiz • 1 hour • Verification</span>
-                  <div style={{ marginTop: '10px' }}>
-                     <button className="secondary-action btn-sm">Take Checkpoint</button>
-                  </div>
-                </div>
-              </div>
-              
-              <div style={{ flex: 1, borderLeft: '4px solid #2ecc71', paddingLeft: '15px' }}>
-                <h4 style={{ color: '#2ecc71', marginBottom: '10px' }}>Week 4: Application</h4>
-                <div style={{ padding: '15px', background: '#fff', border: '1px solid #eee', marginBottom: '10px', borderRadius: '8px' }}>
-                  <strong>Role-Based Project</strong><br/>
-                  <span style={{ fontSize: '12px', color: '#666' }}>Final Assessment • 8 hours • Skill Passport Integration</span>
-                  <div style={{ marginTop: '10px' }}>
-                     <span className="status-pill" style={{ fontSize: '11px' }}>Locked until Week 3</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         )}
+
     
 {dashboardView === 'dashboard' && (
           <>
