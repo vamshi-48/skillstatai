@@ -4326,6 +4326,7 @@ function App() {
                 onChange={(e) => setLanguage(e.target.value)}
                 aria-label="Select Language"
               >
+              <button type="button" className="header-icon-btn" style={{ marginLeft: '10px' }} onClick={() => setIsAccessibilityOpen(true)} title="Accessibility">♿</button>
                 {supportedLanguages.map(([value, label]) => (
                   <option key={value} value={value}>
                     {label}
@@ -4675,6 +4676,7 @@ function App() {
               onChange={(e) => setLanguage(e.target.value)}
               aria-label="Select Language"
             >
+              <button type="button" className="header-icon-btn" style={{ marginLeft: '10px' }} onClick={() => setIsAccessibilityOpen(true)} title="Accessibility">♿</button>
               {supportedLanguages.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </div>
@@ -4863,6 +4865,7 @@ function App() {
               onChange={(e) => setLanguage(e.target.value)}
               aria-label="Select Language"
             >
+              <button type="button" className="header-icon-btn" style={{ marginLeft: '10px' }} onClick={() => setIsAccessibilityOpen(true)} title="Accessibility">♿</button>
               {supportedLanguages.map(([val, label]) => (
                 <option key={val} value={val}>{label}</option>
               ))}
@@ -5677,7 +5680,8 @@ function App() {
     )
   }
   return (
-    <div className={`dashboard-app-layout ${isSidebarCollapsed ? 'sidebar-collapsed' : ''} ${isMobileSidebarOpen ? 'mobile-sidebar-open' : ''}`}>
+    <div className={`dashboard-app-layout
+      <AccessibilityPanel isOpen={isAccessibilityOpen} onClose={() => setIsAccessibilityOpen(false)} /> ${isSidebarCollapsed ? 'sidebar-collapsed' : ''} ${isMobileSidebarOpen ? 'mobile-sidebar-open' : ''}`}>
       {/* Mobile Drawer Backdrop */}
       {isMobileSidebarOpen && (
         <div
@@ -5708,7 +5712,7 @@ function App() {
 
             <button
               type="button"
-              className={sidebar-nav-item }
+              className={`sidebar-nav-item ${dashboardView === 'ai-interview' ? 'active' : ''}`}
               onClick={() => { setDashboardView('ai-interview'); setIsMobileSidebarOpen(false) }}
             >
               <span className="nav-icon">🤖</span>
@@ -5716,7 +5720,7 @@ function App() {
             </button>
             <button
               type="button"
-              className={sidebar-nav-item }
+              className={`sidebar-nav-item ${dashboardView === 'passport' ? 'active' : ''}`}
               onClick={() => { setDashboardView('passport'); setIsMobileSidebarOpen(false) }}
             >
               <span className="nav-icon">🛂</span>
@@ -5724,7 +5728,7 @@ function App() {
             </button>
             <button
               type="button"
-              className={sidebar-nav-item }
+              className={`sidebar-nav-item ${dashboardView === 'learning-path' ? 'active' : ''}`}
               onClick={() => { setDashboardView('learning-path'); setIsMobileSidebarOpen(false) }}
             >
               <span className="nav-icon">🗺️</span>
