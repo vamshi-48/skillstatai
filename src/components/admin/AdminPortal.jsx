@@ -557,12 +557,6 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
         <div className="admin-content-view">
           {/* TAB 1: ADMIN DASHBOARD */}
           
-        
-
-        
-
-        
-    
         {activeTab === 'ai-copilot' && (
           <div className="admin-panel">
             <div className="admin-header">
@@ -740,7 +734,7 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
           </div>
         )}
 
-        {activeTab === 'dashboard' && (
+{activeTab === 'dashboard' && (
             <div>
               <div className="admin-stats-grid">
                 <div className="admin-stat-card">

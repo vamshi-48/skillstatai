@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 import {
+  syncToSupabaseAuth,
   findUser,
   getUserByIdentityOrEmail,
   getUserBySessionToken,
