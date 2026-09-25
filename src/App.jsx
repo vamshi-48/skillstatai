@@ -3455,6 +3455,8 @@ function AccessibilityPanel({ isOpen, onClose }) {
 }
 
 function App() {
+    const [showInterviewOverlay, setShowInterviewOverlay] = useState(false);
+    const [showLearningOverlay, setShowLearningOverlay] = useState(false);
   const [language, setLanguage] = useState('en')
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -6300,7 +6302,7 @@ function App() {
             
             <div style={{ marginTop: '20px', padding: '20px', textAlign: 'center', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
                 <p style={{ color: '#666', marginBottom: '20px' }}>Ready to start your adaptive interview session?</p>
-                <button className="primary-action" onClick={() => startQuiz('standard')}>Start Interview Session</button>
+                <button className="primary-action" onClick={() => setShowInterviewOverlay(true)}>Start Interview Session</button>
             </div>
           </div>
         )}
@@ -6387,7 +6389,7 @@ function App() {
                                  {isComplete ? (
                                     <span className="status-pill blue" style={{ fontSize: '11px' }}>Skipped: Already Proficient</span>
                                  ) : (
-                                    <button className="primary-action btn-sm" onClick={() => setDashboardView('recommendations')}>Start Learning</button>
+                                    <button className="primary-action btn-sm" onClick={() => setShowLearningOverlay(true)}>Start Learning</button>
                                  )}
                               </div>
                             </div>
