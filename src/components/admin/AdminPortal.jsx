@@ -195,11 +195,11 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
       }
     })
       .then(res => {
-        if (!res.ok) throw new Error('Failed to fetch users')
-        return res.json()
+        if (!res.ok) return { users: [] }
+        return res.json().catch(() => ({ users: [] }))
       })
       .then(data => {
-        if (data && Array.isArray(data.users)) {
+        if (data && Array.isArray(data.users) && data.users.length > 0) {
           const mappedUsers = data.users.map((u, i) => {
             const rawScore = Number(u.overallScore) || 0
             const dept = u.profile?.department || 'National Statistical Office (NSO)'
@@ -257,7 +257,7 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
           })
         }
       })
-      .catch(err => console.error('[Admin] Failed to load real users:', err))
+      .catch(() => {})
   }
 
   useEffect(() => {
