@@ -11,9 +11,68 @@
   animation: ivFadeIn 0.35s ease;
 }
 
+.interview-root.fullscreen-mode {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 99999;
+  background: #090e1a;
+  padding: 18px 28px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  margin: 0;
+  border-radius: 0;
+}
+
+.interview-root.fullscreen-mode .interview-body {
+  flex: 1;
+  min-height: 0;
+}
+
 @keyframes ivFadeIn {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Input Lock Status Banners */
+.input-lock-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  margin-bottom: 8px;
+  animation: ivFadeIn 0.25s ease;
+}
+
+.input-lock-banner.speaking {
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  color: #93c5fd;
+}
+
+.input-lock-banner.thinking {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #fcd34d;
+}
+
+.input-lock-banner.ready {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #6ee7b7;
+}
+
+.answer-textarea.locked {
+  background: rgba(15, 23, 42, 0.6) !important;
+  opacity: 0.65;
+  cursor: not-allowed;
+  border-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 /* ── TOP BAR ─────────────────────────────────────────────── */

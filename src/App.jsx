@@ -6505,6 +6505,7 @@ function App() {
             onScoreUpdate={(score) => {
               setOverallScore(score)
             }}
+            onExit={() => setDashboardView('dashboard')}
           />
         )}
 
@@ -7812,21 +7813,23 @@ function App() {
       </main>
       </div> {/* .dashboard-main-viewport */}
 
-      {/* Floating Skillstat AI Copilot Assistant */}
-      <ChatBot
-        profile={profile}
-        selectedSkillList={selectedSkillList}
-        skillGapData={skillGapData}
-        overallScore={overallScore}
-        quizzesCompleted={quizzesCompleted}
-        competencyGaps={competencyGaps}
-        onNavigate={(targetView) => {
-          setDashboardView(targetView)
-        }}
-        startQuiz={startQuiz}
-        initialHistory={chatHistory}
-        onHistoryChange={setChatHistory}
-      />
+      {/* Floating Skillstat AI Copilot Assistant — Disabled during AI Interview */}
+      {dashboardView !== 'ai-interview' && (
+        <ChatBot
+          profile={profile}
+          selectedSkillList={selectedSkillList}
+          skillGapData={skillGapData}
+          overallScore={overallScore}
+          quizzesCompleted={quizzesCompleted}
+          competencyGaps={competencyGaps}
+          onNavigate={(targetView) => {
+            setDashboardView(targetView)
+          }}
+          startQuiz={startQuiz}
+          initialHistory={chatHistory}
+          onHistoryChange={setChatHistory}
+        />
+      )}
 
 
 

@@ -143,7 +143,7 @@ function evaluateAnswerLocally(text, competencyName, candidateRole = 'Statistica
   }
 }
 
-export default function AIInterviewView({ profile = {}, competencyGaps = [], onScoreUpdate }) {
+export default function AIInterviewView({ profile = {}, competencyGaps = [], onScoreUpdate, onExit }) {
   const [messages, setMessages] = useState([])
   const [inputText, setInputText] = useState('')
   const [isAiThinking, setIsAiThinking] = useState(false)
@@ -153,7 +153,19 @@ export default function AIInterviewView({ profile = {}, competencyGaps = [], onS
   const [questionCount, setQuestionCount] = useState(0)
   const [ttsEnabled, setTtsEnabled] = useState(true)
   const [interviewStarted, setInterviewStarted] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const [sessionScores, setSessionScores] = useState([])
+
+  useEffect(() => {
+    if (isFullscreen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [isFullscreen])
 
   const chatBottomRef = useRef(null)
   const textareaRef = useRef(null)
@@ -238,6 +250,7 @@ export default function AIInterviewView({ profile = {}, competencyGaps = [], onS
 
   // ── Start Interview Session (Real-Life HR Opening) ──────────────────────────
   const startInterview = async () => {
+    setIsFullscreen(true)
     setInterviewStarted(true)
     setIsAiThinking(true)
 
@@ -469,11 +482,12 @@ CRITICAL HR INTERVIEWER TRAINING & DIRECTIVES:
     setEvaluationDossier(null)
     setInputText('')
     setInterviewStarted(false)
+    setIsFullscreen(false)
     setSessionScores([])
   }
 
   return (
-    <div className="interview-root">
+    <div className={`interview-root ${isFullscreen ? 'fullscreen-mode' : ''}`}>
 
       {/* TOP HEADER */}
       <div className="interview-topbar">
@@ -488,6 +502,28 @@ CRITICAL HR INTERVIEWER TRAINING & DIRECTIVES:
           {candidateName} &nbsp;·&nbsp; {userRole} ({userDept})
         </div>
         <div className="topbar-right">
+          <button
+            type="button"
+            className="fullscreen-toggle-btn"
+            onClick={() => setIsFullscreen(prev => !prev)}
+            title={isFullscreen ? 'Exit Full Screen' : 'Enter Full Screen'}
+            style={{
+              background: isFullscreen ? 'rgba(59, 130, 246, 0.25)' : 'rgba(255, 255, 255, 0.08)',
+              color: isFullscreen ? '#93c5fd' : '#e2e8f0',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              borderRadius: '20px',
+              padding: '6px 14px',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            {isFullscreen ? '🗗 Minimize' : '⛶ Full Screen'}
+          </button>
           <button
             type="button"
             className={`voice-toggle ${ttsEnabled ? 'on' : 'off'}`}
@@ -521,6 +557,32 @@ CRITICAL HR INTERVIEWER TRAINING & DIRECTIVES:
               }}
             >
               Finish Interview
+            </button>
+          )}
+          {onExit && (
+            <button
+              type="button"
+              className="exit-view-btn"
+              onClick={() => {
+                if ('speechSynthesis' in window) window.speechSynthesis.cancel()
+                setIsAiSpeaking(false)
+                setIsFullscreen(false)
+                onExit()
+              }}
+              title="Return to Dashboard"
+              style={{
+                background: 'rgba(239, 68, 68, 0.15)',
+                color: '#fca5a5',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: '20px',
+                padding: '6px 14px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              ✕ Exit Interview
             </button>
           )}
         </div>
@@ -686,16 +748,37 @@ CRITICAL HR INTERVIEWER TRAINING & DIRECTIVES:
                   <div className="input-hint">
                     ⌨️ Type your response naturally — Dr. Ramanathan will listen, evaluate, and adapt the next question to your answer
                   </div>
+                  {(isAiSpeaking || isAiThinking) && (
+                    <div className={`input-lock-banner ${isAiSpeaking ? 'speaking' : 'thinking'}`}>
+                      <span>{isAiSpeaking ? '🎙️' : '⏳'}</span>
+                      <span>
+                        {isAiSpeaking
+                          ? 'Chat box disabled: Dr. Ramanathan is speaking. Please listen attentively...'
+                          : 'Chat box disabled: The HR Panel is evaluating your response...'}
+                      </span>
+                    </div>
+                  )}
                   <div className="input-row">
                     <textarea
                       ref={textareaRef}
-                      className="answer-textarea"
-                      placeholder="Share your practical experience, actions taken, and outcomes..."
+                      className={`answer-textarea ${isAiThinking || isAiSpeaking ? 'locked' : ''}`}
+                      placeholder={
+                        isAiSpeaking
+                          ? 'Chat box disabled while Dr. Ramanathan is speaking...'
+                          : isAiThinking
+                          ? 'Chat box disabled while panel evaluates response...'
+                          : 'Share your practical experience, actions taken, and outcomes...'
+                      }
                       rows={3}
                       value={inputText}
                       onChange={e => setInputText(e.target.value)}
                       onKeyDown={e => {
-                        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault()
+                          if (!isAiThinking && !isAiSpeaking && inputText.trim()) {
+                            handleSend()
+                          }
+                        }
                       }}
                       disabled={isAiThinking || isAiSpeaking}
                     />
