@@ -1536,6 +1536,34 @@ function enhancePathway(data, currentScore, currentRole) {
   const isEligible = currentScore >= benchmark
   const remainingGap = Math.max(0, benchmark - currentScore)
 
+  // Map or compute explicit salary band figures for promotion
+  const gradeStr = data.gradeIncrement || ''
+  let estimatedSalaryBand = '₹78,800 – ₹1,08,500 / month'
+  let salaryHike = '+22% Emolument Revision'
+  let basicPay = 'Pay Level 8 (7th CPC)'
+
+  if (gradeStr.includes('Level 10') || gradeStr.includes('Senior Medical')) {
+    estimatedSalaryBand = '₹95,000 – ₹1,35,000 / month'
+    salaryHike = '+28% Senior Cadre Hike'
+    basicPay = 'Pay Level 10 (Senior Scale)'
+  } else if (gradeStr.includes('Level 11') || gradeStr.includes('Director')) {
+    estimatedSalaryBand = '₹1,25,000 – ₹1,75,000 / month'
+    salaryHike = '+32% Leadership Band'
+    basicPay = 'Pay Level 11 (Directorate)'
+  } else if (gradeStr.includes('Level 9') || gradeStr.includes('Senior Data Scientist')) {
+    estimatedSalaryBand = '₹90,000 – ₹1,28,000 / month'
+    salaryHike = '+25% Principal Scale'
+    basicPay = 'Pay Level 9'
+  } else if (gradeStr.includes('Level 7') || gradeStr.includes('Level 8')) {
+    estimatedSalaryBand = '₹78,800 – ₹1,08,500 / month'
+    salaryHike = '+22% Gazetted Scale'
+    basicPay = 'Pay Level 8 (Senior Scale)'
+  } else if (gradeStr.includes('Level 6')) {
+    estimatedSalaryBand = '₹56,100 – ₹82,400 / month'
+    salaryHike = '+20% Cadre Revision'
+    basicPay = 'Pay Level 6 / 7'
+  }
+
   return {
     ...data,
     currentRole,
@@ -1544,6 +1572,9 @@ function enhancePathway(data, currentScore, currentRole) {
     readinessPct,
     isEligible,
     remainingGap,
+    promotionalSalary: data.promotionalSalary || estimatedSalaryBand,
+    promotionalHike: data.promotionalHike || salaryHike,
+    promotionalPayLevel: data.promotionalPayLevel || basicPay,
   }
 }
 
@@ -6479,9 +6510,17 @@ function App() {
                 <h3 className="promo-target-heading">
                   Next Promotion Milestone: <span className="promo-target-role-text">{pathwayPreview.targetRole}</span>
                 </h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', margin: '6px 0 10px 0' }}>
+                  <span style={{ background: '#dcfce7', color: '#166534', border: '1px solid #86efac', padding: '4px 10px', borderRadius: '6px', fontSize: '13px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                    💵 Projected Salary: {pathwayPreview.promotionalSalary}
+                  </span>
+                  <span style={{ background: '#e0f2fe', color: '#0369a1', border: '1px solid #7dd3fc', padding: '4px 10px', borderRadius: '6px', fontSize: '12.5px', fontWeight: 600 }}>
+                    📈 {pathwayPreview.promotionalHike} ({pathwayPreview.promotionalPayLevel})
+                  </span>
+                </div>
                 <p className="promo-target-sub">
                   Target Benchmark: <strong>{pathwayPreview.benchmarkScore}%</strong> • Current Score: <strong>{overallScore}%</strong> • 
-                  Expected Increment: <strong>{pathwayPreview.gradeIncrement}</strong>
+                  Cadre Scale: <strong>{pathwayPreview.gradeIncrement}</strong>
                 </p>
                 <div className="promo-preview-summary-pills">
                   <span className="promo-tag-item">📚 {pathwayPreview.courses.length} Accredited Courses</span>
@@ -6995,13 +7034,24 @@ function App() {
                 <div className="promo-benefit-card compensation">
                   <div className="benefit-card-header">
                     <span className="benefit-card-icon">💰</span>
-                    <h4>Pay Scale & Grade Promotion</h4>
+                    <h4>Pay Scale & Salary on Promotion</h4>
                   </div>
-                  <div className="benefit-grade-highlight">
-                    {pathway.gradeIncrement}
+                  <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '14px', marginBottom: '8px' }}>
+                    <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#166534', fontWeight: 700 }}>
+                      Projected Monthly Remuneration
+                    </div>
+                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#15803d', margin: '4px 0' }}>
+                      {pathway.promotionalSalary}
+                    </div>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#166534', fontWeight: 600, background: '#dcfce7', padding: '2px 8px', borderRadius: '4px' }}>
+                      ✨ {pathway.promotionalHike} • {pathway.promotionalPayLevel}
+                    </div>
+                  </div>
+                  <div className="benefit-grade-highlight" style={{ fontSize: '12.5px' }}>
+                    <strong>Cadre Scale:</strong> {pathway.gradeIncrement}
                   </div>
                   <p className="benefit-card-desc">
-                    Eligible for promotional grade pay revision, higher allowances, and advanced seniority status within the department.
+                    Includes revised Basic Pay, DA allowances, HRA elevation, and senior gazetted emoluments upon completing credential verification.
                   </p>
                 </div>
 
