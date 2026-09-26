@@ -155,6 +155,10 @@ export default function AIInterviewView({ profile = {}, competencyGaps = [], onS
   const [interviewStarted, setInterviewStarted] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [sessionScores, setSessionScores] = useState([])
+  const [tabViolations, setTabViolations] = useState(0)
+  const [tabWarningModal, setTabWarningModal] = useState(null)
+  const [exitConfirmModal, setExitConfirmModal] = useState(false)
+  const lastViolationTimeRef = useRef(0)
 
   useEffect(() => {
     if (isFullscreen) {
@@ -253,6 +257,9 @@ export default function AIInterviewView({ profile = {}, competencyGaps = [], onS
     setIsFullscreen(true)
     setInterviewStarted(true)
     setIsAiThinking(true)
+    setTabViolations(0)
+    setTabWarningModal(null)
+    setExitConfirmModal(false)
 
     const initialQ = `Good day, ${candidateName}. Welcome. I am Dr. V. Ramanathan, Chair of the Senior Executive HR & Talent Assessment Panel. We are very glad to connect with you today.\n\nOur objective here is to have a genuine, two-way professional conversation to understand your practical competencies, leadership, and operational decision-making in ${userDept}.\n\nTo kick off our conversation: could you walk me through your current scope of responsibilities as a ${userRole}, and tell me about a standout project or initiative where your direct contribution drove a significant outcome?`
 
@@ -270,6 +277,146 @@ export default function AIInterviewView({ profile = {}, competencyGaps = [], onS
     setIsAiThinking(false)
     setTimeout(() => speakText(initialQ), 500)
   }
+
+  // ── Conclude Interview Helper ───────────────────────────────────────────────
+  const concludeSessionWithMalpractice = (reason) => {
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel()
+    setIsAiSpeaking(false)
+    setIsAiThinking(false)
+
+    const closingDialogue = `Assessment Disqualification. Candidate ${candidateName}, multiple tab-switching violations were detected during this live viva-voce. Under executive assessment integrity regulations, your interview has been terminated and recorded as an integrity failure.`
+
+    const closeMsg = {
+      id: `ai-disqualify-${Date.now()}`,
+      sender: 'ai',
+      text: closingDialogue,
+      time: nowTime(),
+      isConclusion: true,
+      isInappropriate: true,
+      inappropriatenessReason: reason,
+    }
+
+    setMessages(prev => [...prev, closeMsg])
+    speakText(closingDialogue)
+
+    const dossier = {
+      id: `iv-${Date.now()}`,
+      candidateName,
+      candidateEmail,
+      role: userRole,
+      department: userDept,
+      overallScore: 0,
+      verdict: 'Disqualified — Assessment Integrity Violation (Excessive Tab Switching)',
+      date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+      timestamp: new Date().toISOString(),
+      questionsCompleted: questionCount,
+      scores: [{ q: 1, score: 0, competency: 'Assessment Integrity & Compliance' }],
+      disqualified: true,
+      disqualificationReason: reason,
+      tabViolations: 3,
+    }
+
+    setEvaluationDossier(dossier)
+    setInterviewComplete(true)
+    if (typeof onScoreUpdate === 'function') onScoreUpdate(0)
+
+    try {
+      const existing = JSON.parse(localStorage.getItem('skillstat_interview_records') || '[]')
+      existing.unshift(dossier)
+      localStorage.setItem('skillstat_interview_records', JSON.stringify(existing.slice(0, 250)))
+      window.dispatchEvent(new CustomEvent('skillstat_admin_update', { detail: { type: 'interview_records', dossier } }))
+    } catch (err) {
+      console.error('Storage sync error:', err)
+    }
+  }
+
+  // ── Anti-Cheat Tab Switching & Focus Loss Proctoring Engine ─────────────────
+  useEffect(() => {
+    if (!interviewStarted || interviewComplete) return
+
+    const MAX_VIOLATIONS = 3
+
+    const registerViolation = (type) => {
+      const now = Date.now()
+      if (now - lastViolationTimeRef.current < 1500) return
+      lastViolationTimeRef.current = now
+
+      // Warning beep using standard Web Audio API
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+        const osc = audioCtx.createOscillator()
+        const gain = audioCtx.createGain()
+        osc.type = 'triangle'
+        osc.frequency.setValueAtTime(440, audioCtx.currentTime)
+        osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15)
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35)
+        osc.connect(gain)
+        gain.connect(audioCtx.destination)
+        osc.start()
+        osc.stop(audioCtx.currentTime + 0.35)
+      } catch {}
+
+      setTabViolations(prev => {
+        const next = prev + 1
+        if (next >= MAX_VIOLATIONS) {
+          concludeSessionWithMalpractice(`Candidate switched tabs ${MAX_VIOLATIONS} times during an active proctored interview.`)
+          setTabWarningModal(null)
+        } else {
+          setTabWarningModal({
+            strike: next,
+            max: MAX_VIOLATIONS,
+            remaining: MAX_VIOLATIONS - next,
+            time: new Date().toLocaleTimeString(),
+            type,
+          })
+          if (ttsEnabled) {
+            speakText(`Attention candidate. Tab switching is strictly prohibited during this interview. Warning ${next} of ${MAX_VIOLATIONS}. Return to the assessment window immediately.`)
+          }
+        }
+        return next
+      })
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        registerViolation('Navigated to another browser tab or minimized window')
+      }
+    }
+
+    const handleWindowBlur = () => {
+      registerViolation('Lost browser window focus')
+    }
+
+    const handleBeforeUnload = (e) => {
+      e.preventDefault()
+      e.returnValue = 'An official AI interview session is currently in progress. If you leave or switch tabs now, your interview will be terminated and recorded as an integrity failure.'
+      return e.returnValue
+    }
+
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'r' || e.key === 'R' || e.key === 'w' || e.key === 'W' || e.key === 't' || e.key === 'T')) {
+        e.preventDefault()
+        registerViolation('Prohibited shortcut attempt (tab switch or reload)')
+      }
+      if (e.key === 'F5') {
+        e.preventDefault()
+        registerViolation('Page reload attempt')
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('blur', handleWindowBlur)
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('blur', handleWindowBlur)
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [interviewStarted, interviewComplete, ttsEnabled, candidateName, userRole, userDept, questionCount])
 
   // ── Conclude Interview Helper ───────────────────────────────────────────────
   const concludeSession = (scoresToDate) => {
@@ -484,6 +631,9 @@ CRITICAL HR INTERVIEWER TRAINING & DIRECTIVES:
     setInterviewStarted(false)
     setIsFullscreen(false)
     setSessionScores([])
+    setTabViolations(0)
+    setTabWarningModal(null)
+    setExitConfirmModal(false)
   }
 
   return (
@@ -502,11 +652,29 @@ CRITICAL HR INTERVIEWER TRAINING & DIRECTIVES:
           {candidateName} &nbsp;·&nbsp; {userRole} ({userDept})
         </div>
         <div className="topbar-right">
+          {interviewStarted && !interviewComplete && (
+            <div className={`proctor-badge ${tabViolations === 0 ? 'clean' : tabViolations === 1 ? 'warn' : 'danger'}`}>
+              <span>🛡️</span>
+              <span>{tabViolations === 0 ? 'Proctored: No Tab Switches' : `⚠️ Tab Violations: ${tabViolations}/3`}</span>
+            </div>
+          )}
           <button
             type="button"
             className="fullscreen-toggle-btn"
-            onClick={() => setIsFullscreen(prev => !prev)}
-            title={isFullscreen ? 'Exit Full Screen' : 'Enter Full Screen'}
+            onClick={() => {
+              if (interviewStarted && !interviewComplete) {
+                setTabWarningModal({
+                  strike: tabViolations,
+                  max: 3,
+                  remaining: Math.max(0, 3 - tabViolations),
+                  time: new Date().toLocaleTimeString(),
+                  type: 'Fullscreen is mandatory during the live interview to prevent tab switching.',
+                })
+                return
+              }
+              setIsFullscreen(prev => !prev)
+            }}
+            title={interviewStarted && !interviewComplete ? 'Fullscreen locked during interview' : isFullscreen ? 'Exit Full Screen' : 'Enter Full Screen'}
             style={{
               background: isFullscreen ? 'rgba(59, 130, 246, 0.25)' : 'rgba(255, 255, 255, 0.08)',
               color: isFullscreen ? '#93c5fd' : '#e2e8f0',
@@ -515,14 +683,14 @@ CRITICAL HR INTERVIEWER TRAINING & DIRECTIVES:
               padding: '6px 14px',
               fontSize: '12px',
               fontWeight: 600,
-              cursor: 'pointer',
+              cursor: interviewStarted && !interviewComplete ? 'default' : 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
               transition: 'all 0.2s ease',
             }}
           >
-            {isFullscreen ? '🗗 Minimize' : '⛶ Full Screen'}
+            {interviewStarted && !interviewComplete ? '🛡️ Fullscreen Locked' : isFullscreen ? '🗗 Minimize' : '⛶ Full Screen'}
           </button>
           <button
             type="button"
@@ -564,6 +732,10 @@ CRITICAL HR INTERVIEWER TRAINING & DIRECTIVES:
               type="button"
               className="exit-view-btn"
               onClick={() => {
+                if (interviewStarted && !interviewComplete) {
+                  setExitConfirmModal(true)
+                  return
+                }
                 if ('speechSynthesis' in window) window.speechSynthesis.cancel()
                 setIsAiSpeaking(false)
                 setIsFullscreen(false)
@@ -662,6 +834,7 @@ CRITICAL HR INTERVIEWER TRAINING & DIRECTIVES:
                 <li>⌨️ Type your real, detailed professional experience in the response box</li>
                 <li>🎯 <strong>Dynamic &amp; Adaptive:</strong> Questions are not fixed to 4 — each follow-up is adapted to what you say</li>
                 <li>📊 Accurate scoring reflecting your actual depth, recorded directly to the Admin Portal &amp; Competency Passport</li>
+                <li>🛡️ <strong>Strict Anti-Cheat Proctoring:</strong> Tab switching, window minimizing, or leaving the interview screen is strictly prohibited (3-strike limit)</li>
               </ul>
               <button type="button" className="start-btn" onClick={startInterview}>
                 Start Face-to-Face Interview ➤
@@ -811,17 +984,36 @@ CRITICAL HR INTERVIEWER TRAINING & DIRECTIVES:
       {interviewComplete && evaluationDossier && (
         <div className="dossier-wrap">
           <div className="dossier-card">
-            <div className="dossier-seal">🏛️</div>
+            <div className="dossier-seal">{evaluationDossier.disqualified ? '⚠️' : '🏛️'}</div>
             <h3 className="dossier-title">Official Competency Evaluation Dossier</h3>
             <p className="dossier-sub">Executive Talent Viva-Voce Assessment — {evaluationDossier.date}</p>
+            {evaluationDossier.disqualified && (
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid #ef4444',
+                borderRadius: '10px',
+                padding: '12px 16px',
+                margin: '12px 0 16px 0',
+                color: '#fca5a5',
+                fontSize: '13px',
+                textAlign: 'center',
+                lineHeight: 1.5,
+              }}>
+                ⚠️ <strong>Integrity Disqualification:</strong> {evaluationDossier.disqualificationReason}
+              </div>
+            )}
             <div className="dossier-grid">
               <div className="dossier-metric">
                 <span className="dm-label">Candidate Score</span>
-                <span className="dm-value score-color">{evaluationDossier.overallScore}%</span>
+                <span className="dm-value score-color" style={{ color: evaluationDossier.disqualified ? '#ef4444' : undefined }}>
+                  {evaluationDossier.overallScore}%
+                </span>
               </div>
               <div className="dossier-metric">
                 <span className="dm-label">HR Panel Verdict</span>
-                <span className="dm-value verdict-color">{evaluationDossier.verdict}</span>
+                <span className="dm-value verdict-color" style={{ color: evaluationDossier.disqualified ? '#ef4444' : undefined }}>
+                  {evaluationDossier.verdict}
+                </span>
               </div>
               <div className="dossier-metric">
                 <span className="dm-label">Questions Evaluated</span>
@@ -841,6 +1033,105 @@ CRITICAL HR INTERVIEWER TRAINING & DIRECTIVES:
               </div>
             </div>
             <p className="dossier-notice">✔ Data automatically synchronized to the Admin Panel and your Competency Passport.</p>
+          </div>
+        </div>
+      )}
+
+      {/* PROCTORING TAB SWITCHING WARNING MODAL */}
+      {tabWarningModal && (
+        <div className="tab-warning-overlay">
+          <div className="tab-warning-modal">
+            <div className="tab-warning-icon">⚠️</div>
+            <div className="tab-warning-badge">ASSESSMENT INTEGRITY PROCTOR</div>
+            <h3 className="tab-warning-title">Tab Switching Violation Detected!</h3>
+            <p className="tab-warning-desc">
+              You navigated away from the proctored interview screen. In accordance with civil service assessment standards, <strong>tab switching, minimizing the browser, or opening background windows is strictly prohibited.</strong>
+            </p>
+
+            <div className="tab-warning-strikes">
+              <div className={`strike-pill ${tabWarningModal.strike >= 1 ? 'violated' : ''}`}>
+                <span>Strike 1</span>
+                <strong>{tabWarningModal.strike >= 1 ? '⚠️ Violation Logged' : 'Clean'}</strong>
+              </div>
+              <div className={`strike-pill ${tabWarningModal.strike >= 2 ? 'violated' : ''}`}>
+                <span>Strike 2</span>
+                <strong>{tabWarningModal.strike >= 2 ? '⚠️ Final Warning' : 'Pending'}</strong>
+              </div>
+              <div className={`strike-pill ${tabWarningModal.strike >= 3 ? 'violated' : 'danger'}`}>
+                <span>Strike 3</span>
+                <strong>Auto Disqualification</strong>
+              </div>
+            </div>
+
+            <div className="tab-warning-alert">
+              ⚠️ <strong>Warning {tabWarningModal.strike} of {tabWarningModal.max}:</strong> You have{' '}
+              <span style={{ color: '#ef4444', fontWeight: 800 }}>{tabWarningModal.remaining}</span> strike{tabWarningModal.remaining === 1 ? '' : 's'} remaining before your viva-voce is immediately terminated and marked as an integrity failure.
+            </div>
+
+            <button
+              type="button"
+              className="resume-interview-btn"
+              onClick={() => {
+                setTabWarningModal(null)
+                setTimeout(() => textareaRef.current?.focus(), 100)
+              }}
+            >
+              I Understand &amp; Agree — Resume Interview
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* EXIT CONFIRMATION MODAL */}
+      {exitConfirmModal && (
+        <div className="tab-warning-overlay">
+          <div className="tab-warning-modal" style={{ borderColor: 'rgba(239, 68, 68, 0.4)' }}>
+            <div className="tab-warning-icon">🚪</div>
+            <div className="tab-warning-badge" style={{ color: '#cbd5e1', borderColor: 'rgba(255, 255, 255, 0.2)' }}>
+              EXIT CONFIRMATION
+            </div>
+            <h3 className="tab-warning-title">Abort Active AI Interview?</h3>
+            <p className="tab-warning-desc">
+              Your live interview with <strong>Dr. V. Ramanathan</strong> is currently in progress. Exiting now will conclude the session early and record an incomplete assessment dossier.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '16px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setExitConfirmModal(false)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  color: '#fff',
+                  padding: '10px 20px',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                Cancel &amp; Continue Interview
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setExitConfirmModal(false)
+                  if ('speechSynthesis' in window) window.speechSynthesis.cancel()
+                  setIsAiSpeaking(false)
+                  setIsFullscreen(false)
+                  if (onExit) onExit()
+                }}
+                style={{
+                  background: '#ef4444',
+                  border: 'none',
+                  color: '#fff',
+                  padding: '10px 20px',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                }}
+              >
+                Yes, Abort Interview
+              </button>
+            </div>
           </div>
         </div>
       )}
