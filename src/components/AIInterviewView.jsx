@@ -34,7 +34,7 @@ function evaluateAnswerLocally(text, competencyName) {
   const qualitySignals = [
     'challenge', 'result', 'team', 'lead', 'metric', 'project', 'process',
     'improved', 'data', 'stakeholder', 'strategy', 'analysis', 'delivered',
-    'solved', 'action', 'impact', 'managed', 'collaborated'
+    'solved', 'action', 'impact', 'managed', 'collaborated', 'measured'
   ]
   const matchCount = qualitySignals.filter(k => lower.includes(k)).length
   calculatedScore += Math.min(14, matchCount * 3)
@@ -45,9 +45,9 @@ function evaluateAnswerLocally(text, competencyName) {
   return {
     score: finalScore,
     verdict,
-    feedback: `Good articulation regarding ${competencyName || 'your professional experience'}. Your response highlights valuable operational understanding.`,
-    strength: words > 30 ? 'Comprehensive context and practical depth.' : 'Focused response directly answering the question.',
-    improvement: 'Consider structuring your next example using the STAR approach (Situation, Task, Action, Result) with quantified impact.',
+    feedback: `Thank you for sharing that context. You demonstrated clear practical awareness regarding ${competencyName || 'your professional workflow'}.`,
+    strength: words > 30 ? 'Comprehensive context and structured problem-solving approach.' : 'Focused response directly answering the core challenge.',
+    improvement: 'Ensure you consistently articulate measurable outcomes and specific stakeholder alignment.',
   }
 }
 
@@ -56,8 +56,6 @@ export default function AIInterviewView({ profile = {}, competencyGaps = [], onS
   const [inputText, setInputText] = useState('')
   const [isAiThinking, setIsAiThinking] = useState(false)
   const [isAiSpeaking, setIsAiSpeaking] = useState(false)
-  const [mouthOpen, setMouthOpen] = useState(false)
-  const [eyeBlink, setEyeBlink] = useState(false)
   const [interviewComplete, setInterviewComplete] = useState(false)
   const [evaluationDossier, setEvaluationDossier] = useState(null)
   const [questionCount, setQuestionCount] = useState(0)
@@ -66,9 +64,8 @@ export default function AIInterviewView({ profile = {}, competencyGaps = [], onS
   const [sessionScores, setSessionScores] = useState([])
 
   const chatBottomRef = useRef(null)
-  const mouthIntervalRef = useRef(null)
-  const blinkIntervalRef = useRef(null)
   const textareaRef = useRef(null)
+  const selectedVoiceRef = useRef(null)
 
   const userRole = (profile.role && profile.role.trim()) || (profile.designation && profile.designation.trim()) || 'Professional'
   const userDept = profile.department || 'Official Organization'
@@ -77,37 +74,44 @@ export default function AIInterviewView({ profile = {}, competencyGaps = [], onS
 
   const nowTime = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
-  // ── Avatar Animations ───────────────────────────────────────────────────────
-  const startMouthAnimation = () => {
-    stopMouthAnimation()
-    mouthIntervalRef.current = setInterval(() => {
-      setMouthOpen(prev => !prev)
-    }, 130)
+  // ── Voice Management (Consistent, Authoritative Voice that Remains Same) ───
+  const getCachedVoice = () => {
+    if (selectedVoiceRef.current) return selectedVoiceRef.current
+    if (!('speechSynthesis' in window)) return null
+    const voices = window.speechSynthesis.getVoices()
+    if (!voices || voices.length === 0) return null
+
+    // Exact original voice selection criteria: British/Indian English / Daniel / Google UK / Natural
+    const pick = voices.find(v =>
+      v.name.includes('Daniel') ||
+      v.name.includes('Google UK English Male') ||
+      v.name.includes('George') ||
+      v.name.includes('Oliver') ||
+      v.name.includes('Ravi') ||
+      (v.lang.includes('en-GB') && !v.name.toLowerCase().includes('female')) ||
+      (v.lang.includes('en-IN') && !v.name.toLowerCase().includes('female')) ||
+      v.name.includes('Natural')
+    ) || voices.find(v => v.lang.startsWith('en')) || voices[0]
+
+    selectedVoiceRef.current = pick
+    return pick
   }
 
-  const stopMouthAnimation = () => {
-    if (mouthIntervalRef.current) {
-      clearInterval(mouthIntervalRef.current)
-      mouthIntervalRef.current = null
+  useEffect(() => {
+    getCachedVoice()
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = () => {
+        getCachedVoice()
+      }
     }
-    setMouthOpen(false)
-  }
+  }, [])
 
-  const startBlinkLoop = () => {
-    blinkIntervalRef.current = setInterval(() => {
-      setEyeBlink(true)
-      setTimeout(() => setEyeBlink(false), 140)
-    }, 3000)
-  }
-
-  // ── Realistic Voice Synthesis ──────────────────────────────────────────────
+  // ── Natural Speech Synthesis ───────────────────────────────────────────────
   const speakText = (text) => {
     if (!('speechSynthesis' in window) || !ttsEnabled) {
       setIsAiSpeaking(true)
-      startMouthAnimation()
       setTimeout(() => {
         setIsAiSpeaking(false)
-        stopMouthAnimation()
       }, Math.min(text.length * 36, 8000))
       return
     }
@@ -115,30 +119,24 @@ export default function AIInterviewView({ profile = {}, competencyGaps = [], onS
       window.speechSynthesis.cancel()
       const clean = text.replace(/[*_#`]/g, '').trim()
       const utter = new SpeechSynthesisUtterance(clean)
-      utter.rate = 0.95
-      utter.pitch = 1.05
-      const voices = window.speechSynthesis.getVoices()
-      const pick = voices.find(v =>
-        (v.name.includes('Female') || v.name.includes('Zira') || v.name.includes('Samantha') || v.name.includes('Google UK English Female') || v.lang.includes('en-IN') || v.lang.includes('en-GB'))
-      ) || voices[0]
-      if (pick) utter.voice = pick
-      utter.onstart = () => { setIsAiSpeaking(true); startMouthAnimation() }
-      utter.onend = () => { setIsAiSpeaking(false); stopMouthAnimation() }
-      utter.onerror = () => { setIsAiSpeaking(false); stopMouthAnimation() }
+      utter.rate = 0.93 // Original exact rate
+      utter.pitch = 1.0 // Original exact pitch
+      const voice = getCachedVoice()
+      if (voice) utter.voice = voice
+      utter.onstart = () => setIsAiSpeaking(true)
+      utter.onend = () => setIsAiSpeaking(false)
+      utter.onerror = () => setIsAiSpeaking(false)
       window.speechSynthesis.speak(utter)
     } catch {
       setIsAiSpeaking(true)
-      startMouthAnimation()
-      setTimeout(() => { setIsAiSpeaking(false); stopMouthAnimation() }, 4000)
+      setTimeout(() => setIsAiSpeaking(false), 4000)
     }
   }
 
   useEffect(() => {
-    startBlinkLoop()
     return () => {
       if ('speechSynthesis' in window) window.speechSynthesis.cancel()
-      stopMouthAnimation()
-      if (blinkIntervalRef.current) clearInterval(blinkIntervalRef.current)
+      setIsAiSpeaking(false)
     }
   }, [])
 
@@ -146,19 +144,19 @@ export default function AIInterviewView({ profile = {}, competencyGaps = [], onS
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isAiThinking])
 
-  // ── Start Interview Session ─────────────────────────────────────────────────
+  // ── Start Interview Session (Real-Life HR Opening) ──────────────────────────
   const startInterview = async () => {
     setInterviewStarted(true)
     setIsAiThinking(true)
 
-    const initialQ = `Hello ${candidateName}, welcome! I'm Priya Sharma from Senior Talent & HR Advisory. It's a pleasure to connect with you today.\n\nTo kick off our conversation, could you walk me through your key responsibilities as a ${userRole} within ${userDept}, and share what you consider your most meaningful professional accomplishment in this role?`
+    const initialQ = `Good day, ${candidateName}. Welcome. I am Dr. V. Ramanathan, Chair of the Senior Executive HR & Talent Assessment Panel. We are very glad to connect with you today.\n\nOur objective here is to have a genuine, two-way professional conversation to understand your practical competencies, leadership, and operational decision-making in ${userDept}.\n\nTo kick off our conversation: could you walk me through your current scope of responsibilities as a ${userRole}, and tell me about a standout project or initiative where your direct contribution drove a significant outcome?`
 
     const firstMsg = {
       id: 'ai-0',
       sender: 'ai',
       text: initialQ,
       time: nowTime(),
-      competency: 'Role Scope & Professional Background',
+      competency: 'Core Professional Scope & High-Impact Delivery',
       questionNumber: 1,
     }
 
@@ -174,7 +172,7 @@ export default function AIInterviewView({ profile = {}, competencyGaps = [], onS
     const overall = Math.round(finalScores.reduce((acc, s) => acc + s.score, 0) / finalScores.length)
     const passed = overall >= 75
 
-    const closingDialogue = `Thank you very much, ${candidateName}. That wraps up our interview today! I really enjoyed learning about your background and how you approach challenges in ${userDept}. Our panel has completed the evaluation, and your performance report has been synced to your Competency Passport and the Admin Portal.`
+    const closingDialogue = `Thank you very much, ${candidateName}. That concludes today's interview session. I have thoroughly enjoyed our discussion and learning about your practical leadership in ${userDept}. Our panel has completed your evaluation, and your performance dossier has been synchronized with the Admin Portal and your Competency Passport. Well done.`
 
     const closeMsg = {
       id: `ai-close-${Date.now()}`,
@@ -216,14 +214,13 @@ export default function AIInterviewView({ profile = {}, competencyGaps = [], onS
     }
   }
 
-  // ── Handle Candidate Response (Adaptive HR Logic) ───────────────────────────
+  // ── Handle Candidate Response (Adaptive Real-Life HR Logic) ─────────────────
   const handleSend = async (e) => {
     e?.preventDefault()
     const text = inputText.trim()
     if (!text || isAiThinking || isAiSpeaking) return
 
     if ('speechSynthesis' in window) window.speechSynthesis.cancel()
-    stopMouthAnimation()
     setIsAiSpeaking(false)
 
     const userMsg = { id: `u-${Date.now()}`, sender: 'user', text, time: nowTime() }
@@ -233,7 +230,7 @@ export default function AIInterviewView({ profile = {}, competencyGaps = [], onS
 
     // ── Off-topic Guard (Prompt candidate to answer the actual HR question) ────
     if (isOffTopicResponse(text)) {
-      const redirectText = `I appreciate you speaking up, ${candidateName}, but as an interviewer I need to hear about your actual professional experience. Please take a moment and answer the question with details about your work or projects. There's no rush!`
+      const redirectText = `I appreciate you speaking up, ${candidateName}, but as an executive interviewer I need to hear about your actual professional experience. Please take a moment and respond to the question with details about your work or projects. There is no rush!`
       const redirectMsg = {
         id: `ai-redirect-${Date.now()}`,
         sender: 'ai',
@@ -251,40 +248,47 @@ export default function AIInterviewView({ profile = {}, competencyGaps = [], onS
     const currentQNumber = questionCount
     const lastAiMsg = [...messages].reverse().find(m => m.sender === 'ai' && !m.isConclusion)
     const promptPayload = {
-      message: `You are Priya Sharma, an empathetic, highly professional Senior Talent Acquisition & Human Resources Lead at ${userDept}.
-You are currently interviewing ${candidateName}, who works as/targets the position of ${userRole}.
+      message: `You are Dr. V. Ramanathan, a distinguished Senior Executive HR Director and Chair of the Talent Assessment Panel.
+You are conducting a live executive competency interview with ${candidateName}, who works as/targets the position of ${userRole} in ${userDept}.
 
 PREVIOUS QUESTION YOU ASKED:
-"${lastAiMsg ? lastAiMsg.text : 'Tell me about yourself'}"
+"${lastAiMsg ? lastAiMsg.text : 'Walk me through your background'}"
 
-CANDIDATE'S ANSWER:
+CANDIDATE'S ACTUAL ANSWER:
 "${text}"
 
 TOTAL QUESTIONS ASKED SO FAR: ${currentQNumber}
 
-INSTRUCTIONS FOR YOUR RESPONSE:
-1. Act like a REAL HR interviewer. Acknowledge and react specifically to what the candidate just said in a warm, conversational, authentic tone.
-2. Evaluate their answer realistically between 45% and 96% based strictly on their actual depth, clarity, relevance, and problem-solving.
-   - Poor, superficial, or vague answers: 50% - 68%
-   - Solid, practical answers with some examples: 72% - 84%
-   - Exceptional, quantifiable answers with strong impact: 86% - 96%
-   NEVER default to 60%. Use an accurate score based on their input.
-3. ADAPTIVE NEXT QUESTION:
-   - Formulate the NEXT question based organically on what they just shared or probe deeper into their approach, technical decision-making, or conflict resolution.
-   - The interview is not strictly 4 questions. If they have answered at least 3 questions thoroughly, you can conclude by setting "shouldConclude": true. Otherwise set "shouldConclude": false and provide "nextQuestion".
+CRITICAL HR INTERVIEWER INSTRUCTIONS:
+1. ACT LIKE A REAL-LIFE EXECUTIVE HR DIRECTOR:
+   - Always begin your response by directly acknowledging and reflecting on what the candidate just told you with professional depth (e.g. "I appreciate you walking me through that cross-departmental friction...", "That is a sound analytical framework you chose for mitigating the data bottleneck...").
+   - Speak conversationally, with high-level professional gravitas, empathy, and active listening.
+2. ADAPTIVE REAL-LIFE HR FOLLOW-UP:
+   - Formulate your NEXT question directly building upon what they shared or probing their behavioral competency (STAR method: Situation, Task, Action, Result).
+   - If they gave an overview without mentioning pushback or conflict, probe: "How did you manage pushback from reluctant stakeholders or conflicting priorities?"
+   - If they discussed an achievement, probe: "What specific metric proved that was a success, and what would you do differently in hindsight?"
+   - If they discussed leadership, probe: "How do you navigate underperforming team members when project deadlines are tight?"
+   - Questions are not fixed to 4. Adapt organically to their practical experience.
+   - If they have answered at least 3-4 questions with depth and clarity, you can wrap up by setting "shouldConclude": true. Otherwise set "shouldConclude": false and provide "nextQuestion".
+3. REALISTIC INPUT-BASED SCORING:
+   - Evaluate strictly based on what they actually wrote:
+     * Brief/vague/generic: 52% - 66%
+     * Competent, practical with examples: 74% - 84%
+     * Exemplary, quantifiable, structured STAR response: 86% - 96%
+   - NEVER default to 60%.
 
 RETURN STRICT JSON ONLY:
 {
-  "hrFeedback": "Natural 1-2 sentence reaction to what they said",
+  "hrFeedback": "Natural 1-2 sentence executive HR reaction addressing what they said",
   "score": 84,
   "verdict": "Proficient",
-  "strength": "Clear demonstration of stakeholder consensus building",
-  "improvement": "Include specific quantitative metrics or KPI improvements",
+  "strength": "Specific practical strength demonstrated in their response",
+  "improvement": "Constructive executive coaching tip or area to elaborate",
   "nextQuestion": "The next adaptive question tailored to their answer",
-  "competency": "Adaptive Competency Area",
+  "competency": "Domain / Behavioral Competency Area",
   "shouldConclude": false
 }`,
-      context: { role: userRole, department: userDept, candidateName },
+      context: { role: userRole, department: userDept, candidateName, isInterview: true, mode: 'interview' },
     }
 
     try {
@@ -308,17 +312,17 @@ RETURN STRICT JSON ONLY:
 
       // Safe local evaluation fallback if API fails
       if (!evalResult || typeof evalResult.score !== 'number') {
-        const local = evaluateAnswerLocally(text, 'Practical Competency')
+        const local = evaluateAnswerLocally(text, 'Practical Execution')
         evalResult = {
-          hrFeedback: `Thank you for that response, ${candidateName}. That gives helpful context to your problem-solving style.`,
+          hrFeedback: `Thank you for detailing that, ${candidateName}. Your approach demonstrates commendable operational discipline.`,
           score: local.score,
           verdict: local.verdict,
           strength: local.strength,
           improvement: local.improvement,
           nextQuestion: currentQNumber < 3
-            ? `Building on what you mentioned, when unexpected obstacles or conflicting stakeholder priorities arise, what method do you use to renegotiate deadlines and maintain alignment?`
-            : `Looking toward the future, what specific skills or domain technologies are you looking to develop over the next year to expand your impact?`,
-          competency: currentQNumber < 3 ? 'Operational Problem Solving' : 'Professional Growth & Roadmap',
+            ? `When dealing with tight delivery timelines and competing stakeholder demands in ${userDept}, what systematic approach do you use to prioritize critical deliverables?`
+            : `Looking toward the next 2 to 3 years, what emerging methodologies or competencies are you prioritizing to elevate your strategic impact?`,
+          competency: currentQNumber < 3 ? 'Operational Prioritization & Risk' : 'Strategic Growth & Leadership',
           shouldConclude: currentQNumber >= 4,
         }
       }
@@ -369,7 +373,6 @@ RETURN STRICT JSON ONLY:
   // ── Retake session ─────────────────────────────────────────────────────────
   const handleRestart = () => {
     if ('speechSynthesis' in window) window.speechSynthesis.cancel()
-    stopMouthAnimation()
     setIsAiSpeaking(false)
     setMessages([])
     setQuestionCount(0)
@@ -388,7 +391,7 @@ RETURN STRICT JSON ONLY:
         <div className="topbar-left">
           <span className="live-badge">
             <span className="live-dot" />
-            LIVE HR SESSION
+            LIVE EXECUTIVE PANEL
           </span>
           <span className="topbar-title">AI Face-to-Face Competency Interview</span>
         </div>
@@ -402,7 +405,6 @@ RETURN STRICT JSON ONLY:
             onClick={() => {
               if (ttsEnabled && 'speechSynthesis' in window) {
                 window.speechSynthesis.cancel()
-                stopMouthAnimation()
                 setIsAiSpeaking(false)
               }
               setTtsEnabled(t => !t)
@@ -438,128 +440,35 @@ RETURN STRICT JSON ONLY:
       {/* MAIN BODY */}
       <div className="interview-body">
 
-        {/* LEFT: ENHANCED REALISTIC HR AVATAR */}
+        {/* LEFT: PHOTOREALISTIC EXECUTIVE HR AVATAR */}
         <div className="avatar-panel">
           <div className="avatar-scene">
             <div className={`ring ring-outer ${isAiSpeaking ? 'speaking' : ''}`} />
             <div className={`ring ring-inner ${isAiSpeaking ? 'speaking' : ''}`} />
 
             <div className={`avatar-container ${isAiSpeaking ? 'bob' : ''}`}>
-              <svg viewBox="0 0 200 230" className="avatar-svg" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                  {/* Skin Tone Gradient - Warm, Natural Professional */}
-                  <radialGradient id="hrSkin" cx="50%" cy="38%" r="62%">
-                    <stop offset="0%" stopColor="#ffdfc4" />
-                    <stop offset="70%" stopColor="#e8a87c" />
-                    <stop offset="100%" stopColor="#cf8a5c" />
-                  </radialGradient>
-
-                  {/* Sleek Professional Dark Hair */}
-                  <linearGradient id="hrHair" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#2c1d11" />
-                    <stop offset="50%" stopColor="#1a1109" />
-                    <stop offset="100%" stopColor="#0d0804" />
-                  </linearGradient>
-
-                  {/* Elegant Navy Blazer */}
-                  <linearGradient id="hrBlazer" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#1e293b" />
-                    <stop offset="100%" stopColor="#0f172a" />
-                  </linearGradient>
-
-                  {/* Silk Blouse */}
-                  <linearGradient id="hrBlouse" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stopColor="#f8fafc" />
-                    <stop offset="100%" stopColor="#e2e8f0" />
-                  </linearGradient>
-
-                  <filter id="softShadow">
-                    <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#00000040" />
-                  </filter>
-                </defs>
-
-                {/* Shoulders & Navy Executive Blazer */}
-                <path d="M 12 230 L 32 165 Q 65 174 100 170 Q 135 174 168 165 L 188 230 Z" fill="url(#hrBlazer)" />
-
-                {/* Silk Blouse & Neckline */}
-                <polygon points="100,170 70,165 85,215" fill="url(#hrBlouse)" />
-                <polygon points="100,170 130,165 115,215" fill="url(#hrBlouse)" />
-                
-                {/* Gold Executive Pendant */}
-                <circle cx="100" cy="192" r="3.5" fill="#f59e0b" />
-                <line x1="90" y1="172" x2="100" y2="192" stroke="#d97706" strokeWidth="1" />
-                <line x1="110" y1="172" x2="100" y2="192" stroke="#d97706" strokeWidth="1" />
-
-                {/* Neck */}
-                <rect x="85" y="140" width="30" height="28" fill="#cf8a5c" rx="6" />
-
-                {/* Hair Background */}
-                <ellipse cx="100" cy="95" rx="55" ry="62" fill="url(#hrHair)" />
-                <path d="M 44 95 Q 36 170 65 190 Q 75 160 52 110 Z" fill="url(#hrHair)" />
-                <path d="M 156 95 Q 164 170 135 190 Q 125 160 148 110 Z" fill="url(#hrHair)" />
-
-                {/* Face Shape */}
-                <ellipse cx="100" cy="105" rx="46" ry="54" fill="url(#hrSkin)" filter="url(#softShadow)" />
-
-                {/* Hair Front Part */}
-                <path d="M 54 85 Q 100 48 146 85 Q 125 58 100 56 Q 72 58 54 85 Z" fill="url(#hrHair)" />
-                <path d="M 54 85 Q 75 110 52 135 Q 48 100 54 85 Z" fill="url(#hrHair)" />
-
-                {/* Ears & Pearl Earrings */}
-                <ellipse cx="54" cy="110" rx="6" ry="9" fill="#cf8a5c" />
-                <ellipse cx="146" cy="110" rx="6" ry="9" fill="#cf8a5c" />
-                <circle cx="53" cy="114" r="2.8" fill="#ffffff" stroke="#cbd5e1" strokeWidth="0.5" />
-                <circle cx="147" cy="114" r="2.8" fill="#ffffff" stroke="#cbd5e1" strokeWidth="0.5" />
-
-                {/* Refined Eyebrows */}
-                <path d="M 72 87 Q 84 82 93 87" stroke="#3e2723" strokeWidth="2.4" fill="none" strokeLinecap="round" />
-                <path d="M 107 87 Q 116 82 128 87" stroke="#3e2723" strokeWidth="2.4" fill="none" strokeLinecap="round" />
-
-                {/* Expressive Eyes */}
-                {eyeBlink ? (
-                  <>
-                    <line x1="73" y1="99" x2="91" y2="99" stroke="#2c1d11" strokeWidth="2.8" strokeLinecap="round" />
-                    <line x1="109" y1="99" x2="127" y2="99" stroke="#2c1d11" strokeWidth="2.8" strokeLinecap="round" />
-                  </>
-                ) : (
-                  <>
-                    <ellipse cx="82" cy="98" rx="8.5" ry="6" fill="#fff" />
-                    <circle cx="82" cy="98" r="4.5" fill="#4b382a" />
-                    <circle cx="82" cy="98" r="2.5" fill="#1c1917" />
-                    <circle cx="84" cy="96" r="1.5" fill="#fff" />
-                    <path d="M 73 95 Q 82 92 91 95" stroke="#2c1d11" strokeWidth="1.8" fill="none" />
-
-                    <ellipse cx="118" cy="98" rx="8.5" ry="6" fill="#fff" />
-                    <circle cx="118" cy="98" r="4.5" fill="#4b382a" />
-                    <circle cx="118" cy="98" r="2.5" fill="#1c1917" />
-                    <circle cx="120" cy="96" r="1.5" fill="#fff" />
-                    <path d="M 109 95 Q 118 92 127 95" stroke="#2c1d11" strokeWidth="1.8" fill="none" />
-                  </>
+              <div className={`avatar-photo-frame ${isAiSpeaking ? 'speaking' : ''}`}>
+                <div className="camera-feed-badge">
+                  <span className="camera-feed-dot" />
+                  LIVE HD
+                </div>
+                <img
+                  src="/avatar-interviewer.jpg"
+                  alt="Dr. V. Ramanathan - Senior Executive HR & Panel Chair"
+                  className="avatar-photo-img"
+                />
+                {isAiSpeaking && (
+                  <div className="avatar-audio-waves">
+                    {[1, 2, 3, 4, 5].map((w) => (
+                      <span
+                        key={w}
+                        className={`viz-bar bar-${w} active`}
+                        style={{ height: `${10 + (w % 3) * 6}px` }}
+                      />
+                    ))}
+                  </div>
                 )}
-
-                {/* Soft Cheeks */}
-                <ellipse cx="70" cy="115" rx="7" ry="4" fill="#fb7185" opacity="0.35" />
-                <ellipse cx="130" cy="115" rx="7" ry="4" fill="#fb7185" opacity="0.35" />
-
-                {/* Nose */}
-                <path d="M 100 102 L 98 116 Q 100 119 102 116 Z" fill="#b45309" opacity="0.4" />
-
-                {/* Natural Animated Mouth */}
-                {isAiSpeaking ? (
-                  mouthOpen ? (
-                    <g>
-                      <path d="M 86 134 Q 100 150 114 134 Q 100 144 86 134 Z" fill="#991b1b" />
-                      <rect x="91" y="134" width="18" height="4" rx="2" fill="#f8fafc" opacity="0.9" />
-                    </g>
-                  ) : (
-                    <path d="M 87 136 Q 100 143 113 136 Q 100 140 87 136 Z" fill="#be123c" />
-                  )
-                ) : isAiThinking ? (
-                  <path d="M 89 136 Q 100 138 111 136" stroke="#9f1239" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeDasharray="3 3" />
-                ) : (
-                  <path d="M 88 136 Q 100 144 112 136" stroke="#be123c" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-                )}
-              </svg>
+              </div>
             </div>
 
             {/* Audio Bars */}
@@ -571,8 +480,8 @@ RETURN STRICT JSON ONLY:
           </div>
 
           <div className="examiner-info">
-            <div className="examiner-name">Priya Sharma</div>
-            <div className="examiner-role">Senior HR & Talent Acquisition Lead</div>
+            <div className="examiner-name">Dr. V. Ramanathan</div>
+            <div className="examiner-role">Senior Executive HR Director &amp; Panel Chair</div>
             <div className={`status-pill ${isAiSpeaking ? 'speaking' : isAiThinking ? 'thinking' : 'listening'}`}>
               {isAiSpeaking ? '🎙️ Speaking...' : isAiThinking ? '⏳ Reviewing your answer...' : '👂 Listening intently'}
             </div>
@@ -594,14 +503,14 @@ RETURN STRICT JSON ONLY:
         <div className="chat-panel">
           {!interviewStarted ? (
             <div className="welcome-screen">
-              <div className="welcome-icon">👩‍💼</div>
+              <div className="welcome-icon">🏛️</div>
               <h2>Executive AI HR Interview</h2>
-              <p>Welcome, {candidateName}! You are about to enter a live, face-to-face conversational interview with <strong>Priya Sharma</strong>, your Senior Talent Partner.</p>
+              <p>Welcome, {candidateName}! You are about to enter a live, face-to-face conversational interview with <strong>Dr. V. Ramanathan</strong>, Chair of the Senior Executive HR &amp; Talent Assessment Panel.</p>
               <ul className="welcome-rules">
-                <li>🎙️ Priya speaks aloud with real-time conversational animation</li>
-                <li>⌨️ Type your real, detailed professional experience in the chat</li>
-                <li>🎯 <strong>Dynamic &amp; Adaptive:</strong> Questions are not fixed to 4 — Priya adapts each question to what you say</li>
-                <li>📊 Accurate scoring reflecting your depth and competency, recorded directly to the Admin Portal &amp; Competency Passport</li>
+                <li>🎙️ Dr. Ramanathan speaks aloud with clear, consistent vocal cadence</li>
+                <li>⌨️ Type your real, detailed professional experience in the response box</li>
+                <li>🎯 <strong>Dynamic &amp; Adaptive:</strong> Questions are not fixed to 4 — each follow-up is adapted to what you say</li>
+                <li>📊 Accurate scoring reflecting your actual depth, recorded directly to the Admin Portal &amp; Competency Passport</li>
               </ul>
               <button type="button" className="start-btn" onClick={startInterview}>
                 Start Face-to-Face Interview ➤
@@ -616,7 +525,7 @@ RETURN STRICT JSON ONLY:
                     <div className={`msg-bubble ${msg.sender === 'ai' ? 'ai-bubble' : 'user-bubble'}`}>
                       {msg.sender === 'ai' && (
                         <div className="msg-header">
-                          <span className="msg-sender">Priya Sharma (HR)</span>
+                          <span className="msg-sender">Dr. V. Ramanathan (HR Chair)</span>
                           {msg.questionNumber && <span className="q-badge">Q{msg.questionNumber}</span>}
                           {msg.competency && <span className="competency-tag">{msg.competency}</span>}
                           <span className="msg-time">{msg.time}</span>
@@ -650,7 +559,7 @@ RETURN STRICT JSON ONLY:
                   <div className="msg-row ai-row">
                     <div className="msg-avatar-badge">HR</div>
                     <div className="msg-bubble ai-bubble thinking-bubble">
-                      <span>Priya is analyzing your response and preparing the next question</span>
+                      <span>Dr. Ramanathan is analyzing your response and preparing the next question</span>
                       <div className="thinking-dots"><span /><span /><span /></div>
                     </div>
                   </div>
@@ -661,7 +570,7 @@ RETURN STRICT JSON ONLY:
               {!interviewComplete ? (
                 <form className="input-area" onSubmit={handleSend}>
                   <div className="input-hint">
-                    ⌨️ Type your response naturally — Priya will listen, evaluate, and adapt the next question to your answer
+                    ⌨️ Type your response naturally — Dr. Ramanathan will listen, evaluate, and adapt the next question to your answer
                   </div>
                   <div className="input-row">
                     <textarea
