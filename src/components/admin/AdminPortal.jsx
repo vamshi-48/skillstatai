@@ -138,6 +138,10 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
       return JSON.parse(localStorage.getItem('skillstat_interview_records') || '[]')
     } catch { return [] }
   })
+  const [selectedDossier, setSelectedDossier] = useState(null)
+  const [interviewSearch, setInterviewSearch] = useState('')
+  const [interviewVerdictFilter, setInterviewVerdictFilter] = useState('All')
+  const [interviewDeptFilter, setInterviewDeptFilter] = useState('All')
 
   // Search & Filter State
   const [searchTerm, setSearchTerm] = useState('')
@@ -540,6 +544,60 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
     return matchesSearch && matchesDept
   })
 
+  const handleExportInterviewCSV = () => {
+    if (!interviewRecords || interviewRecords.length === 0) return
+    const headers = ['Candidate Name', 'Email', 'Role', 'Department', 'Score', 'Verdict', 'Questions Evaluated', 'Tab Violations', 'Date']
+    const rows = interviewRecords.map(r => [
+      `"${r.candidateName || 'Candidate'}"`,
+      `"${r.candidateEmail || ''}"`,
+      `"${r.role || ''}"`,
+      `"${r.department || ''}"`,
+      `"${r.overallScore || 0}%"`,
+      `"${r.verdict || ''}"`,
+      `"${r.questionsCompleted || (r.scores?.length || 0)}"`,
+      `"${r.tabViolations || (r.disqualified ? 3 : 0)}"`,
+      `"${r.date || (r.timestamp ? new Date(r.timestamp).toLocaleDateString() : '')}"`,
+    ])
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n')
+    const encodedUri = encodeURI(csvContent)
+    const link = document.createElement('a')
+    link.setAttribute('href', encodedUri)
+    link.setAttribute('download', `skillstat-ai-interview-report-${new Date().toISOString().split('T')[0]}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const handleDeleteInterviewRecord = (id) => {
+    if (window.confirm('Delete this interview record from the panel?')) {
+      const updated = interviewRecords.filter(r => r.id !== id)
+      setInterviewRecords(updated)
+      localStorage.setItem('skillstat_interview_records', JSON.stringify(updated))
+    }
+  }
+
+  const filteredInterviewRecords = interviewRecords.filter((r) => {
+    const q = interviewSearch.toLowerCase()
+    const matchesSearch = !q ||
+      (r.candidateName && r.candidateName.toLowerCase().includes(q)) ||
+      (r.candidateEmail && r.candidateEmail.toLowerCase().includes(q)) ||
+      (r.role && r.role.toLowerCase().includes(q)) ||
+      (r.department && r.department.toLowerCase().includes(q))
+
+    const matchesDept = interviewDeptFilter === 'All' || r.department === interviewDeptFilter
+
+    let matchesVerdict = true
+    if (interviewVerdictFilter === 'Qualified') {
+      matchesVerdict = (r.overallScore || 0) >= passThreshold && !r.disqualified
+    } else if (interviewVerdictFilter === 'NeedsDevelopment') {
+      matchesVerdict = (r.overallScore || 0) < passThreshold && !r.disqualified
+    } else if (interviewVerdictFilter === 'Disqualified') {
+      matchesVerdict = Boolean(r.disqualified || (r.tabViolations && r.tabViolations >= 3))
+    }
+
+    return matchesSearch && matchesDept && matchesVerdict
+  })
+
   if (!isAllowedAdmin(adminUser?.email)) {
     return (
       <div className="admin-layout" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
@@ -642,6 +700,7 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
             {activeTab === 'reports' && 'Department Competency Reports & Exports'}
             {activeTab === 'notifications' && 'Broadcast Reminders & Announcements'}
             {activeTab === 'settings' && 'Admin Account & System Settings'}
+            {activeTab === 'interview-records' && 'AI Face-to-Face Viva-Voce Assessment Records'}
           </h1>
           <div className="admin-top-actions">
             <span style={{ fontSize: '13px', color: '#64748b' }}>Logged in as: <strong>{adminName}</strong></span>
@@ -1397,120 +1456,474 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
             </div>
           )}
           {activeTab === 'interview-records' && (
-            <div className="admin-content-section">
-              <div className="admin-section-header">
+            <div className="admin-content-section" style={{ width: '100%', boxSizing: 'border-box' }}>
+              <div className="admin-section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
                 <div>
-                  <h2 className="admin-section-title">🎙️ AI Competency Interview Records</h2>
-                  <p className="admin-section-desc">Live records of all candidates and employees who have taken the AI Face-to-Face Viva-Voce Interview assessment.</p>
+                  <h2 className="admin-section-title" style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span>🎙️</span> AI Face-to-Face Viva-Voce Assessment Records
+                  </h2>
+                  <p className="admin-section-desc" style={{ margin: 0, fontSize: '14px', color: '#64748b', maxWidth: '720px', lineHeight: 1.5 }}>
+                    Real-time audit log of all candidate interviews evaluated by Dr. V. Ramanathan. Review live dossiers, scores, STAR methodology feedback, and proctoring compliance.
+                  </p>
                 </div>
-                {interviewRecords.length > 0 && (
-                  <button
-                    type="button"
-                    className="admin-btn-secondary"
-                    style={{ color: '#dc2626', borderColor: '#fca5a5' }}
-                    onClick={() => {
-                      if (window.confirm('Are you sure you want to clear all recorded interview history?')) {
-                        localStorage.removeItem('skillstat_interview_records')
-                        setInterviewRecords([])
-                      }
-                    }}
-                  >
-                    Clear Records
-                  </button>
-                )}
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  {interviewRecords.length > 0 && (
+                    <button
+                      type="button"
+                      className="admin-btn-secondary"
+                      onClick={handleExportInterviewCSV}
+                      title="Download CSV audit log"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '8px',
+                        padding: '8px 14px',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        color: '#334155',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      📥 Export CSV Report
+                    </button>
+                  )}
+                  {interviewRecords.length > 0 && (
+                    <button
+                      type="button"
+                      className="admin-btn-secondary"
+                      style={{
+                        color: '#dc2626',
+                        borderColor: '#fca5a5',
+                        background: '#fff',
+                        borderRadius: '8px',
+                        padding: '8px 14px',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => {
+                        if (window.confirm('Are you sure you want to permanently clear all recorded interview history?')) {
+                          localStorage.removeItem('skillstat_interview_records')
+                          setInterviewRecords([])
+                        }
+                      }}
+                    >
+                      🗑️ Clear All Records
+                    </button>
+                  )}
+                </div>
               </div>
 
-              {/* Summary Stats */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-                <div className="stat-card" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
-                  <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Total Interviews Taken</div>
-                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#1e3a8a', marginTop: '6px' }}>{interviewRecords.length}</div>
+              {/* 4 Summary Stat Cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '28px' }}>
+                <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '18px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
+                  <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Interviews Taken</div>
+                  <div style={{ fontSize: '30px', fontWeight: 800, color: '#1e3a8a', marginTop: '6px' }}>{interviewRecords.length}</div>
+                  <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>Recorded viva-voce assessments</div>
                 </div>
-                <div className="stat-card" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
-                  <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Avg Performance Score</div>
-                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#15803d', marginTop: '6px' }}>
+
+                <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '18px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
+                  <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Avg Candidate Score</div>
+                  <div style={{ fontSize: '30px', fontWeight: 800, color: '#15803d', marginTop: '6px' }}>
                     {interviewRecords.length > 0
                       ? Math.round(interviewRecords.reduce((acc, r) => acc + (r.overallScore || 0), 0) / interviewRecords.length) + '%'
                       : 'N/A'}
                   </div>
+                  <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>Benchmark standard: {passThreshold}%</div>
                 </div>
-                <div className="stat-card" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
-                  <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Benchmark Qualified</div>
-                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#7c3aed', marginTop: '6px' }}>
-                    {interviewRecords.filter(r => (r.overallScore || 0) >= passThreshold).length} Candidates
+
+                <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '18px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
+                  <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Benchmark Qualified</div>
+                  <div style={{ fontSize: '30px', fontWeight: 800, color: '#7c3aed', marginTop: '6px' }}>
+                    {interviewRecords.filter(r => (r.overallScore || 0) >= passThreshold).length}
                   </div>
+                  <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
+                    {interviewRecords.length > 0
+                      ? Math.round((interviewRecords.filter(r => (r.overallScore || 0) >= passThreshold).length / interviewRecords.length) * 100) + '% qualification rate'
+                      : '0% qualification rate'}
+                  </div>
+                </div>
+
+                <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '18px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
+                  <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Integrity Disqualifications</div>
+                  <div style={{ fontSize: '30px', fontWeight: 800, color: '#dc2626', marginTop: '6px' }}>
+                    {interviewRecords.filter(r => r.disqualified || (r.tabViolations && r.tabViolations >= 3)).length}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>Flagged for excessive tab switching</div>
                 </div>
               </div>
 
-              {/* Records Table */}
-              {interviewRecords.length === 0 ? (
-                <div style={{ padding: '48px 24px', textAlign: 'center', background: '#fff', border: '1px dashed #cbd5e1', borderRadius: '12px', color: '#64748b' }}>
-                  <span style={{ fontSize: '40px', display: 'block', marginBottom: '12px' }}>🎙️</span>
-                  <h3 style={{ margin: '0 0 6px', color: '#1e293b' }}>No Interview Sessions Recorded Yet</h3>
-                  <p style={{ margin: 0, fontSize: '14px' }}>When candidates take the AI Interview in the Learner Portal, their real-time dossiers, evaluation metrics, and AI HR remarks will automatically appear here.</p>
+              {/* Search & Filter Toolbar */}
+              <div style={{
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '12px',
+                padding: '16px 20px',
+                marginBottom: '20px',
+                display: 'flex',
+                gap: '14px',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}>
+                <div style={{ display: 'flex', gap: '12px', flex: '1 1 320px', flexWrap: 'wrap' }}>
+                  <div style={{ position: 'relative', flex: '1 1 240px' }}>
+                    <input
+                      type="text"
+                      placeholder="Search by candidate name, role, email..."
+                      value={interviewSearch}
+                      onChange={(e) => setInterviewSearch(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+
+                  <select
+                    value={interviewVerdictFilter}
+                    onChange={(e) => setInterviewVerdictFilter(e.target.value)}
+                    style={{
+                      padding: '10px 14px',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      background: '#fff',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <option value="All">All Verdicts</option>
+                    <option value="Qualified">Qualified (&gt;= {passThreshold}%)</option>
+                    <option value="NeedsDevelopment">Needs Development (&lt; {passThreshold}%)</option>
+                    <option value="Disqualified">Disqualified (Integrity Violation)</option>
+                  </select>
+
+                  <select
+                    value={interviewDeptFilter}
+                    onChange={(e) => setInterviewDeptFilter(e.target.value)}
+                    style={{
+                      padding: '10px 14px',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      background: '#fff',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <option value="All">All Departments</option>
+                    {Array.from(new Set(interviewRecords.map(r => r.department).filter(Boolean))).map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ fontSize: '13px', color: '#64748b' }}>
+                  Showing <strong>{filteredInterviewRecords.length}</strong> of <strong>{interviewRecords.length}</strong> sessions
+                </div>
+              </div>
+
+              {/* Records List / Table */}
+              {filteredInterviewRecords.length === 0 ? (
+                <div style={{ padding: '60px 24px', textAlign: 'center', background: '#ffffff', border: '1px dashed #cbd5e1', borderRadius: '12px', color: '#64748b' }}>
+                  <span style={{ fontSize: '44px', display: 'block', marginBottom: '12px' }}>🎙️</span>
+                  <h3 style={{ margin: '0 0 6px', color: '#1e293b', fontSize: '18px' }}>
+                    {interviewRecords.length === 0 ? 'No Interview Sessions Recorded Yet' : 'No Records Match Your Filter'}
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '14px', maxWidth: '500px', marginInline: 'auto', lineHeight: 1.5 }}>
+                    {interviewRecords.length === 0
+                      ? 'When officers complete their face-to-face AI interview in the Learner Portal, their real-time performance dossiers and HR panel scores will automatically stream into this audit console.'
+                      : 'Try adjusting your search criteria or resetting filters to see available interview sessions.'}
+                  </p>
                 </div>
               ) : (
-                <div className="admin-table-card" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
-                  <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                        <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', color: '#475569' }}>Candidate / Officer</th>
-                        <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', color: '#475569' }}>Target Role & Dept</th>
-                        <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', color: '#475569' }}>Overall Score</th>
-                        <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', color: '#475569' }}>Questions</th>
-                        <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', color: '#475569' }}>HR Panel Verdict</th>
-                        <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', color: '#475569' }}>Date Taken</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {interviewRecords.map((rec) => (
-                        <tr key={rec.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          <td style={{ padding: '14px 16px' }}>
-                            <div style={{ fontWeight: 700, color: '#1e293b' }}>{rec.candidateName || 'Candidate'}</div>
-                            <div style={{ fontSize: '11.5px', color: '#64748b' }}>{rec.candidateEmail || 'Logged-in User'}</div>
-                          </td>
-                          <td style={{ padding: '14px 16px' }}>
-                            <div style={{ fontWeight: 600, color: '#334155' }}>{rec.role || 'Officer'}</div>
-                            <div style={{ fontSize: '11.5px', color: '#64748b' }}>{rec.department || 'General'}</div>
-                          </td>
-                          <td style={{ padding: '14px 16px' }}>
-                            <span style={{
-                              fontWeight: 800,
-                              fontSize: '15px',
-                              color: (rec.overallScore || 0) >= passThreshold ? '#15803d' : '#b91c1c'
-                            }}>
-                              {rec.overallScore}%
-                            </span>
-                          </td>
-                          <td style={{ padding: '14px 16px', fontSize: '13px', color: '#475569' }}>
-                            {rec.questionsCompleted || (rec.scores?.length || 0)} Questions
-                          </td>
-                          <td style={{ padding: '14px 16px' }}>
-                            <span style={{
-                              display: 'inline-block',
-                              padding: '4px 10px',
-                              borderRadius: '20px',
-                              fontSize: '12px',
-                              fontWeight: 600,
-                              background: (rec.overallScore || 0) >= passThreshold ? '#dcfce7' : '#fee2e2',
-                              color: (rec.overallScore || 0) >= passThreshold ? '#15803d' : '#b91c1c'
-                            }}>
-                              {rec.verdict || ((rec.overallScore || 0) >= passThreshold ? 'Qualified' : 'Development Required')}
-                            </span>
-                          </td>
-                          <td style={{ padding: '14px 16px', fontSize: '12.5px', color: '#64748b' }}>
-                            {rec.date || (rec.timestamp ? new Date(rec.timestamp).toLocaleDateString() : 'Recent')}
-                          </td>
+                <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '780px' }}>
+                      <thead>
+                        <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                          <th style={{ padding: '14px 18px', fontSize: '12px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Candidate / Officer</th>
+                          <th style={{ padding: '14px 18px', fontSize: '12px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Target Role &amp; Dept</th>
+                          <th style={{ padding: '14px 18px', fontSize: '12px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Score</th>
+                          <th style={{ padding: '14px 18px', fontSize: '12px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>HR Panel Verdict</th>
+                          <th style={{ padding: '14px 18px', fontSize: '12px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Proctoring Audit</th>
+                          <th style={{ padding: '14px 18px', fontSize: '12px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Date</th>
+                          <th style={{ padding: '14px 18px', fontSize: '12px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', textAlign: 'right' }}>Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {filteredInterviewRecords.map((rec, idx) => {
+                          const isDisqualified = Boolean(rec.disqualified || (rec.tabViolations && rec.tabViolations >= 3))
+                          const score = rec.overallScore || 0
+                          const isPass = score >= passThreshold && !isDisqualified
+
+                          return (
+                            <tr key={rec.id || idx} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.15s ease' }}>
+                              <td style={{ padding: '16px 18px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                  <div style={{
+                                    width: '38px',
+                                    height: '38px',
+                                    borderRadius: '50%',
+                                    background: isDisqualified ? '#fee2e2' : isPass ? '#dcfce7' : '#fef3c7',
+                                    color: isDisqualified ? '#dc2626' : isPass ? '#15803d' : '#b45309',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontWeight: 800,
+                                    fontSize: '14px',
+                                    flexShrink: 0
+                                  }}>
+                                    {(rec.candidateName || 'C').charAt(0).toUpperCase()}
+                                  </div>
+                                  <div>
+                                    <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '14px' }}>{rec.candidateName || 'Candidate'}</div>
+                                    <div style={{ fontSize: '12px', color: '#64748b' }}>{rec.candidateEmail || 'Official Registered Profile'}</div>
+                                  </div>
+                                </div>
+                              </td>
+
+                              <td style={{ padding: '16px 18px' }}>
+                                <div style={{ fontWeight: 600, color: '#334155', fontSize: '13px' }}>{rec.role || 'Statistical Officer'}</div>
+                                <div style={{ fontSize: '12px', color: '#64748b' }}>{rec.department || 'National Statistical Office'}</div>
+                              </td>
+
+                              <td style={{ padding: '16px 18px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{
+                                    fontSize: '17px',
+                                    fontWeight: 800,
+                                    color: isDisqualified ? '#dc2626' : isPass ? '#15803d' : '#b45309'
+                                  }}>
+                                    {score}%
+                                  </span>
+                                  <span style={{ fontSize: '11px', color: '#94a3b8' }}>({rec.questionsCompleted || rec.scores?.length || 0} Qs)</span>
+                                </div>
+                              </td>
+
+                              <td style={{ padding: '16px 18px' }}>
+                                <span style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  padding: '5px 12px',
+                                  borderRadius: '20px',
+                                  fontSize: '12px',
+                                  fontWeight: 700,
+                                  background: isDisqualified ? '#fee2e2' : isPass ? '#dcfce7' : '#fef3c7',
+                                  color: isDisqualified ? '#991b1b' : isPass ? '#166534' : '#92400e',
+                                  border: `1px solid ${isDisqualified ? '#fca5a5' : isPass ? '#86efac' : '#fde68a'}`
+                                }}>
+                                  <span>{isDisqualified ? '⚠️' : isPass ? '✓' : '▲'}</span>
+                                  <span>{rec.verdict || (isPass ? 'Qualified' : 'Development Recommended')}</span>
+                                </span>
+                              </td>
+
+                              <td style={{ padding: '16px 18px' }}>
+                                {isDisqualified ? (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#dc2626', fontSize: '12px', fontWeight: 700 }}>
+                                    <span>⚠️</span> 3 Tab Violations (Disqualified)
+                                  </span>
+                                ) : rec.tabViolations > 0 ? (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#b45309', fontSize: '12px', fontWeight: 600 }}>
+                                    <span>⚠️</span> {rec.tabViolations} Tab Switch{rec.tabViolations > 1 ? 'es' : ''} Flagged
+                                  </span>
+                                ) : (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#16a34a', fontSize: '12px', fontWeight: 600 }}>
+                                    <span>🛡️</span> Clean Compliance
+                                  </span>
+                                )}
+                              </td>
+
+                              <td style={{ padding: '16px 18px', fontSize: '12.5px', color: '#64748b' }}>
+                                {rec.date || (rec.timestamp ? new Date(rec.timestamp).toLocaleDateString() : 'Recent')}
+                              </td>
+
+                              <td style={{ padding: '16px 18px', textAlign: 'right' }}>
+                                <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedDossier(rec)}
+                                    title="View Full Evaluation Dossier"
+                                    style={{
+                                      background: '#eff6ff',
+                                      border: '1px solid #bfdbfe',
+                                      color: '#1d4ed8',
+                                      borderRadius: '6px',
+                                      padding: '6px 12px',
+                                      fontSize: '12px',
+                                      fontWeight: 600,
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    👁️ Dossier
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteInterviewRecord(rec.id)}
+                                    title="Delete record"
+                                    style={{
+                                      background: '#fff',
+                                      border: '1px solid #fecaca',
+                                      color: '#dc2626',
+                                      borderRadius: '6px',
+                                      padding: '6px 10px',
+                                      fontSize: '12px',
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    🗑️
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>
           )}
         </div>
       </main>
+
+      {/* MODAL: Full AI Interview Dossier Inspection */}
+      {selectedDossier && (
+        <div className="admin-modal-backdrop" onClick={() => setSelectedDossier(null)}>
+          <div className="admin-modal-dialog-large" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '840px', maxHeight: '90vh' }}>
+            <div className="metric-modal-header" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%)', color: '#fff', padding: '18px 24px' }}>
+              <div>
+                <span style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '1px', textTransform: 'uppercase', color: '#93c5fd' }}>
+                  Official Assessment Audit
+                </span>
+                <h3 style={{ margin: '4px 0 0 0', fontSize: '18px', color: '#fff' }}>
+                  AI Viva-Voce Dossier — {selectedDossier.candidateName}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedDossier(null)}
+                style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', fontSize: '20px', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="metric-modal-body" style={{ padding: '24px', overflowY: 'auto' }}>
+              {selectedDossier.disqualified && (
+                <div style={{
+                  background: '#fef2f2',
+                  border: '1px solid #f87171',
+                  borderRadius: '10px',
+                  padding: '12px 16px',
+                  marginBottom: '20px',
+                  color: '#991b1b',
+                  fontSize: '13px',
+                }}>
+                  ⚠️ <strong>Integrity Disqualification Notice:</strong> {selectedDossier.disqualificationReason || 'Candidate committed multiple tab-switching violations.'}
+                </div>
+              )}
+
+              {/* Top Overview Cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '14px', marginBottom: '24px' }}>
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 16px' }}>
+                  <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>OVERALL SCORE</div>
+                  <div style={{ fontSize: '24px', fontWeight: 800, color: selectedDossier.disqualified ? '#dc2626' : (selectedDossier.overallScore || 0) >= passThreshold ? '#15803d' : '#b45309', marginTop: '4px' }}>
+                    {selectedDossier.overallScore}%
+                  </div>
+                </div>
+
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 16px' }}>
+                  <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>PANEL VERDICT</div>
+                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#1e293b', marginTop: '8px' }}>
+                    {selectedDossier.verdict || 'Assessed'}
+                  </div>
+                </div>
+
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 16px' }}>
+                  <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>OFFICER ROLE</div>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#1e293b', marginTop: '8px' }}>
+                    {selectedDossier.role || 'Statistical Officer'}
+                  </div>
+                </div>
+
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 16px' }}>
+                  <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700 }}>DEPARTMENT</div>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#1e293b', marginTop: '8px' }}>
+                    {selectedDossier.department || 'Official Statistics'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Question Breakdown */}
+              <h4 style={{ margin: '0 0 14px 0', fontSize: '15px', color: '#0f172a', fontWeight: 700 }}>
+                Adaptive Viva-Voce Question Evaluation Breakdown:
+              </h4>
+
+              {Array.isArray(selectedDossier.scores) && selectedDossier.scores.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {selectedDossier.scores.map((s, qIdx) => (
+                    <div key={s.q || qIdx} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontWeight: 700, fontSize: '13px', color: '#1e3a8a' }}>
+                          Question {s.q || qIdx + 1}: {s.competency || 'Domain Competency'}
+                        </span>
+                        <span style={{
+                          fontWeight: 800,
+                          fontSize: '14px',
+                          color: (s.score || 0) >= 80 ? '#15803d' : (s.score || 0) >= 65 ? '#b45309' : '#dc2626'
+                        }}>
+                          {s.score}%
+                        </span>
+                      </div>
+                      <div style={{ height: '6px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden', marginBottom: '10px' }}>
+                        <div style={{
+                          width: `${s.score || 0}%`,
+                          height: '100%',
+                          background: (s.score || 0) >= 80 ? '#16a34a' : (s.score || 0) >= 65 ? '#f59e0b' : '#dc2626'
+                        }} />
+                      </div>
+                      {s.strength && (
+                        <div style={{ fontSize: '12.5px', color: '#166534', marginBottom: '4px' }}>
+                          ✔ <strong>Strength:</strong> {s.strength}
+                        </div>
+                      )}
+                      {s.improvement && (
+                        <div style={{ fontSize: '12.5px', color: '#9a3412' }}>
+                          ▲ <strong>Coaching Opportunity:</strong> {s.improvement}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '8px', color: '#64748b', fontSize: '13px' }}>
+                  No per-question score breakdown recorded for this session.
+                </div>
+              )}
+
+              <div style={{ marginTop: '24px', textAlign: 'right' }}>
+                <button
+                  type="button"
+                  className="admin-btn-primary"
+                  onClick={() => setSelectedDossier(null)}
+                  style={{ padding: '8px 20px', borderRadius: '8px', cursor: 'pointer' }}
+                >
+                  Close Dossier
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL: Add / Edit Employee */}
       {modalType === 'addEmployee' && (
@@ -2078,95 +2491,7 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
         </div>
       )}
 
-        {/* ── 11. AI Interview Records ───────────────────────────────────── */}
-        {activeTab === 'interview-records' && (
-          <div className="admin-panel">
-            <div className="admin-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-              <h2>🎙️ AI Interview Records</h2>
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                <span style={{ fontSize: '13px', color: '#64748b' }}>{interviewRecords.length} session{interviewRecords.length !== 1 ? 's' : ''} recorded</span>
-                {interviewRecords.length > 0 && (
-                  <button
-                    type="button"
-                    className="secondary-btn"
-                    style={{ fontSize: '12px', padding: '5px 14px' }}
-                    onClick={() => {
-                      if (window.confirm('Clear all interview records from the admin panel?')) {
-                        localStorage.removeItem('skillstat_interview_records')
-                        setInterviewRecords([])
-                      }
-                    }}
-                  >
-                    Clear All Records
-                  </button>
-                )}
-              </div>
-            </div>
-            <p style={{ color: '#64748b', marginBottom: '20px', fontSize: '14px' }}>
-              All completed AI-assisted viva-voce interview sessions are recorded here in real time. Each record includes candidate details, overall score, verdict, and per-question breakdown.
-            </p>
 
-            {interviewRecords.length === 0 ? (
-              <div style={{ padding: '60px', textAlign: 'center', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: '48px', marginBottom: '14px' }}>🎙️</div>
-                <h3 style={{ margin: '0 0 8px', color: '#1e293b' }}>No Interview Records Yet</h3>
-                <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>Interview records will appear here once employees complete the AI Interview session from their dashboard.</p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {interviewRecords.map((record, rIdx) => (
-                  <div key={record?.id || rIdx} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
-                    {/* Record Header */}
-                    <div style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%)', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: '15px', color: '#f8fafc' }}>{record?.candidateName || 'Official Candidate'}</div>
-                        <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>{record?.role || 'Statistical Officer'} &bull; {record?.department || 'Official Statistics'}</div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ textAlign: 'center' }}>
-                          <div style={{ fontSize: '24px', fontWeight: 800, color: (record?.overallScore ?? 0) >= 75 ? '#86efac' : '#fca5a5' }}>{record?.overallScore ?? 0}%</div>
-                          <div style={{ fontSize: '11px', color: '#94a3b8' }}>Overall Score</div>
-                        </div>
-                        <span style={{
-                          background: (record?.overallScore ?? 0) >= 75 ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
-                          border: `1px solid ${(record?.overallScore ?? 0) >= 75 ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.4)'}`,
-                          color: (record?.overallScore ?? 0) >= 75 ? '#86efac' : '#fca5a5',
-                          fontSize: '12px', fontWeight: 700, padding: '4px 12px', borderRadius: '20px'
-                        }}>
-                          {record?.verdict || 'Assessed'}
-                        </span>
-                        <div style={{ fontSize: '12px', color: '#cbd5e1' }}>{record?.date || 'Today'}</div>
-                      </div>
-                    </div>
-
-                    {/* Per-question scores */}
-                    {Array.isArray(record?.scores) && record.scores.length > 0 && (
-                      <div style={{ padding: '14px 20px', display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                        {record.scores.map((s, sIdx) => (
-                          <div key={s?.q || sIdx} style={{
-                            flex: '1 1 180px',
-                            background: '#f8fafc',
-                            border: '1px solid #e2e8f0',
-                            borderRadius: '8px',
-                            padding: '10px 14px',
-                          }}>
-                            <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', marginBottom: '4px' }}>Q{s?.q || sIdx + 1}: {s?.competency || 'Competency'}</div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <div style={{ flex: 1, height: '6px', background: '#e2e8f0', borderRadius: '4px' }}>
-                                <div style={{ width: `${s?.score || 0}%`, height: '100%', background: (s?.score || 0) >= 80 ? '#16a34a' : (s?.score || 0) >= 65 ? '#f59e0b' : '#dc2626', borderRadius: '4px' }} />
-                              </div>
-                              <span style={{ fontSize: '13px', fontWeight: 700, color: (s?.score || 0) >= 80 ? '#15803d' : '#92400e' }}>{s?.score || 0}%</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
 
     </div>
   )
