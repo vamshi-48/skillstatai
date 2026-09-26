@@ -2114,48 +2114,48 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {interviewRecords.map((record) => (
-                  <div key={record.id} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
+                {interviewRecords.map((record, rIdx) => (
+                  <div key={record?.id || rIdx} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
                     {/* Record Header */}
                     <div style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%)', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: '15px', color: '#f8fafc' }}>{record.candidateName}</div>
-                        <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>{record.role} &bull; {record.department}</div>
+                        <div style={{ fontWeight: 700, fontSize: '15px', color: '#f8fafc' }}>{record?.candidateName || 'Official Candidate'}</div>
+                        <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>{record?.role || 'Statistical Officer'} &bull; {record?.department || 'Official Statistics'}</div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{ textAlign: 'center' }}>
-                          <div style={{ fontSize: '24px', fontWeight: 800, color: record.overallScore >= 75 ? '#86efac' : '#fca5a5' }}>{record.overallScore}%</div>
+                          <div style={{ fontSize: '24px', fontWeight: 800, color: (record?.overallScore ?? 0) >= 75 ? '#86efac' : '#fca5a5' }}>{record?.overallScore ?? 0}%</div>
                           <div style={{ fontSize: '11px', color: '#94a3b8' }}>Overall Score</div>
                         </div>
                         <span style={{
-                          background: record.overallScore >= 75 ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
-                          border: `1px solid ${record.overallScore >= 75 ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.4)'}`,
-                          color: record.overallScore >= 75 ? '#86efac' : '#fca5a5',
+                          background: (record?.overallScore ?? 0) >= 75 ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
+                          border: `1px solid ${(record?.overallScore ?? 0) >= 75 ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.4)'}`,
+                          color: (record?.overallScore ?? 0) >= 75 ? '#86efac' : '#fca5a5',
                           fontSize: '12px', fontWeight: 700, padding: '4px 12px', borderRadius: '20px'
                         }}>
-                          {record.verdict}
+                          {record?.verdict || 'Assessed'}
                         </span>
-                        <div style={{ fontSize: '12px', color: '#64748b' }}>{record.date}</div>
+                        <div style={{ fontSize: '12px', color: '#cbd5e1' }}>{record?.date || 'Today'}</div>
                       </div>
                     </div>
 
                     {/* Per-question scores */}
-                    {Array.isArray(record.scores) && record.scores.length > 0 && (
+                    {Array.isArray(record?.scores) && record.scores.length > 0 && (
                       <div style={{ padding: '14px 20px', display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                        {record.scores.map(s => (
-                          <div key={s.q} style={{
+                        {record.scores.map((s, sIdx) => (
+                          <div key={s?.q || sIdx} style={{
                             flex: '1 1 180px',
                             background: '#f8fafc',
                             border: '1px solid #e2e8f0',
                             borderRadius: '8px',
                             padding: '10px 14px',
                           }}>
-                            <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', marginBottom: '4px' }}>Q{s.q}: {s.competency}</div>
+                            <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', marginBottom: '4px' }}>Q{s?.q || sIdx + 1}: {s?.competency || 'Competency'}</div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <div style={{ flex: 1, height: '6px', background: '#e2e8f0', borderRadius: '4px' }}>
-                                <div style={{ width: `${s.score}%`, height: '100%', background: s.score >= 80 ? '#16a34a' : s.score >= 65 ? '#f59e0b' : '#dc2626', borderRadius: '4px' }} />
+                                <div style={{ width: `${s?.score || 0}%`, height: '100%', background: (s?.score || 0) >= 80 ? '#16a34a' : (s?.score || 0) >= 65 ? '#f59e0b' : '#dc2626', borderRadius: '4px' }} />
                               </div>
-                              <span style={{ fontSize: '13px', fontWeight: 700, color: s.score >= 80 ? '#15803d' : '#92400e' }}>{s.score}%</span>
+                              <span style={{ fontSize: '13px', fontWeight: 700, color: (s?.score || 0) >= 80 ? '#15803d' : '#92400e' }}>{s?.score || 0}%</span>
                             </div>
                           </div>
                         ))}
