@@ -177,8 +177,8 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
     }
   }
 
-  // Fetch real users from backend
-  useEffect(() => {
+  // Fetch real users from backend & keep Admin Portal live
+  const loadAdminUsers = () => {
     const token = localStorage.getItem('skillstat_session')
     if (!token) return
 
@@ -192,21 +192,83 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
         return res.json()
       })
       .then(data => {
-        if (data && data.users) {
-          const mappedUsers = data.users.map((u, i) => ({
-            id: u.id,
-            name: u.profile?.name || u.email.split('@')[0],
-            role: u.profile?.role || 'Learner',
-            department: 'General',
-            email: u.email,
-            status: 'Active',
-            progress: u.overallScore || 0,
-            lastActive: 'Recently'
-          }))
+        if (data && Array.isArray(data.users)) {
+          const mappedUsers = data.users.map((u, i) => {
+            const rawScore = Number(u.overallScore) || 0
+            const dept = u.profile?.department || 'National Statistical Office (NSO)'
+            const empId = u.employeeId || u.profile?.employeeId || `GOV-${String(u.id || i).slice(0, 6).toUpperCase()}`
+            const designation = u.profile?.designation || u.profile?.role || 'Statistical Officer'
+            const role = u.profile?.role || u.profile?.designation || 'Statistical Officer'
+            
+            return {
+              id: u.id,
+              name: u.profile?.name || u.email.split('@')[0],
+              email: u.email,
+              employeeId: empId,
+              department: dept,
+              designation: designation,
+              role: role,
+              status: 'Active',
+              coursesCompleted: Number(u.quizzesCompleted) || (rawScore > 0 ? 1 : 0),
+              coursesInProgress: 1,
+              avgAssessmentScore: rawScore,
+              progress: rawScore,
+              lastActive: u.updatedAt ? new Date(u.updatedAt).toLocaleDateString() : 'Recently',
+              joinedDate: u.updatedAt ? new Date(u.updatedAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+              criticalGaps: Array.isArray(u.competencyGaps) && u.competencyGaps.length > 0 
+                ? u.competencyGaps.map(g => g.skill || g.name)
+                : ['Official Statistics & Protocols']
+            }
+          })
+
           setEmployees(mappedUsers)
+
+          // Dynamically synchronize Department staffing breakdown based on live employees
+          setDepartments(prevDepts => {
+            const userDepts = Array.from(new Set(mappedUsers.map(u => u.department).filter(Boolean)))
+            let updated = prevDepts.map(d => {
+              const count = mappedUsers.filter(u => u.department.toLowerCase() === d.name.toLowerCase()).length
+              return { ...d, employeeCount: count }
+            })
+
+            // If an employee belongs to a department not yet listed, create it
+            userDepts.forEach(dName => {
+              if (!updated.some(d => d.name.toLowerCase() === dName.toLowerCase())) {
+                const count = mappedUsers.filter(u => u.department.toLowerCase() === dName.toLowerCase()).length
+                updated.push({
+                  id: `dept-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                  name: dName,
+                  head: 'Nodal Officer',
+                  code: dName.slice(0, 4).toUpperCase(),
+                  description: 'Government Directorate / Division',
+                  employeeCount: count
+                })
+              }
+            })
+
+            return updated
+          })
         }
       })
       .catch(err => console.error('[Admin] Failed to load real users:', err))
+  }
+
+  useEffect(() => {
+    loadAdminUsers()
+
+    // Listen to real-time events when another user registers, logs in, or submits scores
+    const handleLiveSync = (e) => {
+      if (e?.detail?.type === 'employees' || e?.detail?.type === 'departments') {
+        return
+      }
+      loadAdminUsers()
+    }
+    window.addEventListener('skillstat_admin_update', handleLiveSync)
+    window.addEventListener('storage', handleLiveSync)
+    return () => {
+      window.removeEventListener('skillstat_admin_update', handleLiveSync)
+      window.removeEventListener('storage', handleLiveSync)
+    }
   }, [])
 
   // Reactive Sync to localStorage & Cross-Tab / Cross-Component Event Bus

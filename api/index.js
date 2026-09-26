@@ -585,8 +585,30 @@ export default async function handler(request, response) {
         return
       }
       
-      const allowedAdmins = (process.env.VITE_ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase())
-      if (!allowedAdmins.includes(user.email.toLowerCase())) {
+      const hardcodedAdmins = [
+        'karshikalamvamshi48@gmail.com',
+        'karshikalamvamshi34@gmail.com',
+        'sathvika846@gmail.com',
+        'vivekchaitanyasambu@gmail.com',
+        'harinchedam@gmail.com',
+        'vundhyalaakshaya@gmail.com',
+        'varshithgotur30@gmail.com',
+        'admin@mospi.gov.in',
+      ]
+      const envAdmins = (process.env.VITE_ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
+      const allowedAdmins = Array.from(new Set([...hardcodedAdmins, ...envAdmins]))
+      const cleanUserEmail = (user.email || '').trim().toLowerCase()
+      
+      const matchesEntry = (target, input) => {
+        if (!target || !input) return false
+        if (target === input) return true
+        if (!target.includes('@') && (input === `${target}@gmail.com` || input.startsWith(`${target}@`))) return true
+        if (!input.includes('@') && (target === `${input}@gmail.com` || target.startsWith(`${input}@`))) return true
+        return false
+      }
+
+      const isPermitted = allowedAdmins.some((allowed) => matchesEntry(allowed, cleanUserEmail))
+      if (!isPermitted) {
         sendJson(response, 403, { error: 'Forbidden. Admin access required.' })
         return
       }
@@ -596,8 +618,12 @@ export default async function handler(request, response) {
         users: allUsers.map(u => ({
           id: u.id,
           email: u.email,
+          employeeId: u.employeeId || u.employee_id || u.state?.profile?.employeeId || '',
           profile: u.state?.profile || {},
-          overallScore: u.state?.overallScore || 0,
+          overallScore: Number(u.state?.overallScore) || 0,
+          quizzesCompleted: Number(u.state?.quizzesCompleted) || 0,
+          competencyGaps: u.state?.competencyGaps || [],
+          skillGapData: u.state?.skillGapData || {},
           updatedAt: u.updatedAt || new Date().toISOString()
         }))
       })

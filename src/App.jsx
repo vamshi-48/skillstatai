@@ -3803,7 +3803,11 @@ function App() {
       chatHistory,
     }
     const saveTimer = setTimeout(() => {
-      apiRequest('/api/state', { method: 'POST', body: JSON.stringify(state) }).catch(() => {})
+      apiRequest('/api/state', { method: 'POST', body: JSON.stringify(state) })
+        .then(() => {
+          window.dispatchEvent(new CustomEvent('skillstat_admin_update', { detail: { type: 'state_saved', email: profile?.email } }))
+        })
+        .catch(() => {})
     }, 350)
     return () => clearTimeout(saveTimer)
   }, [sessionToken, isStateLoaded, profile, selectedSkillList, skillGapData, competencyGaps, recommendationData, recommendationsBySkill, quizzesCompleted, overallScore, questionResults, questions, chatHistory])
@@ -4467,12 +4471,24 @@ function App() {
                   apiRequest('/api/auth/login', {
                     method: 'POST',
                     body: JSON.stringify({ email: isEmail ? identity : '', employeeId: isEmail ? '' : identity, password }),
-                  }).then(({ token, state }) => {
+                  }).then(({ token, state, user }) => {
                     onboardingSessionRef.current = false
                     localStorage.removeItem('skillstat_onboarding')
                     localStorage.setItem('skillstat_session', token)
                     setSessionToken(token)
+                    const userProfile = state?.profile || user?.profile || {}
                     if (state?.profile) setProfile((current) => ({ ...current, ...state.profile }))
+                    
+                    const loggedInEmail = user?.email || userProfile?.email || (isEmail ? identity : '')
+                    const userIsAdmin = isAllowedAdmin(loggedInEmail)
+                    
+                    if (userIsAdmin) {
+                      setDashboardView('admin')
+                    }
+                    
+                    window.dispatchEvent(new CustomEvent('skillstat_admin_update', { detail: { type: 'login', email: loggedInEmail } }))
+                    window.dispatchEvent(new Event('storage'))
+                    
                     setAuthModal(null)
                     setStep('dashboard')
                   }).catch((error) => {
