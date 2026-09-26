@@ -1,53 +1,145 @@
 import React, { useState, useEffect, useRef } from 'react'
 import './AIInterviewView.css'
 
-// ── Off-topic / Non-answer detection ──────────────────────────────────────────
-const OFF_TOPIC_EXACT = [
-  'bye', 'goodbye', 'hello', 'hi', 'hey', 'ok', 'okay', 'yes', 'no', 'sure', 'fine',
-  'nothing', 'idk', "i don't know", 'skip', 'pass', 'next', 'done', 'stop',
-  'quit', 'exit', 'thanks', 'thank you', 'good', 'great', 'cool', 'nice',
-  'lol', 'haha', 'test', 'testing', '...',
-]
+// ── Comprehensive Answer Analysis & Inappropriateness Detection ──────────────
+function analyzeAnswerAppropriateness(text, candidateRole = 'Statistical Officer', candidateDept = 'National Statistical Office') {
+  const trimmed = text.trim()
+  const lower = trimmed.toLowerCase()
+  const words = trimmed.split(/\s+/).filter(Boolean)
+  const wordCount = words.length
 
-function isOffTopicResponse(text) {
-  const trimmed = text.trim().toLowerCase()
-  if (trimmed.length < 15) return true
-  if (OFF_TOPIC_EXACT.some(p => trimmed === p || trimmed.startsWith(p + ' ') || trimmed.endsWith(' ' + p))) return true
-  const wordCount = trimmed.split(/\s+/).length
-  if (wordCount < 4) return true
-  return false
+  // 1. Unprofessional, rude, abusive, disrespectful, or vulgar language
+  const RUDE_OR_UNPROFESSIONAL = [
+    'shut up', 'fuck', 'shit', 'bitch', 'asshole', 'bastard', 'crap', 'damn', 'idiot', 'fool', 'stupid',
+    'none of your business', 'why do you care', 'mind your own business', 'who asked you', 'why are you asking',
+    'hate you', 'hate this', 'waste of time', 'bullshit', 'scam', 'useless', 'go away', 'get lost',
+    'i don\'t care', 'dont care', 'idgaf', 'whatever', 'no way', 'nah', 'nope', 'nah bro', 'shut your mouth',
+  ]
+  const isRude = RUDE_OR_UNPROFESSIONAL.some(phrase => lower.includes(phrase))
+
+  // 2. Unethical, illegal, or conduct violations
+  const UNETHICAL_OR_MALPRACTICE = [
+    'bribed', 'bribe', 'faked the data', 'fake data', 'cheated', 'falsified', 'forged', 'stole',
+    'leaked the data', 'leaked confidential', 'ignored rules', 'broke the law', 'deleted audit logs',
+    'faked numbers', 'manipulated report'
+  ]
+  const isMalpractice = UNETHICAL_OR_MALPRACTICE.some(phrase => lower.includes(phrase))
+
+  // 3. Evasive, trivial, or monosyllabic greetings/exits
+  const EVASIVE_PATTERNS = [
+    'bye', 'goodbye', 'hello', 'hi', 'hey', 'ok', 'okay', 'yes', 'no', 'sure', 'fine',
+    'nothing', 'idk', 'i don\'t know', 'dont know', 'skip', 'pass', 'next', 'done', 'stop',
+    'quit', 'exit', 'thanks', 'thank you', 'good', 'great', 'cool', 'nice', 'lol', 'haha',
+    'test', 'testing', '...', 'hmm', 'uh', 'um', 'blah', 'asdf', 'qwerty', 'idk really'
+  ]
+  const isEvasive = wordCount < 4 || EVASIVE_PATTERNS.some(p => lower === p || lower === `${p}.` || lower === `${p}!`)
+
+  // 4. Repetitive characters or gibberish (e.g. "aaaaa", "asdfghjk")
+  const isGibberish = /^([a-z0-9])\1{4,}$/i.test(trimmed) || (wordCount <= 3 && !/[aeiou]/i.test(trimmed))
+
+  if (isRude) {
+    return {
+      isInappropriate: true,
+      category: 'unprofessional',
+      reason: 'Your response contains dismissive or unprofessional language, which violates executive civil service standards and committee viva-voce decorum.',
+      modelAnswer: `When addressing administrative questions as a ${candidateRole}, an officer is expected to demonstrate executive composure: "In our division at ${candidateDept}, my approach is to maintain objective focus on statutory objectives, aligning team members around transparent milestones, data integrity, and empirical performance metrics."`,
+    }
+  }
+
+  if (isMalpractice) {
+    return {
+      isInappropriate: true,
+      category: 'malpractice',
+      reason: 'Your response references actions contrary to official civil service conduct, statutory guidelines, or data integrity protocols.',
+      modelAnswer: `A compliant, ethical response adheres strictly to statutory governance: "When facing operational pressure, I strictly follow statutory data security and audit protocols, immediately reporting discrepancies to the nodal directorate and initiating formal verification procedures."`,
+    }
+  }
+
+  if (isGibberish || isEvasive) {
+    return {
+      isInappropriate: true,
+      category: 'evasive',
+      reason: `Your response ("${trimmed.slice(0, 32)}${trimmed.length > 32 ? '...' : ''}") is inadequate or evasive. A senior assessment requires substantive evidence of your real-world professional practice.`,
+      modelAnswer: `An appropriate response should employ the STAR method: "In my recent assignment as a ${candidateRole} in ${candidateDept}, I led a data reconciliation initiative where our team identified sampling anomalies. By implementing automated validation scripts in Python and SQL, we improved data throughput by 22% while eliminating cross-tabulation discrepancies."`,
+    }
+  }
+
+  return { isInappropriate: false }
 }
 
-// ── Local Fallback Evaluator (Dynamic Scoring according to user input) ────────
-function evaluateAnswerLocally(text, competencyName) {
-  const words = text.trim().split(/\s+/).length
-  const lower = text.toLowerCase()
+// ── Local Evaluator (Reflects Candidate Input & Generates Model Answers for Inappropriate Inputs) ──
+function evaluateAnswerLocally(text, competencyName, candidateRole = 'Statistical Officer', candidateDept = 'National Statistical Office', lastQuestion = '') {
+  const analysis = analyzeAnswerAppropriateness(text, candidateRole, candidateDept)
+  const trimmed = text.trim()
+  const lower = trimmed.toLowerCase()
+  const words = trimmed.split(/\s+/).filter(Boolean)
+  const wordCount = words.length
 
-  // Base score according to response depth & articulation
-  let calculatedScore = 68
-  if (words > 65) calculatedScore += 16
-  else if (words > 40) calculatedScore += 11
-  else if (words > 22) calculatedScore += 6
-  else if (words < 12) calculatedScore -= 18
+  // Case 1: Inappropriate or Evasive Response
+  if (analysis.isInappropriate) {
+    const penalizedScore = Math.floor(Math.random() * 12) + 32 // 32% - 44%
+    return {
+      isInappropriate: true,
+      inappropriatenessReason: analysis.reason,
+      modelAnswer: analysis.modelAnswer,
+      score: penalizedScore,
+      verdict: 'Unsatisfactory / Inadequate Response',
+      hrFeedback: `Candidate, as Chair of the Executive Assessment Panel, I must be direct with you: ${analysis.reason}`,
+      strength: 'Identified an urgent opportunity to calibrate responses to the structured STAR competency standard.',
+      improvement: 'Must present concrete situations, operational actions, and quantifiable outcomes with executive composure.',
+      nextQuestion: `Let us redirect our focus to your core functional domain. Could you describe a specific time in ${candidateDept} where you had to manage competing priorities under strict regulatory timelines? What systematic method did you apply?`,
+      competency: 'Professional Conduct & Operational Discipline',
+      shouldConclude: false,
+    }
+  }
 
-  // Professional competencies & STAR methodology signals
-  const qualitySignals = [
-    'challenge', 'result', 'team', 'lead', 'metric', 'project', 'process',
-    'improved', 'data', 'stakeholder', 'strategy', 'analysis', 'delivered',
-    'solved', 'action', 'impact', 'managed', 'collaborated', 'measured'
+  // Case 2: Substantive Response — Extract specific technical tools, methodologies, and actions
+  const detectedTools = ['python', 'sql', 'r', 'excel', 'power bi', 'gis', 'stata', 'spss', 'tableau', 'database', 'pipeline']
+    .filter(t => lower.includes(t))
+  const detectedMethods = ['sampling', 'survey', 'reconciliation', 'audit', 'validation', 'framework', 'stratification', 'kpi', 'metric', 'quality', 'report']
+    .filter(m => lower.includes(m))
+  const detectedActions = ['led', 'managed', 'collaborated', 'resolved', 'automated', 'delivered', 'improved', 'implemented', 'streamlined', 'coordinated']
+    .filter(a => lower.includes(a))
+
+  let calculatedScore = 72
+  if (wordCount > 65) calculatedScore += 14
+  else if (wordCount > 40) calculatedScore += 9
+  else if (wordCount > 20) calculatedScore += 4
+  else calculatedScore -= 8
+
+  calculatedScore += Math.min(10, detectedTools.length * 3 + detectedMethods.length * 2)
+
+  const finalScore = Math.max(58, Math.min(96, calculatedScore))
+  const verdict = finalScore >= 85 ? 'Exceeds Expectations' : finalScore >= 75 ? 'Proficient — Benchmark Met' : 'Competent — Further Detail Recommended'
+
+  const citedDetails = []
+  if (detectedTools.length > 0) citedDetails.push(`your utilization of ${detectedTools.join(', ').toUpperCase()}`)
+  if (detectedMethods.length > 0) citedDetails.push(`your structured focus on ${detectedMethods.join(' and ')}`)
+  if (detectedActions.length > 0) citedDetails.push(`how you ${detectedActions[0]} the key deliverables`)
+
+  const citedText = citedDetails.length > 0
+    ? `I noted with interest ${citedDetails.join(', as well as ')}.`
+    : `I appreciate you articulating that operational scenario in ${candidateDept}.`
+
+  const adaptiveFollowUps = [
+    `Building directly on that: when unforeseen field discrepancies or stakeholder pushback arose during that process, what specific risk mitigation protocol did you initiate?`,
+    `Given that workflow, what quantifiable metric or KPI proved that your intervention was an enduring operational success?`,
+    `Reflecting on that project in hindsight, what governance or technical safeguard would you institutionalize to prevent similar bottlenecks in future cycles?`,
   ]
-  const matchCount = qualitySignals.filter(k => lower.includes(k)).length
-  calculatedScore += Math.min(14, matchCount * 3)
-
-  const finalScore = Math.max(50, Math.min(97, calculatedScore))
-  const verdict = finalScore >= 80 ? 'Exceeds Expectations' : finalScore >= 70 ? 'Meets Expectations' : 'Development Required'
+  const pickedFollowUp = adaptiveFollowUps[Math.floor(Math.random() * adaptiveFollowUps.length)]
 
   return {
+    isInappropriate: false,
+    inappropriatenessReason: null,
+    modelAnswer: null,
     score: finalScore,
     verdict,
-    feedback: `Thank you for sharing that context. You demonstrated clear practical awareness regarding ${competencyName || 'your professional workflow'}.`,
-    strength: words > 30 ? 'Comprehensive context and structured problem-solving approach.' : 'Focused response directly answering the core challenge.',
-    improvement: 'Ensure you consistently articulate measurable outcomes and specific stakeholder alignment.',
+    hrFeedback: `${citedText} That demonstrates commendable practical grounding in your scope as a ${candidateRole}.`,
+    strength: wordCount > 35 ? 'Structured articulation with concrete operational context and ownership.' : 'Direct, focused response addressing the primary challenge.',
+    improvement: 'Consistently quantify the long-term impact and institutional scalability of your solutions.',
+    nextQuestion: pickedFollowUp,
+    competency: competencyName || 'Operational Execution & Quality Control',
+    shouldConclude: false,
   }
 }
 
@@ -228,59 +320,57 @@ export default function AIInterviewView({ profile = {}, competencyGaps = [], onS
     setMessages(updatedMessages)
     setInputText('')
 
-    // ── Off-topic Guard (Prompt candidate to answer the actual HR question) ────
-    if (isOffTopicResponse(text)) {
-      const redirectText = `I appreciate you speaking up, ${candidateName}, but as an executive interviewer I need to hear about your actual professional experience. Please take a moment and respond to the question with details about your work or projects. There is no rush!`
-      const redirectMsg = {
-        id: `ai-redirect-${Date.now()}`,
-        sender: 'ai',
-        text: redirectText,
-        time: nowTime(),
-      }
-      setMessages(prev => [...prev, redirectMsg])
-      speakText(redirectText)
-      setTimeout(() => textareaRef.current?.focus(), 250)
-      return
-    }
-
     setIsAiThinking(true)
 
     const currentQNumber = questionCount
     const lastAiMsg = [...messages].reverse().find(m => m.sender === 'ai' && !m.isConclusion)
     const promptPayload = {
       message: `You are Dr. V. Ramanathan, a distinguished Senior Executive HR Director and Chair of the Talent Assessment Panel.
-You are conducting a live executive competency interview with ${candidateName}, who works as/targets the position of ${userRole} in ${userDept}.
+You are conducting a high-stakes, live competency viva-voce interview with ${candidateName}, candidate for the position of ${userRole} in ${userDept}.
 
 PREVIOUS QUESTION YOU ASKED:
-"${lastAiMsg ? lastAiMsg.text : 'Walk me through your background'}"
+"${lastAiMsg ? lastAiMsg.text : 'Walk me through your background and scope of responsibilities'}"
 
 CANDIDATE'S ACTUAL ANSWER:
 "${text}"
 
 TOTAL QUESTIONS ASKED SO FAR: ${currentQNumber}
 
-CRITICAL HR INTERVIEWER INSTRUCTIONS:
-1. ACT LIKE A REAL-LIFE EXECUTIVE HR DIRECTOR:
-   - Always begin your response by directly acknowledging and reflecting on what the candidate just told you with professional depth (e.g. "I appreciate you walking me through that cross-departmental friction...", "That is a sound analytical framework you chose for mitigating the data bottleneck...").
-   - Speak conversationally, with high-level professional gravitas, empathy, and active listening.
-2. ADAPTIVE REAL-LIFE HR FOLLOW-UP:
-   - Formulate your NEXT question directly building upon what they shared or probing their behavioral competency (STAR method: Situation, Task, Action, Result).
-   - If they gave an overview without mentioning pushback or conflict, probe: "How did you manage pushback from reluctant stakeholders or conflicting priorities?"
-   - If they discussed an achievement, probe: "What specific metric proved that was a success, and what would you do differently in hindsight?"
-   - If they discussed leadership, probe: "How do you navigate underperforming team members when project deadlines are tight?"
-   - Questions are not fixed to 4. Adapt organically to their practical experience.
-   - If they have answered at least 3-4 questions with depth and clarity, you can wrap up by setting "shouldConclude": true. Otherwise set "shouldConclude": false and provide "nextQuestion".
-3. REALISTIC INPUT-BASED SCORING:
-   - Evaluate strictly based on what they actually wrote:
-     * Brief/vague/generic: 52% - 66%
-     * Competent, practical with examples: 74% - 84%
-     * Exemplary, quantifiable, structured STAR response: 86% - 96%
-   - NEVER default to 60%.
+CRITICAL HR INTERVIEWER TRAINING & DIRECTIVES:
+1. DEEP ANSWER ANALYSIS & ACTIVE LISTENING:
+   - Closely analyze what the candidate specifically stated.
+   - Quote or explicitly cite specific technical frameworks, operational tools, methodologies, or actions from their text in your hrFeedback.
 
-RETURN STRICT JSON ONLY:
+2. DETECT & ADDRESS INAPPROPRIATE, EVASIVE, OR DEFICIENT ANSWERS:
+   - If the candidate's response is:
+     a) Unprofessional, dismissive, sarcastic, rude, or disrespectful (e.g. "shut up", "none of your business", "who asked you", offensive slang);
+     b) Evasive, trivial, monosyllabic, or completely off-topic (e.g. "bye", "ok", "cool", "idk", talking about sports/movies, gibberish like "asdfghjk");
+     c) Violating civil service ethics or statutory data integrity protocols:
+   - THEN YOU MUST:
+     * Set "isInappropriate": true.
+     * In "inappropriatenessReason", explain why this response fails official executive standards.
+     * In "modelAnswer", PROVIDE THE COMPLETE, EXEMPLARY MODEL ANSWER showing how an authorized official should effectively answer this specific challenge using the STAR framework.
+     * In "hrFeedback", address the candidate firmly and courteously with executive poise, point out the deficiency, and introduce the model standard.
+     * Score accordingly low: 25% to 45% (verdict: "Inadequate / Below Standard").
+     * In "nextQuestion", provide a structured redirection question to give them a focused opportunity to redeem themselves.
+
+3. APPROPRIATE, COMPETENT ANSWERS:
+   - If the candidate gave a relevant, professional answer:
+     * Set "isInappropriate": false, "modelAnswer": null, "inappropriatenessReason": null.
+     * In "hrFeedback", acknowledge and analyze specific strengths and tools from their actual text.
+     * In "nextQuestion", formulate an adaptive follow-up probing deeper into that specific scenario (risk mitigation, stakeholder diplomacy, measurable KPIs, scalability).
+     * Score between 74% and 96% based strictly on depth, practical evidence, and STAR methodology. NEVER default to 60%.
+
+4. CONCLUSION CONDITION:
+   - If at least 3-4 questions have been answered with substance and the candidate has demonstrated clear competency, set "shouldConclude": true. Otherwise set "shouldConclude": false.
+
+5. RETURN STRICT JSON ONLY matching this schema:
 {
-  "hrFeedback": "Natural 1-2 sentence executive HR reaction addressing what they said",
-  "score": 84,
+  "isInappropriate": false,
+  "inappropriatenessReason": null,
+  "modelAnswer": null,
+  "hrFeedback": "Specific executive HR reaction analyzing what the candidate wrote",
+  "score": 82,
   "verdict": "Proficient",
   "strength": "Specific practical strength demonstrated in their response",
   "improvement": "Constructive executive coaching tip or area to elaborate",
@@ -310,21 +400,9 @@ RETURN STRICT JSON ONLY:
         console.warn('API call fallback:', err)
       }
 
-      // Safe local evaluation fallback if API fails
+      // Safe local evaluation fallback if API fails or returns invalid structure
       if (!evalResult || typeof evalResult.score !== 'number') {
-        const local = evaluateAnswerLocally(text, 'Practical Execution')
-        evalResult = {
-          hrFeedback: `Thank you for detailing that, ${candidateName}. Your approach demonstrates commendable operational discipline.`,
-          score: local.score,
-          verdict: local.verdict,
-          strength: local.strength,
-          improvement: local.improvement,
-          nextQuestion: currentQNumber < 3
-            ? `When dealing with tight delivery timelines and competing stakeholder demands in ${userDept}, what systematic approach do you use to prioritize critical deliverables?`
-            : `Looking toward the next 2 to 3 years, what emerging methodologies or competencies are you prioritizing to elevate your strategic impact?`,
-          competency: currentQNumber < 3 ? 'Operational Prioritization & Risk' : 'Strategic Growth & Leadership',
-          shouldConclude: currentQNumber >= 4,
-        }
+        evalResult = evaluateAnswerLocally(text, 'Operational Delivery & Quality', userRole, userDept, lastAiMsg?.text)
       }
 
       const newScoreRecord = {
@@ -335,7 +413,7 @@ RETURN STRICT JSON ONLY:
       const updatedScores = [...sessionScores, newScoreRecord]
       setSessionScores(updatedScores)
 
-      const shouldFinish = evalResult.shouldConclude || (currentQNumber >= 5)
+      const shouldFinish = evalResult.shouldConclude || (currentQNumber >= 5 && !evalResult.isInappropriate)
 
       if (shouldFinish) {
         setIsAiThinking(false)
@@ -344,23 +422,34 @@ RETURN STRICT JSON ONLY:
         const nextQNum = currentQNumber + 1
         setQuestionCount(nextQNum)
 
-        const dialogue = `${evalResult.hrFeedback}\n\n${evalResult.nextQuestion}`
+        const isBad = Boolean(evalResult.isInappropriate)
+        let spokenText = evalResult.hrFeedback
+        if (isBad && evalResult.modelAnswer) {
+          spokenText += ` To assist your preparation, here is how an authorized official should respond: ${evalResult.modelAnswer}`
+        }
+        spokenText += ` ${evalResult.nextQuestion}`
+
+        const fullMsgText = `${evalResult.hrFeedback}\n\n${evalResult.nextQuestion}`
+
         const aiMsg = {
           id: `ai-${Date.now()}`,
           sender: 'ai',
-          text: dialogue,
+          text: fullMsgText,
           time: nowTime(),
           score: evalResult.score,
           verdict: evalResult.verdict,
           strength: evalResult.strength,
           improvement: evalResult.improvement,
+          isInappropriate: isBad,
+          inappropriatenessReason: evalResult.inappropriatenessReason,
+          modelAnswer: evalResult.modelAnswer,
           questionNumber: nextQNum,
           competency: evalResult.competency,
         }
 
         setMessages(prev => [...prev, aiMsg])
         setIsAiThinking(false)
-        setTimeout(() => speakText(dialogue), 400)
+        setTimeout(() => speakText(spokenText), 400)
       }
     } catch (err) {
       console.error(err)
@@ -538,13 +627,38 @@ RETURN STRICT JSON ONLY:
                           </React.Fragment>
                         ))}
                       </div>
-                      {msg.score && (
+                      {msg.isInappropriate && (
+                        <div className="inappropriate-alert-box">
+                          <div className="inappropriate-header">
+                            <span>⚠️ Evaluation Alert: Inappropriate / Inadequate Response</span>
+                          </div>
+                          <p className="inappropriate-reason-text">
+                            {msg.inappropriatenessReason || 'The answer provided was off-topic, evasive, or failed to meet executive standards.'}
+                          </p>
+                        </div>
+                      )}
+
+                      {msg.modelAnswer && (
+                        <div className="model-answer-box">
+                          <div className="model-answer-header">
+                            <span>💡 Model Exemplary Response</span>
+                            <span className="model-answer-badge">How to Answer Effectively</span>
+                          </div>
+                          <div className="model-answer-quote">
+                            "{msg.modelAnswer}"
+                          </div>
+                        </div>
+                      )}
+
+                      {msg.score !== undefined && (
                         <div className="score-card">
                           <div className="score-row">
-                            <span className="score-num" style={{ color: msg.score >= 75 ? '#15803d' : '#b45309' }}>
+                            <span className="score-num" style={{ color: msg.isInappropriate ? '#e11d48' : msg.score >= 75 ? '#15803d' : '#b45309' }}>
                               {msg.score}%
                             </span>
-                            <span className={`verdict-tag ${msg.score >= 80 ? 'good' : 'warn'}`}>{msg.verdict}</span>
+                            <span className={`verdict-tag ${msg.isInappropriate ? 'danger' : msg.score >= 80 ? 'good' : 'warn'}`}>
+                              {msg.verdict}
+                            </span>
                           </div>
                           {msg.strength && <div className="score-detail strength-line">✔ <strong>Strength:</strong> {msg.strength}</div>}
                           {msg.improvement && <div className="score-detail improve-line">▲ <strong>Opportunity:</strong> {msg.improvement}</div>}
