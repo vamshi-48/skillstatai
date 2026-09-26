@@ -6340,6 +6340,146 @@ function App() {
           />
         )}
 
+        {dashboardView === 'passport' && (
+          <div className="dashboard-panel" style={{ padding: '24px', background: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '28px' }}>🛂</span>
+                  <h2 style={{ margin: 0, fontSize: '24px', color: '#1e293b' }}>My Official Competency Passport</h2>
+                </div>
+                <p style={{ margin: '6px 0 0 0', color: '#64748b', fontSize: '14px' }}>
+                  Verified government competency credentials, viva assessment scores, and dynamic skill benchmarks.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="primary-action"
+                onClick={() => window.print()}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '10px', background: '#1e3a8a', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+              >
+                <span>🖨️ Export / Print Passport</span>
+              </button>
+            </div>
+
+            {/* Officer Profile Card */}
+            <div style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%)', borderRadius: '14px', padding: '20px 24px', color: '#fff', marginBottom: '24px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '18px' }}>
+              <div>
+                <div style={{ fontSize: '11px', textTransform: 'uppercase', color: '#93c5fd', letterSpacing: '1px' }}>Officer Name</div>
+                <div style={{ fontSize: '18px', fontWeight: 700, marginTop: '4px' }}>{profile?.name || 'Authorized Officer'}</div>
+                <div style={{ fontSize: '12px', color: '#cbd5e1' }}>{profile?.email || 'N/A'}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', textTransform: 'uppercase', color: '#93c5fd', letterSpacing: '1px' }}>Designation / Cadre</div>
+                <div style={{ fontSize: '16px', fontWeight: 600, marginTop: '4px' }}>{(profile?.role && profile.role.trim()) || (profile?.designation && profile.designation.trim()) || 'Statistical Officer'}</div>
+                <div style={{ fontSize: '12px', color: '#cbd5e1' }}>{profile?.department || 'Official Statistics'}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', textTransform: 'uppercase', color: '#93c5fd', letterSpacing: '1px' }}>Overall Assessment Score</div>
+                <div style={{ fontSize: '24px', fontWeight: 800, color: (overallScore || 0) >= 75 ? '#4ade80' : '#facc15', marginTop: '4px' }}>
+                  {overallScore || 0}%
+                </div>
+                <div style={{ fontSize: '11px', color: '#cbd5e1' }}>
+                  {(overallScore || 0) >= 75 ? 'Qualified (Exceeds Standard)' : 'Active Upskilling'}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', textTransform: 'uppercase', color: '#93c5fd', letterSpacing: '1px' }}>Passport Status</div>
+                <div style={{ display: 'inline-block', marginTop: '6px', background: 'rgba(34,197,94,0.2)', border: '1px solid #4ade80', color: '#86efac', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 700 }}>
+                  ✔ VERIFIED CADRE
+                </div>
+                <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>Issued by Skillstat AI / MoSPI</div>
+              </div>
+            </div>
+
+            {/* Verified Competencies */}
+            <h3 style={{ fontSize: '18px', color: '#1e293b', marginBottom: '14px' }}>Verified Competency Gaps & Matrix</h3>
+            {(!competencyGaps || competencyGaps.length === 0) ? (
+              <div style={{ padding: '36px 20px', textAlign: 'center', background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: '12px', color: '#64748b' }}>
+                <p style={{ margin: '0 0 6px 0', fontWeight: 600, color: '#334155' }}>No competency assessments taken yet.</p>
+                <p style={{ margin: 0, fontSize: '13px' }}>Take an <strong>AI Face-to-Face Interview</strong> or standard assessment to automatically populate verified competencies in your passport.</p>
+                <button
+                  type="button"
+                  className="primary-action"
+                  onClick={() => setDashboardView('ai-interview')}
+                  style={{ marginTop: '14px', padding: '8px 18px', borderRadius: '8px', background: '#2563eb', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}
+                >
+                  Start AI Interview Now ➤
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                {competencyGaps.map((gap, idx) => {
+                  const currentScore = gap.current !== undefined ? gap.current : overallScore || 70
+                  const reqScore = gap.required || 75
+                  const isMet = currentScore >= reqScore
+                  return (
+                    <div
+                      key={gap.skill || idx}
+                      style={{
+                        padding: '18px',
+                        background: isMet ? '#f8fafc' : '#fffbeb',
+                        borderRadius: '12px',
+                        border: `1px solid ${isMet ? '#e2e8f0' : '#fde68a'}`,
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                        <strong style={{ fontSize: '15px', color: '#1e293b' }}>{gap.skill || gap.name || `Competency #${idx + 1}`}</strong>
+                        <span style={{
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          padding: '3px 8px',
+                          borderRadius: '12px',
+                          background: isMet ? '#dcfce7' : '#fef3c7',
+                          color: isMet ? '#15803d' : '#b45309'
+                        }}>
+                          {isMet ? '✓ Benchmark Met' : 'Upskilling Needed'}
+                        </span>
+                      </div>
+                      <div style={{ width: '100%', background: '#e2e8f0', borderRadius: '6px', height: '8px', overflow: 'hidden', marginBottom: '8px' }}>
+                        <div
+                          style={{
+                            width: `${Math.min(100, Math.max(0, currentScore))}%`,
+                            background: isMet ? '#16a34a' : '#f59e0b',
+                            height: '100%',
+                            borderRadius: '6px',
+                            transition: 'width 0.4s ease'
+                          }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748b' }}>
+                        <span>Current: <strong style={{ color: '#1e293b' }}>{currentScore}%</strong></span>
+                        <span>Required Target: <strong>{reqScore}%</strong></span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Quick Actions */}
+            <div style={{ marginTop: '24px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="secondary-action"
+                onClick={() => setDashboardView('ai-interview')}
+                style={{ padding: '10px 18px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}
+              >
+                🎙️ Retake / Update via AI Interview
+              </button>
+              <button
+                type="button"
+                className="secondary-action"
+                onClick={() => setDashboardView('recommendations')}
+                style={{ padding: '10px 18px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}
+              >
+                📚 View Recommended iGOT Courses
+              </button>
+            </div>
+          </div>
+        )}
+
     
 {dashboardView === 'dashboard' && (
           <>

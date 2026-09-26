@@ -1396,6 +1396,119 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
               </div>
             </div>
           )}
+          {activeTab === 'interview-records' && (
+            <div className="admin-content-section">
+              <div className="admin-section-header">
+                <div>
+                  <h2 className="admin-section-title">🎙️ AI Competency Interview Records</h2>
+                  <p className="admin-section-desc">Live records of all candidates and employees who have taken the AI Face-to-Face Viva-Voce Interview assessment.</p>
+                </div>
+                {interviewRecords.length > 0 && (
+                  <button
+                    type="button"
+                    className="admin-btn-secondary"
+                    style={{ color: '#dc2626', borderColor: '#fca5a5' }}
+                    onClick={() => {
+                      if (window.confirm('Are you sure you want to clear all recorded interview history?')) {
+                        localStorage.removeItem('skillstat_interview_records')
+                        setInterviewRecords([])
+                      }
+                    }}
+                  >
+                    Clear Records
+                  </button>
+                )}
+              </div>
+
+              {/* Summary Stats */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+                <div className="stat-card" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
+                  <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Total Interviews Taken</div>
+                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#1e3a8a', marginTop: '6px' }}>{interviewRecords.length}</div>
+                </div>
+                <div className="stat-card" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
+                  <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Avg Performance Score</div>
+                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#15803d', marginTop: '6px' }}>
+                    {interviewRecords.length > 0
+                      ? Math.round(interviewRecords.reduce((acc, r) => acc + (r.overallScore || 0), 0) / interviewRecords.length) + '%'
+                      : 'N/A'}
+                  </div>
+                </div>
+                <div className="stat-card" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px' }}>
+                  <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>Benchmark Qualified</div>
+                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#7c3aed', marginTop: '6px' }}>
+                    {interviewRecords.filter(r => (r.overallScore || 0) >= passThreshold).length} Candidates
+                  </div>
+                </div>
+              </div>
+
+              {/* Records Table */}
+              {interviewRecords.length === 0 ? (
+                <div style={{ padding: '48px 24px', textAlign: 'center', background: '#fff', border: '1px dashed #cbd5e1', borderRadius: '12px', color: '#64748b' }}>
+                  <span style={{ fontSize: '40px', display: 'block', marginBottom: '12px' }}>🎙️</span>
+                  <h3 style={{ margin: '0 0 6px', color: '#1e293b' }}>No Interview Sessions Recorded Yet</h3>
+                  <p style={{ margin: 0, fontSize: '14px' }}>When candidates take the AI Interview in the Learner Portal, their real-time dossiers, evaluation metrics, and AI HR remarks will automatically appear here.</p>
+                </div>
+              ) : (
+                <div className="admin-table-card" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
+                  <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', color: '#475569' }}>Candidate / Officer</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', color: '#475569' }}>Target Role & Dept</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', color: '#475569' }}>Overall Score</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', color: '#475569' }}>Questions</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', color: '#475569' }}>HR Panel Verdict</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', color: '#475569' }}>Date Taken</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {interviewRecords.map((rec) => (
+                        <tr key={rec.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '14px 16px' }}>
+                            <div style={{ fontWeight: 700, color: '#1e293b' }}>{rec.candidateName || 'Candidate'}</div>
+                            <div style={{ fontSize: '11.5px', color: '#64748b' }}>{rec.candidateEmail || 'Logged-in User'}</div>
+                          </td>
+                          <td style={{ padding: '14px 16px' }}>
+                            <div style={{ fontWeight: 600, color: '#334155' }}>{rec.role || 'Officer'}</div>
+                            <div style={{ fontSize: '11.5px', color: '#64748b' }}>{rec.department || 'General'}</div>
+                          </td>
+                          <td style={{ padding: '14px 16px' }}>
+                            <span style={{
+                              fontWeight: 800,
+                              fontSize: '15px',
+                              color: (rec.overallScore || 0) >= passThreshold ? '#15803d' : '#b91c1c'
+                            }}>
+                              {rec.overallScore}%
+                            </span>
+                          </td>
+                          <td style={{ padding: '14px 16px', fontSize: '13px', color: '#475569' }}>
+                            {rec.questionsCompleted || (rec.scores?.length || 0)} Questions
+                          </td>
+                          <td style={{ padding: '14px 16px' }}>
+                            <span style={{
+                              display: 'inline-block',
+                              padding: '4px 10px',
+                              borderRadius: '20px',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              background: (rec.overallScore || 0) >= passThreshold ? '#dcfce7' : '#fee2e2',
+                              color: (rec.overallScore || 0) >= passThreshold ? '#15803d' : '#b91c1c'
+                            }}>
+                              {rec.verdict || ((rec.overallScore || 0) >= passThreshold ? 'Qualified' : 'Development Required')}
+                            </span>
+                          </td>
+                          <td style={{ padding: '14px 16px', fontSize: '12.5px', color: '#64748b' }}>
+                            {rec.date || (rec.timestamp ? new Date(rec.timestamp).toLocaleDateString() : 'Recent')}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </main>
 
