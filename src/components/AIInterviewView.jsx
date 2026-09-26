@@ -1,6 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react'
 import './AIInterviewView.css'
 
+// ── Off-topic / insufficient response detector ───────────────────────────────
+const OFF_TOPIC_PHRASES = [
+  'bye', 'goodbye', 'hello', 'hi', 'ok', 'okay', 'yes', 'no', 'sure', 'fine',
+  'nothing', 'idk', "i don't know", 'skip', 'pass', 'next', 'done', 'stop',
+  'quit', 'exit', 'thanks', 'thank you', 'good', 'great', 'cool', 'nice',
+  'lol', 'haha', 'test', 'testing', '...',
+]
+
+function isOffTopicResponse(text) {
+  const trimmed = text.trim().toLowerCase()
+  if (trimmed.length < 20) return true  // too short to be a real answer
+  if (OFF_TOPIC_PHRASES.some(p => trimmed === p || trimmed.startsWith(p + ' ') || trimmed.endsWith(' ' + p))) return true
+  const wordCount = trimmed.split(/\s+/).length
+  if (wordCount < 5) return true  // fewer than 5 words = not a proper answer
+  return false
+}
+
 export default function AIInterviewView({ profile = {}, competencyGaps = [], onScoreUpdate }) {
   const [messages, setMessages] = useState([])
   const [inputText, setInputText] = useState('')
@@ -13,6 +30,7 @@ export default function AIInterviewView({ profile = {}, competencyGaps = [], onS
   const [currentStep, setCurrentStep] = useState(0)
   const [ttsEnabled, setTtsEnabled] = useState(true)
   const [interviewStarted, setInterviewStarted] = useState(false)
+  const [questionScores, setQuestionScores] = useState([])
 
   const chatBottomRef = useRef(null)
   const mouthIntervalRef = useRef(null)
@@ -154,6 +172,21 @@ export default function AIInterviewView({ profile = {}, competencyGaps = [], onS
     const updated = [...messages, userMsg]
     setMessages(updated)
     setInputText('')
+
+    // ── Off-topic / insufficient answer check ────────────────────────────────
+    if (isOffTopicResponse(text)) {
+      const redirectMsg = {
+        id: `ai-redirect-${Date.now()}`,
+        sender: 'ai',
+        text: `I appreciate you engaging, but I need a proper answer to continue the assessment. Please respond to the question with relevant details about your professional experience and approach. Take your time — there is no rush.`,
+        time: nowTime(),
+      }
+      setMessages(prev => [...prev, redirectMsg])
+      speakText(redirectMsg.text)
+      setTimeout(() => textareaRef.current?.focus(), 200)
+      return
+    }
+
     setIsAiThinking(true)
 
     const activeQ = interviewQuestions[currentStep]
@@ -194,6 +227,9 @@ Return JSON only:
         }
       }
 
+      const updatedScores = [...questionScores, { q: currentStep + 1, score: evalData.score, competency: activeQ.competency }]
+      setQuestionScores(updatedScores)
+
       const next = currentStep + 1
       setCurrentStep(next)
 
@@ -215,7 +251,7 @@ Return JSON only:
         setMessages(prev => [...prev, aiMsg])
         setTimeout(() => speakText(aiText), 400)
       } else {
-        const overall = Math.round((evalData.score + 80 + 76 + 83) / 4)
+        const overall = Math.round(updatedScores.reduce((acc, s) => acc + s.score, 0) / updatedScores.length)
         const closeText = `Thank you very much, ${candidateName}. That concludes today's session. Our panel has carefully evaluated your responses across all four competency areas. Your performance has been recorded and your evaluation dossier is now ready. Well done.`
         setMessages(prev => [...prev, {
           id: `ai-close-${Date.now()}`,
@@ -226,17 +262,28 @@ Return JSON only:
         }])
         setTimeout(() => speakText(closeText), 400)
         const dossier = {
+          id: `iv-${Date.now()}`,
           candidateName,
           role: userRole,
           department: userDept,
           overallScore: overall,
           verdict: overall >= 75 ? 'Qualified — Recommended for Advancement' : 'Competency Development Required',
           date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+          timestamp: new Date().toISOString(),
           questionsCompleted: interviewQuestions.length,
+          scores: updatedScores,
         }
         setEvaluationDossier(dossier)
         setInterviewComplete(true)
         if (typeof onScoreUpdate === 'function') onScoreUpdate(overall)
+
+        // ── Persist to localStorage for Admin Portal ─────────────────────────
+        try {
+          const existing = JSON.parse(localStorage.getItem('skillstat_interview_records') || '[]')
+          existing.unshift(dossier)
+          localStorage.setItem('skillstat_interview_records', JSON.stringify(existing.slice(0, 200)))
+          window.dispatchEvent(new CustomEvent('skillstat_admin_update', { detail: { type: 'interview_records' } }))
+        } catch {}
       }
     } catch (err) {
       console.error(err)

@@ -132,6 +132,13 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
   const [adminName, setAdminName] = useState(adminUser?.name || 'Administrator')
   const [adminEmail, setAdminEmail] = useState(adminUser?.email || 'admin@mospi.gov.in')
 
+  // Interview Records State (from localStorage)
+  const [interviewRecords, setInterviewRecords] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('skillstat_interview_records') || '[]')
+    } catch { return [] }
+  })
+
   // Search & Filter State
   const [searchTerm, setSearchTerm] = useState('')
   const [deptFilter, setDeptFilter] = useState('All')
@@ -268,6 +275,21 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
     return () => {
       window.removeEventListener('skillstat_admin_update', handleLiveSync)
       window.removeEventListener('storage', handleLiveSync)
+    }
+  }, [])
+
+  // Keep interviewRecords in sync whenever admin_update fires
+  useEffect(() => {
+    const handleIvSync = () => {
+      try {
+        setInterviewRecords(JSON.parse(localStorage.getItem('skillstat_interview_records') || '[]'))
+      } catch {}
+    }
+    window.addEventListener('skillstat_admin_update', handleIvSync)
+    window.addEventListener('storage', handleIvSync)
+    return () => {
+      window.removeEventListener('skillstat_admin_update', handleIvSync)
+      window.removeEventListener('storage', handleIvSync)
     }
   }, [])
 
@@ -587,6 +609,15 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
           <button type="button" className={`admin-nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
             <span className="nav-icon">⚙️</span>
             <span>10. Profile & Settings</span>
+          </button>
+          <button type="button" className={`admin-nav-item ${activeTab === 'interview-records' ? 'active' : ''}`} onClick={() => setActiveTab('interview-records')}>
+            <span className="nav-icon">🎙️</span>
+            <span>11. AI Interview Records</span>
+            {interviewRecords.length > 0 && (
+              <span style={{ marginLeft: 'auto', background: '#2563eb', color: '#fff', fontSize: '11px', fontWeight: 700, padding: '1px 7px', borderRadius: '10px' }}>
+                {interviewRecords.length}
+              </span>
+            )}
           </button>
         </nav>
 
@@ -1933,6 +1964,97 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
           </div>
         </div>
       )}
+
+        {/* ── 11. AI Interview Records ───────────────────────────────────── */}
+        {activeTab === 'interview-records' && (
+          <div className="admin-panel">
+            <div className="admin-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+              <h2>🎙️ AI Interview Records</h2>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <span style={{ fontSize: '13px', color: '#64748b' }}>{interviewRecords.length} session{interviewRecords.length !== 1 ? 's' : ''} recorded</span>
+                {interviewRecords.length > 0 && (
+                  <button
+                    type="button"
+                    className="secondary-btn"
+                    style={{ fontSize: '12px', padding: '5px 14px' }}
+                    onClick={() => {
+                      if (window.confirm('Clear all interview records from the admin panel?')) {
+                        localStorage.removeItem('skillstat_interview_records')
+                        setInterviewRecords([])
+                      }
+                    }}
+                  >
+                    Clear All Records
+                  </button>
+                )}
+              </div>
+            </div>
+            <p style={{ color: '#64748b', marginBottom: '20px', fontSize: '14px' }}>
+              All completed AI-assisted viva-voce interview sessions are recorded here in real time. Each record includes candidate details, overall score, verdict, and per-question breakdown.
+            </p>
+
+            {interviewRecords.length === 0 ? (
+              <div style={{ padding: '60px', textAlign: 'center', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: '48px', marginBottom: '14px' }}>🎙️</div>
+                <h3 style={{ margin: '0 0 8px', color: '#1e293b' }}>No Interview Records Yet</h3>
+                <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>Interview records will appear here once employees complete the AI Interview session from their dashboard.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {interviewRecords.map((record) => (
+                  <div key={record.id} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
+                    {/* Record Header */}
+                    <div style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%)', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '15px', color: '#f8fafc' }}>{record.candidateName}</div>
+                        <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>{record.role} &bull; {record.department}</div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: '24px', fontWeight: 800, color: record.overallScore >= 75 ? '#86efac' : '#fca5a5' }}>{record.overallScore}%</div>
+                          <div style={{ fontSize: '11px', color: '#94a3b8' }}>Overall Score</div>
+                        </div>
+                        <span style={{
+                          background: record.overallScore >= 75 ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
+                          border: `1px solid ${record.overallScore >= 75 ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.4)'}`,
+                          color: record.overallScore >= 75 ? '#86efac' : '#fca5a5',
+                          fontSize: '12px', fontWeight: 700, padding: '4px 12px', borderRadius: '20px'
+                        }}>
+                          {record.verdict}
+                        </span>
+                        <div style={{ fontSize: '12px', color: '#64748b' }}>{record.date}</div>
+                      </div>
+                    </div>
+
+                    {/* Per-question scores */}
+                    {Array.isArray(record.scores) && record.scores.length > 0 && (
+                      <div style={{ padding: '14px 20px', display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                        {record.scores.map(s => (
+                          <div key={s.q} style={{
+                            flex: '1 1 180px',
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '8px',
+                            padding: '10px 14px',
+                          }}>
+                            <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', marginBottom: '4px' }}>Q{s.q}: {s.competency}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ flex: 1, height: '6px', background: '#e2e8f0', borderRadius: '4px' }}>
+                                <div style={{ width: `${s.score}%`, height: '100%', background: s.score >= 80 ? '#16a34a' : s.score >= 65 ? '#f59e0b' : '#dc2626', borderRadius: '4px' }} />
+                              </div>
+                              <span style={{ fontSize: '13px', fontWeight: 700, color: s.score >= 80 ? '#15803d' : '#92400e' }}>{s.score}%</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
     </div>
   )
 }
