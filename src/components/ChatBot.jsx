@@ -167,6 +167,24 @@ export default function ChatBot({
       }
     }
 
+    // 4b. AI Interview / Viva-Voce
+    if (query.includes('interview') || query.includes('viva') || query.includes('oral')) {
+      return {
+        text: `The **Live AI Competency Interview** conducts an adaptive oral and scenario-based examination directly evaluating conceptual depth, field protocols, and practical reasoning for **${roleName}** (${deptName}).\n\nWould you like to commence your interview now?`,
+        actions: [
+          {
+            label: '🎙️ Open AI Interview',
+            onClick: () => {
+              if (onNavigate) {
+                setIsOpen(false)
+                onNavigate('ai-interview')
+              }
+            },
+          },
+        ],
+      }
+    }
+
     // 5. Role & Roadmap
     if (query.includes('role') || query.includes('roadmap') || query.includes('career') || query.includes('doctor') || query.includes('analyst')) {
       return {

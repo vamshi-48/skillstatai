@@ -6,6 +6,7 @@ import { getRecommendations } from './services/recommendationService'
 import ChatBot from './components/ChatBot'
 import AdminPortal from './components/admin/AdminPortal'
 import { isAllowedAdmin } from './config/adminConfig'
+import AIInterviewView from './components/AIInterviewView'
 
 const getUserInitial = (name) => String(name || '').trim().charAt(0).toUpperCase() || 'U'
 
@@ -3486,8 +3487,6 @@ function AccessibilityPanel({ isOpen, onClose }) {
 }
 
 function App() {
-    const [showInterviewOverlay, setShowInterviewOverlay] = useState(false);
-    const [showLearningOverlay, setShowLearningOverlay] = useState(false);
   const [language, setLanguage] = useState('en')
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -5784,14 +5783,6 @@ function App() {
               <span className="nav-icon">🛂</span>
               <span className="nav-label">Competency Passport</span>
             </button>
-            <button
-              type="button"
-              className={`sidebar-nav-item ${dashboardView === 'learning-path' ? 'active' : ''}`}
-              onClick={() => { setDashboardView('learning-path'); setIsMobileSidebarOpen(false) }}
-            >
-              <span className="nav-icon">🗺️</span>
-              <span className="nav-label">Learning Path</span>
-            </button>
     
 
 
@@ -6340,112 +6331,13 @@ function App() {
 
         
         {dashboardView === 'ai-interview' && (
-          <div className="dashboard-panel">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2>AI Competency Interview</h2>
-              <span className="status-pill blue">Adaptive Evaluation</span>
-            </div>
-            <p>A conversational assessment that evaluates conceptual understanding and practical reasoning.</p>
-            
-            <div style={{ marginTop: '20px', padding: '20px', textAlign: 'center', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
-                <p style={{ color: '#666', marginBottom: '20px' }}>Ready to start your adaptive interview session?</p>
-                <button className="primary-action" onClick={() => setShowInterviewOverlay(true)}>Start Interview Session</button>
-            </div>
-          </div>
-        )}
-
-        {dashboardView === 'passport' && (
-          <div className="dashboard-panel">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                    <h2>My Competency Passport</h2>
-                    <p style={{ margin: '5px 0' }}>A portable, evidence-backed profile showing verified learning.</p>
-                </div>
-                <button className="primary-action" disabled={!competencyGaps || competencyGaps.length === 0} onClick={() => window.print()}>Export as PDF</button>
-            </div>
-            
-            <div style={{ marginTop: '20px', padding: '20px', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '12px' }}>
-                <div style={{ display: 'flex', gap: '20px', borderBottom: '1px solid #eee', paddingBottom: '20px', marginBottom: '20px' }}>
-                    <div style={{ flex: 1 }}>
-                        <p style={{ margin: '0 0 5px 0', color: '#666' }}>Role</p>
-                        <h3 style={{ margin: 0 }}>{(profile?.role && profile.role.trim()) || (profile?.designation && profile.designation.trim()) || 'Not Specified'}</h3>
-                    </div>
-                    <div style={{ flex: 1 }}>
-                        <p style={{ margin: '0 0 5px 0', color: '#666' }}>Department</p>
-                        <h3 style={{ margin: 0 }}>{profile?.department || 'Not Specified'}</h3>
-                    </div>
-                    <div style={{ flex: 1 }}>
-                        <p style={{ margin: '0 0 5px 0', color: '#666' }}>Last Updated</p>
-                        <h3 style={{ margin: 0 }}>{new Date().toLocaleDateString()}</h3>
-                    </div>
-                </div>
-
-                <h4>Verified Competencies</h4>
-                {(!competencyGaps || competencyGaps.length === 0) ? (
-                    <div style={{ padding: '20px', textAlign: 'center', color: '#666', background: '#f8f9fa', borderRadius: '8px', marginTop: '15px' }}>
-                        <p>No verified competencies found.</p>
-                        <p style={{ fontSize: '12px' }}>Complete an AI Interview or an Assessment to generate your passport data.</p>
-                    </div>
-                ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginTop: '15px' }}>
-                        {competencyGaps.map(gap => (
-                            <div key={gap.skill} style={{ padding: '15px', background: gap.current >= gap.required ? '#f8f9fa' : '#fff3cd', borderRadius: '8px', border: `1px solid ${gap.current >= gap.required ? '#e9ecef' : '#ffeeba'}` }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                                    <strong style={{ fontSize: '16px' }}>{gap.skill}</strong>
-                                    <span className={`status-pill ${gap.current >= gap.required ? 'green' : ''}`} style={gap.current < gap.required ? { background: '#ffc107', color: '#333' } : {}}>{gap.current >= gap.required ? '✓ Verified' : 'Developing'}</span>
-                                </div>
-                                <div style={{ width: '100%', background: gap.current >= gap.required ? '#e9ecef' : '#ffeeba', borderRadius: '4px', height: '8px', marginBottom: '10px' }}>
-                                    <div style={{ width: `${Math.min(100, gap.current)}%`, background: gap.current >= gap.required ? '#28a745' : '#ffc107', height: '100%', borderRadius: '4px' }}></div>
-                                </div>
-                                <p style={{ margin: '0 0 5px 0', fontSize: '13px', color: '#555' }}>Score: {gap.current}% (Required: {gap.required}%)</p>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-          </div>
-        )}
-
-        {dashboardView === 'learning-path' && (
-          <div className="dashboard-panel">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2>AI Learning Path Generator</h2>
-              <span className="status-pill green">Adaptive Mode Active</span>
-            </div>
-            <p>Your personalized learning sequence based on your current competencies and role targets.</p>
-            
-            {(!selectedSkillList || selectedSkillList.length === 0) ? (
-                <div style={{ padding: '20px', textAlign: 'center', color: '#666', background: '#f8f9fa', borderRadius: '8px', marginTop: '20px' }}>
-                    <p>No learning paths generated yet.</p>
-                    <p style={{ fontSize: '12px' }}>Please select a target role or skills to generate your path.</p>
-                </div>
-            ) : (
-                <div style={{ marginTop: '20px', display: 'flex', gap: '20px', overflowX: 'auto', paddingBottom: '10px' }}>
-                  {selectedSkillList.map((skill, index) => {
-                      const gap = competencyGaps.find(g => g.skill === skill) || { current: 0, required: 70 };
-                      const isComplete = gap.current >= gap.required;
-                      const colors = ['#007bff', '#f39c12', '#e74c3c', '#2ecc71', '#9b59b6', '#34495e'];
-                      const color = colors[index % colors.length];
-                      return (
-                          <div key={skill} style={{ minWidth: '250px', flex: 1, borderLeft: `4px solid ${color}`, paddingLeft: '15px' }}>
-                            <h4 style={{ color: color, marginBottom: '10px' }}>Module {index + 1}: {skill}</h4>
-                            <div style={{ padding: '15px', background: '#fff', border: '1px solid #eee', marginBottom: '10px', borderRadius: '8px' }}>
-                              <strong>{skill} Fundamentals</strong><br/>
-                              <span style={{ fontSize: '12px', color: '#666' }}>Target Score: {gap.required}%</span>
-                              <div style={{ marginTop: '10px' }}>
-                                 {isComplete ? (
-                                    <span className="status-pill blue" style={{ fontSize: '11px' }}>Skipped: Already Proficient</span>
-                                 ) : (
-                                    <button className="primary-action btn-sm" onClick={() => setShowLearningOverlay(true)}>Start Learning</button>
-                                 )}
-                              </div>
-                            </div>
-                          </div>
-                      );
-                  })}
-                </div>
-            )}
-          </div>
+          <AIInterviewView
+            profile={profile}
+            competencyGaps={competencyGaps}
+            onScoreUpdate={(score) => {
+              setOverallScore(score)
+            }}
+          />
         )}
 
     
@@ -7628,86 +7520,7 @@ function App() {
         onHistoryChange={setChatHistory}
       />
 
-      {/* AI Interview Overlay Mockup */}
-      {showInterviewOverlay && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: '#fff', width: '90%', maxWidth: '800px', height: '80vh', borderRadius: '12px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <div style={{ padding: '20px', background: '#007bff', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ margin: 0 }}>Live AI Competency Interview</h3>
-                <button onClick={() => setShowInterviewOverlay(false)} style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '24px', cursor: 'pointer' }}>&times;</button>
-            </div>
-            <div style={{ flex: 1, padding: '20px', overflowY: 'auto', background: '#f8f9fa' }}>
-                <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#007bff', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>AI</div>
-                    <div style={{ background: '#fff', padding: '15px', borderRadius: '12px', borderTopLeftRadius: 0, boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
-                        <p style={{ margin: 0 }}>Hello! Let's evaluate your understanding of stratified sampling. Can you describe a scenario in your department where stratified sampling would be preferable to simple random sampling?</p>
-                    </div>
-                </div>
-                
-                <div style={{ display: 'flex', gap: '15px', marginBottom: '20px', flexDirection: 'row-reverse' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#28a745', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>U</div>
-                    <div style={{ background: '#e8f5e9', padding: '15px', borderRadius: '12px', borderTopRightRadius: 0, boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
-                        <p style={{ margin: 0 }}>If we are surveying government hospitals across districts, we'd want to stratify by hospital size (large vs small) to ensure smaller clinics aren't underrepresented.</p>
-                    </div>
-                </div>
 
-                <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#007bff', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>AI</div>
-                    <div style={{ background: '#fff', padding: '15px', borderRadius: '12px', borderTopLeftRadius: 0, boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
-                        <p style={{ margin: 0 }}>Excellent practical example. Now, how would you determine the sample size for each stratum?</p>
-                    </div>
-                </div>
-            </div>
-            <div style={{ padding: '15px', background: '#fff', borderTop: '1px solid #eee', display: 'flex', gap: '10px' }}>
-                <input type="text" placeholder="Type your response or use voice input..." style={{ flex: 1, padding: '12px', borderRadius: '24px', border: '1px solid #ddd' }} />
-                <button style={{ padding: '0 20px', borderRadius: '24px', background: '#007bff', color: '#fff', border: 'none', fontWeight: 'bold' }}>Send</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Learning Path Module Overlay Mockup */}
-      {showLearningOverlay && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: '#fff', width: '95%', maxWidth: '1000px', height: '85vh', borderRadius: '12px', display: 'flex', overflow: 'hidden' }}>
-            <div style={{ flex: 3, display: 'flex', flexDirection: 'column' }}>
-                <div style={{ background: '#000', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
-                    <div style={{ textAlign: 'center' }}>
-                        <h1 style={{ fontSize: '48px', margin: '0 0 20px 0' }}>▶</h1>
-                        <p>Interactive Video Module Player</p>
-                    </div>
-                </div>
-                <div style={{ padding: '20px', background: '#fff', borderTop: '1px solid #eee' }}>
-                    <h2 style={{ margin: '0 0 10px 0' }}>Module 1: Fundamentals</h2>
-                    <p style={{ margin: 0, color: '#666' }}>Learn the core concepts required to close your identified competency gap.</p>
-                </div>
-            </div>
-            <div style={{ flex: 1, background: '#f8f9fa', borderLeft: '1px solid #e0e0e0', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ padding: '20px', borderBottom: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h3 style={{ margin: 0 }}>Course Content</h3>
-                    <button onClick={() => setShowLearningOverlay(false)} style={{ background: 'transparent', border: 'none', fontSize: '24px', cursor: 'pointer' }}>&times;</button>
-                </div>
-                <div style={{ padding: '20px', overflowY: 'auto' }}>
-                    <div style={{ padding: '15px', background: '#e8f0fe', borderRadius: '8px', marginBottom: '10px', borderLeft: '4px solid #1a73e8' }}>
-                        <strong style={{ display: 'block', marginBottom: '5px' }}>1. Introduction to Concepts</strong>
-                        <span style={{ fontSize: '12px', color: '#666' }}>Video • 12 mins</span>
-                    </div>
-                    <div style={{ padding: '15px', background: '#fff', borderRadius: '8px', marginBottom: '10px', border: '1px solid #eee' }}>
-                        <strong style={{ display: 'block', marginBottom: '5px', color: '#666' }}>2. Hands-on Practice Sandbox</strong>
-                        <span style={{ fontSize: '12px', color: '#999' }}>Interactive • 30 mins</span>
-                    </div>
-                    <div style={{ padding: '15px', background: '#fff', borderRadius: '8px', marginBottom: '10px', border: '1px solid #eee' }}>
-                        <strong style={{ display: 'block', marginBottom: '5px', color: '#666' }}>3. Module Assessment</strong>
-                        <span style={{ fontSize: '12px', color: '#999' }}>Quiz • 15 mins</span>
-                    </div>
-                </div>
-                <div style={{ padding: '20px', marginTop: 'auto', borderTop: '1px solid #e0e0e0' }}>
-                    <button onClick={() => { setShowLearningOverlay(false); setDashboardView('passport'); }} style={{ width: '100%', padding: '12px', background: '#28a745', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>Complete Module</button>
-                </div>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   )
