@@ -160,6 +160,13 @@ export default function AIInterviewView({ profile = {}, competencyGaps = [], onS
   const [exitConfirmModal, setExitConfirmModal] = useState(false)
   const lastViolationTimeRef = useRef(0)
 
+  // Scroll to top on mount so AI Interview tab never opens from the bottom/end
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+    document.documentElement.scrollTop = 0
+    document.body.scrollTop = 0
+  }, [])
+
   useEffect(() => {
     if (isFullscreen) {
       document.body.style.overflow = 'hidden'
@@ -172,6 +179,7 @@ export default function AIInterviewView({ profile = {}, competencyGaps = [], onS
   }, [isFullscreen])
 
   const chatBottomRef = useRef(null)
+  const chatMessagesRef = useRef(null)
   const textareaRef = useRef(null)
   const selectedVoiceRef = useRef(null)
 
@@ -248,8 +256,14 @@ export default function AIInterviewView({ profile = {}, competencyGaps = [], onS
     }
   }, [])
 
+  // Auto-scroll the inner chat messages container safely without scrolling the outer page
   useEffect(() => {
-    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (chatMessagesRef.current) {
+      chatMessagesRef.current.scrollTo({
+        top: chatMessagesRef.current.scrollHeight,
+        behavior: 'smooth',
+      })
+    }
   }, [messages, isAiThinking])
 
   // ── Start Interview Session (Real-Life HR Opening) ──────────────────────────
@@ -615,7 +629,7 @@ CRITICAL HR INTERVIEWER TRAINING & DIRECTIVES:
       console.error(err)
       setIsAiThinking(false)
     } finally {
-      setTimeout(() => textareaRef.current?.focus(), 150)
+      setTimeout(() => textareaRef.current?.focus({ preventScroll: true }), 150)
     }
   }
 
@@ -842,10 +856,20 @@ CRITICAL HR INTERVIEWER TRAINING & DIRECTIVES:
             </div>
           ) : (
             <>
-              <div className="chat-messages">
+              <div className="chat-messages" ref={chatMessagesRef}>
                 {messages.map(msg => (
                   <div key={msg.id} className={`msg-row ${msg.sender === 'ai' ? 'ai-row' : 'user-row'}`}>
-                    {msg.sender === 'ai' && <div className="msg-avatar-badge">HR</div>}
+                    {msg.sender === 'ai' && (
+                      <div className="msg-avatar-badge" title="Dr. V. Ramanathan (HR Panel Chair)">
+                        <img
+                          src="/avatar-interviewer.jpg"
+                          alt="HR"
+                          className="msg-avatar-photo"
+                          onError={(e) => { e.currentTarget.style.display = 'none' }}
+                        />
+                        <span className="msg-avatar-fallback">HR</span>
+                      </div>
+                    )}
                     <div className={`msg-bubble ${msg.sender === 'ai' ? 'ai-bubble' : 'user-bubble'}`}>
                       {msg.sender === 'ai' && (
                         <div className="msg-header">
@@ -906,7 +930,15 @@ CRITICAL HR INTERVIEWER TRAINING & DIRECTIVES:
 
                 {isAiThinking && (
                   <div className="msg-row ai-row">
-                    <div className="msg-avatar-badge">HR</div>
+                    <div className="msg-avatar-badge" title="Dr. V. Ramanathan (HR Panel Chair)">
+                      <img
+                        src="/avatar-interviewer.jpg"
+                        alt="HR"
+                        className="msg-avatar-photo"
+                        onError={(e) => { e.currentTarget.style.display = 'none' }}
+                      />
+                      <span className="msg-avatar-fallback">HR</span>
+                    </div>
                     <div className="msg-bubble ai-bubble thinking-bubble">
                       <span>Dr. Ramanathan is analyzing your response and preparing the next question</span>
                       <div className="thinking-dots"><span /><span /><span /></div>
@@ -1073,7 +1105,7 @@ CRITICAL HR INTERVIEWER TRAINING & DIRECTIVES:
               className="resume-interview-btn"
               onClick={() => {
                 setTabWarningModal(null)
-                setTimeout(() => textareaRef.current?.focus(), 100)
+                setTimeout(() => textareaRef.current?.focus({ preventScroll: true }), 100)
               }}
             >
               I Understand &amp; Agree — Resume Interview

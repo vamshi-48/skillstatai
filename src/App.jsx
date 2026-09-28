@@ -5,7 +5,8 @@ import { validateAndCleanQuiz } from './utils/questionValidator'
 import { getRecommendations } from './services/recommendationService'
 import ChatBot from './components/ChatBot'
 import AdminPortal from './components/admin/AdminPortal'
-import { isAllowedAdmin } from './config/adminConfig'
+import AdminLoginModal from './components/admin/AdminLoginModal'
+import { isAllowedAdmin, getAdminDetails } from './config/adminConfig'
 import AIInterviewView from './components/AIInterviewView'
 
 const getUserInitial = (name) => String(name || '').trim().charAt(0).toUpperCase() || 'U'
@@ -3608,6 +3609,9 @@ function App() {
   const [isAccessibilityOpen, setIsAccessibilityOpen] = useState(false)
   const [step, setStep] = useState('loading')
   const [dashboardView, setDashboardView] = useState(() => {
+    if (typeof window !== 'undefined' && localStorage.getItem('skillstat_is_admin') === '1') {
+      return 'admin';
+    }
     return new URLSearchParams(window.location.search).get('view') || 'dashboard';
   })
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
@@ -3635,11 +3639,19 @@ function App() {
   const [roleSearch, setRoleSearch] = useState('')
   const [departmentSearch, setDepartmentSearch] = useState('')
   const [isDepartmentMenuOpen, setIsDepartmentMenuOpen] = useState(false)
-  const [profile, setProfile] = useState({
-    name: '', email: '', employeeId: '', department: '',
-    organization: '', designation: '',
-    assignment: '', currentAssignment: '', educationalQualifications: '', role: '', skills: '', experience: '',
-    previousIGOT: '', previousNSSTA: '', externalTraining: '', certifications: '',
+  const [profile, setProfile] = useState(() => {
+    try {
+      const savedAdmin = localStorage.getItem('skillstat_admin_profile')
+      if (savedAdmin && localStorage.getItem('skillstat_is_admin') === '1') {
+        return JSON.parse(savedAdmin)
+      }
+    } catch {}
+    return {
+      name: '', email: '', employeeId: '', department: '',
+      organization: '', designation: '',
+      assignment: '', currentAssignment: '', educationalQualifications: '', role: '', skills: '', experience: '',
+      previousIGOT: '', previousNSSTA: '', externalTraining: '', certifications: '',
+    }
   })
   const [profileDraft, setProfileDraft] = useState({})
   const [adminSyncTick, setAdminSyncTick] = useState(0)
@@ -3656,7 +3668,11 @@ function App() {
     }
   }, [])
 
-  const isAdmin = isAllowedAdmin(profile?.email)
+  const isAdmin = Boolean(
+    isAllowedAdmin(profile?.email) ||
+    (typeof window !== 'undefined' && localStorage.getItem('skillstat_is_admin') === '1') ||
+    (typeof sessionToken === 'string' && sessionToken.startsWith('admin-session-'))
+  )
 
   // (Admin redirect logic moved down to wait for state load)
   const [isProfileEditing, setIsProfileEditing] = useState(false)
@@ -3671,6 +3687,17 @@ function App() {
   const [questions, setQuestions] = useState([])
   const [questionResults, setQuestionResults] = useState([])
   const [activeQuizType, setActiveQuizType] = useState('standard') // 'standard' | 'weekend' | 'notes'
+
+  // Fix tabs opening from the end: always scroll to top on tab/view/step change
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+    document.documentElement.scrollTop = 0
+    document.body.scrollTop = 0
+    const mainViewport = document.querySelector('.dashboard-main-viewport')
+    if (mainViewport) mainViewport.scrollTop = 0
+    const mainBody = document.querySelector('.dashboard-body')
+    if (mainBody) mainBody.scrollTop = 0
+  }, [dashboardView, step, activeQuizType])
   const [skillGapData, setSkillGapData] = useState({})
   const [quizzesCompleted, setQuizzesCompleted] = useState(0)
   const [overallScore, setOverallScore] = useState(0)
@@ -3829,7 +3856,7 @@ function App() {
     })
   }
 
-  const [authModal, setAuthModal] = useState(null) // null | 'login' | 'signup' | 'sso'
+  const [authModal, setAuthModal] = useState(null) // null | 'login' | 'signup' | 'sso' | 'admin-login'
   const [minLandingElapsed, setMinLandingElapsed] = useState(false)
   const minLandingElapsedRef = useRef(false)
   const pendingDashboardRef = useRef(false)
@@ -3838,14 +3865,81 @@ function App() {
   const [chatHistory, setChatHistory] = useState([])
   const onboardingSessionRef = useRef(localStorage.getItem('skillstat_onboarding') === '1')
 
+  // Handler for authenticating through dedicated Admin Login
+  const handleAdminAuthenticate = (emailToAuth) => {
+    const targetEmail = (emailToAuth || 'karshikalamvamshi48@gmail.com').trim().toLowerCase()
+    const adminDetails = getAdminDetails(targetEmail)
+    const adminToken = 'admin-session-' + Date.now()
+
+    onboardingSessionRef.current = false
+    localStorage.removeItem('skillstat_onboarding')
+    localStorage.setItem('skillstat_session', adminToken)
+    localStorage.setItem('skillstat_is_admin', '1')
+    localStorage.setItem('skillstat_admin_email', targetEmail)
+
+    const updatedProfile = {
+      ...MOCK_ADMIN_PROFILE,
+      name: adminDetails.name,
+      email: adminDetails.email,
+      role: adminDetails.role,
+      designation: adminDetails.designation,
+      department: adminDetails.department,
+      organization: 'Ministry of Statistics & Programme Implementation (MoSPI)',
+      employeeId: adminDetails.employeeId || 'ADM-MoSPI-2026',
+    }
+    localStorage.setItem('skillstat_admin_profile', JSON.stringify(updatedProfile))
+
+    setSessionToken(adminToken)
+    setProfile(updatedProfile)
+    setOverallScore(88)
+    setQuizzesCompleted(4)
+    setCompetencyGaps([
+      { skill: 'Survey Design', current: 92, required: 85, priority: 'High', isAssessed: true },
+      { skill: 'Sampling', current: 88, required: 80, priority: 'Medium', isAssessed: true },
+      { skill: 'Data Quality Frameworks', current: 94, required: 85, priority: 'High', isAssessed: true },
+      { skill: 'Python', current: 86, required: 80, priority: 'Medium', isAssessed: true },
+      { skill: 'SQL', current: 84, required: 80, priority: 'Medium', isAssessed: true },
+      { skill: 'Data Visualization', current: 85, required: 80, priority: 'High', isAssessed: true },
+    ])
+
+    setDashboardView('admin')
+    setStep('dashboard')
+    setAuthModal(null)
+    setIsStateLoaded(true)
+
+    window.dispatchEvent(new CustomEvent('skillstat_admin_update', { detail: { type: 'login', email: targetEmail } }))
+    window.dispatchEvent(new Event('storage'))
+  }
+
+  // URL query/hash listener for direct admin portal access (e.g., ?admin, ?login=admin, #admin)
   useEffect(() => {
-    if (dashboardView === 'admin' && !isAdmin && isStateLoaded) {
+    try {
+      const searchParams = new URLSearchParams(window.location.search)
+      const hash = window.location.hash
+      if (searchParams.has('admin') || searchParams.get('login') === 'admin' || hash === '#admin') {
+        if (isAdmin && sessionToken) {
+          setDashboardView('admin')
+          setStep('dashboard')
+        } else {
+          setAuthModal('admin-login')
+        }
+      }
+    } catch {}
+  }, [isAdmin, sessionToken])
+
+  useEffect(() => {
+    const isCurrentAdmin = Boolean(
+      isAdmin ||
+      (typeof window !== 'undefined' && localStorage.getItem('skillstat_is_admin') === '1') ||
+      (typeof sessionToken === 'string' && sessionToken.startsWith('admin-session-'))
+    )
+    if (dashboardView === 'admin' && !isCurrentAdmin && isStateLoaded) {
       const timer = setTimeout(() => {
         setDashboardView('dashboard')
       }, 0)
       return () => clearTimeout(timer)
     }
-  }, [dashboardView, isAdmin, isStateLoaded])
+  }, [dashboardView, isAdmin, isStateLoaded, sessionToken])
 
   const t = text[language] || extendedText[language] || text.en
   const tx = (key) => uiText[language]?.[key] || uiText.en[key] || key
@@ -3854,6 +3948,19 @@ function App() {
     if (!sessionToken) {
       return
     }
+
+    const isCurrentAdmin = Boolean(
+      (typeof window !== 'undefined' && localStorage.getItem('skillstat_is_admin') === '1') ||
+      (typeof sessionToken === 'string' && sessionToken.startsWith('admin-session-'))
+    )
+
+    if (isCurrentAdmin) {
+      setIsStateLoaded(true)
+      setDashboardView('admin')
+      setStep('dashboard')
+      return
+    }
+
     apiRequest('/api/state')
       .then(({ state }) => {
         if (state.profile) {
@@ -3903,6 +4010,12 @@ function App() {
 
   useEffect(() => {
     if (!sessionToken || !isStateLoaded) return
+    const isCurrentAdmin = Boolean(
+      (typeof window !== 'undefined' && localStorage.getItem('skillstat_is_admin') === '1') ||
+      (typeof sessionToken === 'string' && sessionToken.startsWith('admin-session-'))
+    )
+    if (isCurrentAdmin) return
+
     const state = {
       profile,
       selectedSkillList,
@@ -3933,10 +4046,14 @@ function App() {
   const clearSession = () => {
     onboardingSessionRef.current = false
     localStorage.removeItem('skillstat_onboarding')
+    localStorage.removeItem('skillstat_is_admin')
+    localStorage.removeItem('skillstat_admin_email')
+    localStorage.removeItem('skillstat_admin_profile')
     apiRequest('/api/auth/logout', { method: 'POST' }).catch(() => {})
     localStorage.removeItem('skillstat_session')
     setSessionToken('')
     setIsStateLoaded(false)
+    setDashboardView('dashboard')
     setProfile({
       name: '', email: '', employeeId: '', department: '', organization: '', designation: '',
       assignment: '', currentAssignment: '', educationalQualifications: '', role: '', skills: '', experience: '', previousIGOT: '',
@@ -4506,14 +4623,6 @@ function App() {
               </select>
             </div>
             <button type="button" className="header-icon-btn" style={{ marginLeft: '6px' }} onClick={() => setIsAccessibilityOpen(true)} title="Accessibility">♿</button>
-
-            <button
-              type="button"
-              className="landing-secondary-btn"
-              onClick={() => setAuthModal('login')}
-            >
-              {t.signIn || 'Sign In'}
-            </button>
           </div>
         </header>
 
@@ -4551,7 +4660,21 @@ function App() {
               className="landing-secondary-btn"
               onClick={() => setAuthModal('login')}
             >
-              <span>{t.signIn || 'Sign In'}</span>
+              <span>Sign In</span>
+            </button>
+
+            <button
+              type="button"
+              className="landing-admin-hero-btn"
+              onClick={() => {
+                setSignupError('')
+                setAuthModal('admin-login')
+              }}
+              title="Authorized Access for MoSPI HR Directors, Panel Chairs & System Administrators"
+            >
+              <span className="admin-hero-shield">🛡️</span>
+              <span>Admin Portal Login</span>
+              <span className="admin-hero-tag">MoSPI Command</span>
             </button>
 
             <button
@@ -4722,6 +4845,27 @@ function App() {
                 {tx('continueSso')}
               </button>
 
+              {/* Switch to Admin Login banner */}
+              <div className="admin-switch-banner">
+                <div className="admin-switch-info">
+                  <span className="admin-switch-icon">🛡️</span>
+                  <div>
+                    <strong>System Administrator or Panel Chair?</strong>
+                    <p>Access central workforce evaluation &amp; management portal</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="admin-switch-action-btn"
+                  onClick={() => {
+                    setSignupError('')
+                    setAuthModal('admin-login')
+                  }}
+                >
+                  Admin Login →
+                </button>
+              </div>
+
               <p className="signup-prompt" style={{ marginTop: '16px' }}>
                 New to Skillstat AI?{' '}
                 <button
@@ -4739,6 +4883,17 @@ function App() {
             </div>
           </div>
         )}
+
+        {/* Dedicated Admin Portal Login Modal */}
+        <AdminLoginModal
+          isOpen={authModal === 'admin-login'}
+          onClose={() => setAuthModal(null)}
+          onSuccess={(adminEmail) => handleAdminAuthenticate(adminEmail)}
+          onSwitchToUserLogin={() => {
+            setSignupError('')
+            setAuthModal('login')
+          }}
+        />
 
         {/* Forgot Password Modal */}
         {authModal === 'forgot-password' && (
@@ -5888,6 +6043,7 @@ function App() {
     return (
       <AdminPortal
         onReturnToLearner={() => {
+          localStorage.removeItem('skillstat_is_admin')
           setDashboardView('dashboard')
           setAdminSyncTick((prev) => prev + 1)
         }}
@@ -5898,6 +6054,16 @@ function App() {
   return (
     <div className={`dashboard-app-layout ${isSidebarCollapsed ? 'sidebar-collapsed' : ''} ${isMobileSidebarOpen ? 'mobile-sidebar-open' : ''}`}>
       <AccessibilityPanel isOpen={isAccessibilityOpen} onClose={() => setIsAccessibilityOpen(false)} />
+      {/* Dedicated Admin Portal Login Modal inside Dashboard */}
+      <AdminLoginModal
+        isOpen={authModal === 'admin-login'}
+        onClose={() => setAuthModal(null)}
+        onSuccess={(adminEmail) => handleAdminAuthenticate(adminEmail)}
+        onSwitchToUserLogin={() => {
+          setSignupError('')
+          setAuthModal('login')
+        }}
+      />
       {/* Mobile Drawer Backdrop */}
       {isMobileSidebarOpen && (
         <div
@@ -5940,7 +6106,7 @@ function App() {
               className={`sidebar-nav-item ${dashboardView === 'ai-interview' ? 'active' : ''}`}
               onClick={() => { setDashboardView('ai-interview'); setIsMobileSidebarOpen(false) }}
             >
-              <span className="nav-icon">🤖</span>
+              <span className="nav-icon">🎙️</span>
               <span className="nav-label">AI Interview</span>
             </button>
             <button
@@ -6006,27 +6172,8 @@ function App() {
           </nav>
         </div>
 
-        {/* Fixed Bottom: Management & User Footer */}
+        {/* Fixed Bottom: User Footer */}
         <div className="sidebar-fixed-bottom">
-          {isAdmin && (
-            <div className="sidebar-management-wrap">
-              <div className="sidebar-section-label">MANAGEMENT</div>
-              <nav className="sidebar-nav-group" aria-label="Management">
-                <button
-                  type="button"
-                  className={`sidebar-nav-item admin-portal-btn ${dashboardView === 'admin' ? 'active' : ''}`}
-                  onClick={() => { 
-                    setDashboardView('admin');
-                    setIsMobileSidebarOpen(false);
-                  }}
-                >
-                  <span className="nav-icon">🛡️</span>
-                  <span className="nav-label">Admin Portal</span>
-                  <span className="sidebar-pill-badge admin">Portal</span>
-                </button>
-              </nav>
-            </div>
-          )}
 
           {/* Sidebar Footer User Card */}
           <div className="sidebar-user-footer">
@@ -6122,6 +6269,18 @@ function App() {
                     setDashboardView('promotions')
                     setIsProfileMenuOpen(false)
                   }}>🎖️ {navText[language]?.[5] || navText.en[5]}</button>
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setDashboardView('admin')
+                        setIsProfileMenuOpen(false)
+                      }}
+                    >
+                      🛡️ Admin Command Portal
+                    </button>
+                  )}
                   <button type="button" role="menuitem" onClick={() => setIsSettingsOpen((open) => !open)}>{t.settings}</button>
                   {isSettingsOpen && (
                     <div className="theme-settings" role="group" aria-label={t.settings}>

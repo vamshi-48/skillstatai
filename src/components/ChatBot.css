@@ -105,16 +105,23 @@
 }
 
 .chatbot-avatar-circle {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.18);
+  background: radial-gradient(circle at 35% 35%, #38bdf8, #1e3a8a 70%, #0f172a);
   display: grid;
   place-items: center;
-  font-size: 16px;
-  color: #b3cce6;
+  font-size: 18px;
+  color: #ffffff;
   font-weight: 700;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1.5px solid rgba(56, 189, 248, 0.6);
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.4), inset 0 0 8px rgba(255, 255, 255, 0.3);
+  animation: botAvatarFloat 3s ease-in-out infinite;
+}
+
+@keyframes botAvatarFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
 }
 
 .chatbot-header-info h4 {
@@ -225,16 +232,18 @@
 }
 
 .bot-avatar-badge {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  background: #003688;
+  background: radial-gradient(circle at 35% 35%, #38bdf8, #1e3a8a 80%);
   color: #ffffff;
   display: grid;
   place-items: center;
-  font-size: 12px;
+  font-size: 14px;
   flex-shrink: 0;
   margin-top: 2px;
+  border: 1px solid rgba(56, 189, 248, 0.5);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
 }
 
 .message-bubble {

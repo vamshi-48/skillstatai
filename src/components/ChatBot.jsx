@@ -40,8 +40,15 @@ export default function ChatBot({
     onHistoryChange?.(messages)
   }, [messages, onHistoryChange])
 
+  const messagesBodyRef = useRef(null)
+
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (messagesBodyRef.current) {
+      messagesBodyRef.current.scrollTo({
+        top: messagesBodyRef.current.scrollHeight,
+        behavior: 'smooth',
+      })
+    }
   }
 
   useEffect(() => {
@@ -352,7 +359,7 @@ export default function ChatBot({
           </nav>
 
           {/* Message History */}
-          <div className="chatbot-messages-body">
+          <div className="chatbot-messages-body" ref={messagesBodyRef}>
             {messages.map((msg) => (
               <div
                 key={msg.id}
