@@ -7,6 +7,8 @@
  */
 
 export const ALLOWED_ADMIN_EMAILS = [
+  'admin@mospi.gov.in',
+  'admin',
   'karshikalamvamshi48@gmail.com',
   'karshikalamvamshi34@gmail.com',
   'sathvika846@gmail.com',
@@ -17,6 +19,16 @@ export const ALLOWED_ADMIN_EMAILS = [
 ]
 
 export const ADMIN_DIRECTORY = [
+  {
+    name: 'Karshikala Vamshi',
+    email: 'admin@mospi.gov.in',
+    role: 'Chief Administrative Officer',
+    designation: 'Director General & System Administrator',
+    department: 'National Statistical Office (NSO)',
+    division: 'Executive Directorate',
+    employeeId: 'ADM-MoSPI-001',
+    badge: 'Super Admin',
+  },
   {
     name: 'Karshikala Vamshi',
     email: 'karshikalamvamshi48@gmail.com',
