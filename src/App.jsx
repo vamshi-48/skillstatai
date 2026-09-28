@@ -3668,10 +3668,13 @@ function App() {
     }
   }, [])
 
+  const [sessionToken, setSessionToken] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('skillstat_session') : '') || '')
+
   const isAdmin = Boolean(
     isAllowedAdmin(profile?.email) ||
     (typeof window !== 'undefined' && localStorage.getItem('skillstat_is_admin') === '1') ||
-    (typeof sessionToken === 'string' && sessionToken.startsWith('admin-session-'))
+    (typeof sessionToken === 'string' && sessionToken.startsWith('admin-session-')) ||
+    (typeof window !== 'undefined' && localStorage.getItem('skillstat_session')?.startsWith('admin-session-'))
   )
 
   // (Admin redirect logic moved down to wait for state load)
@@ -3860,7 +3863,6 @@ function App() {
   const [minLandingElapsed, setMinLandingElapsed] = useState(false)
   const minLandingElapsedRef = useRef(false)
   const pendingDashboardRef = useRef(false)
-  const [sessionToken, setSessionToken] = useState(() => localStorage.getItem('skillstat_session') || '')
   const [isStateLoaded, setIsStateLoaded] = useState(false)
   const [chatHistory, setChatHistory] = useState([])
   const onboardingSessionRef = useRef(localStorage.getItem('skillstat_onboarding') === '1')
