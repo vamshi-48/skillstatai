@@ -216,18 +216,20 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
   // Fetch real users from backend & keep Admin Portal live
   const loadAdminUsers = () => {
     const token = localStorage.getItem('skillstat_session')
+    const adminEmail = localStorage.getItem('skillstat_admin_email') || adminUser?.email || ''
     if (!token) return
 
     fetch('/api/admin/users', {
       headers: {
-        'Authorization': `Bearer ${token}`
-      }
+        'Authorization': `Bearer ${token}`,
+        'X-Admin-Email': adminEmail,
+      },
     })
-      .then(res => {
+      .then((res) => {
         if (!res.ok) return { users: [] }
         return res.json().catch(() => ({ users: [] }))
       })
-      .then(data => {
+      .then((data) => {
         if (data && Array.isArray(data.users) && data.users.length > 0) {
           const mappedUsers = data.users.map((u, i) => {
             const rawScore = Number(u.overallScore) || 0
@@ -258,6 +260,42 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
           })
 
           setEmployees(mappedUsers)
+
+          // Dynamically aggregate real skill gaps across all active officers
+          const gapFrequency = {}
+          data.users.forEach((u) => {
+            const gaps = Array.isArray(u.competencyGaps) ? u.competencyGaps : []
+            gaps.forEach((g) => {
+              const sName = g.skill || g.name
+              if (sName) {
+                if (!gapFrequency[sName]) {
+                  gapFrequency[sName] = {
+                    skill: sName,
+                    affectedCount: 0,
+                    avgCurrent: 0,
+                    target: g.required || 75,
+                    priority: g.priority || 'Medium',
+                  }
+                }
+                gapFrequency[sName].affectedCount += 1
+                gapFrequency[sName].avgCurrent += Number(g.current) || 50
+              }
+            })
+          })
+          const computedGaps = Object.values(gapFrequency).map((item, idx) => ({
+            id: `gap-live-${idx}`,
+            skill: item.skill,
+            department: 'Multiple Divisions',
+            requiredProficiency: item.target,
+            currentAvg: Math.round(item.avgCurrent / item.affectedCount),
+            gapDelta: Math.max(0, item.target - Math.round(item.avgCurrent / item.affectedCount)),
+            priority: item.priority || (item.target - Math.round(item.avgCurrent / item.affectedCount) > 15 ? 'High' : 'Medium'),
+            affectedStaff: item.affectedCount,
+            recommendedCourse: `iGOT Karmayogi: ${item.skill} Proficiency Track`,
+          }))
+          if (computedGaps.length > 0) {
+            setSkillGaps(computedGaps)
+          }
 
           // Dynamically synchronize Department staffing breakdown based on live employees
           setDepartments(prevDepts => {
@@ -292,6 +330,16 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
   useEffect(() => {
     loadAdminUsers()
 
+    // 3-second live polling to ensure admin panel data updates every single time
+    const pollInterval = setInterval(() => {
+      loadAdminUsers()
+    }, 3000)
+
+    // Immediate update when window gains focus or tab becomes visible
+    const handleFocus = () => loadAdminUsers()
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleFocus)
+
     // Listen to real-time events when another user registers, logs in, or submits scores
     const handleLiveSync = (e) => {
       if (e?.detail?.type === 'employees' || e?.detail?.type === 'departments') {
@@ -301,7 +349,11 @@ export default function AdminPortal({ onReturnToLearner, adminUser = {} }) {
     }
     window.addEventListener('skillstat_admin_update', handleLiveSync)
     window.addEventListener('storage', handleLiveSync)
+
     return () => {
+      clearInterval(pollInterval)
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleFocus)
       window.removeEventListener('skillstat_admin_update', handleLiveSync)
       window.removeEventListener('storage', handleLiveSync)
     }

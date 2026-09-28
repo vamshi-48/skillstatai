@@ -12,22 +12,22 @@ import AIInterviewView from './components/AIInterviewView'
 const getUserInitial = (name) => String(name || '').trim().charAt(0).toUpperCase() || 'U'
 
 const MOCK_ADMIN_PROFILE = {
-  name: 'Karshikala Vamshi',
-  email: 'karshikalamvamshi48@gmail.com',
-  employeeId: 'EMP-MoSPI-2026-08',
+  name: '',
+  email: '',
+  employeeId: '',
   department: 'National Statistical Office (NSO)',
   organization: 'Ministry of Statistics & Programme Implementation',
-  designation: 'Senior Statistical Officer',
+  designation: 'Statistical Officer',
   role: 'Statistical Officer',
-  skills: 'Survey Design, Sampling, Data Quality Frameworks, Python, SQL, Data Visualization',
-  experience: '6 Years in Official Statistics and Survey Administration',
-  assignment: 'Directorate of Field Operations',
-  currentAssignment: 'National Sample Survey Division',
-  educationalQualifications: 'Master of Statistics (M.Stat)',
-  previousIGOT: 'Official Statistics Framework & Microdata Management',
-  previousNSSTA: 'Advanced Sampling & Index Number Methodology',
-  externalTraining: 'United Nations Statistics Division Workshop',
-  certifications: 'ISO 9001 Data Quality Lead Auditor, Python Data Specialist',
+  skills: '',
+  experience: '',
+  assignment: '',
+  currentAssignment: '',
+  educationalQualifications: '',
+  previousIGOT: '',
+  previousNSSTA: '',
+  externalTraining: '',
+  certifications: '',
 }
 
 function handleOfflineApiFallback(url, options = {}) {
@@ -38,7 +38,7 @@ function handleOfflineApiFallback(url, options = {}) {
   } catch {}
 
   if (url.includes('/api/auth/login')) {
-    const email = body.email || (body.identity && body.identity.includes('@') ? body.identity : 'karshikalamvamshi48@gmail.com')
+    const email = body.email || (body.identity && body.identity.includes('@') ? body.identity : '')
     const token = 'session-token-' + Date.now()
     const profile = { ...MOCK_ADMIN_PROFILE, email }
     return {
@@ -3869,7 +3869,7 @@ function App() {
 
   // Handler for authenticating through dedicated Admin Login
   const handleAdminAuthenticate = (emailToAuth) => {
-    const targetEmail = (emailToAuth || 'karshikalamvamshi48@gmail.com').trim().toLowerCase()
+    const targetEmail = (emailToAuth || 'gadisingapoorgourishanker@gmail.com').trim().toLowerCase()
     const adminDetails = getAdminDetails(targetEmail)
     const adminToken = 'admin-session-' + Date.now()
 
@@ -4382,8 +4382,11 @@ function App() {
   }, [timeLeft, step]);
 
   useEffect(() => {
-    setTimeLeft(60);
-  }, [questionIndex]);
+    const currentQ = questions[questionIndex]
+    const isCodeQ = currentQ?.type === 'code' || (currentQ?.skill && isCodingSkill(currentQ.skill))
+    // Coding questions get an extended time limit: 5 minutes (300s), standard MCQs get 60s
+    setTimeLeft(isCodeQ ? 300 : 60)
+  }, [questionIndex, questions])
 
   // Answer Submission & Verified Competency Update
   const handleAnswerSubmit = () => {
@@ -4690,38 +4693,6 @@ function App() {
             >
               <span className="sso-flag">🇮🇳</span>
               <span>{tx('continueSso')}</span>
-            </button>
-
-            <button
-              type="button"
-              className="landing-primary-btn demo-access-btn"
-              onClick={() => {
-                const token = 'demo-officer-session-' + Date.now()
-                localStorage.setItem('skillstat_session', token)
-                setSessionToken(token)
-                setProfile({ ...MOCK_ADMIN_PROFILE })
-                setOverallScore(82)
-                setQuizzesCompleted(3)
-                setCompetencyGaps([
-                  { skill: 'Survey Design', current: 85, required: 75, priority: 'High', isAssessed: true },
-                  { skill: 'Sampling', current: 78, required: 75, priority: 'Medium', isAssessed: true },
-                  { skill: 'Data Quality Frameworks', current: 82, required: 80, priority: 'High', isAssessed: true },
-                  { skill: 'Python', current: 80, required: 75, priority: 'Medium', isAssessed: true },
-                  { skill: 'SQL', current: 75, required: 75, priority: 'Medium', isAssessed: true },
-                  { skill: 'Data Visualization', current: 70, required: 75, priority: 'High', isAssessed: true },
-                ])
-                setStep('dashboard')
-              }}
-              style={{
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
-                border: 'none',
-                color: '#fff',
-                fontWeight: 700,
-              }}
-            >
-              <span>⚡ Enter Verified Dashboard (Quick Access)</span>
-              <span className="btn-arrow">→</span>
             </button>
           </div>
         </main>
@@ -5084,7 +5055,6 @@ function App() {
                 if (data.requiresVerification) {
                   setVerifyEmail(email)
                   setOtpDigits(['', '', '', '', '', ''])
-                  setDevOtp(data.devOtp || '123456')
                   setVerificationError('')
                   setVerificationSuccess('')
                   setResendCooldown(30)
@@ -5219,7 +5189,6 @@ function App() {
       })
         .then((data) => {
           setResendCooldown(30)
-          if (data?.devOtp) setDevOtp(data.devOtp)
           setVerificationSuccess('A new verification code has been dispatched to your email.')
         })
         .catch((err) => {
@@ -5871,8 +5840,17 @@ function App() {
                 </span>
                 <span>{Math.round((questionIndex / questions.length) * 100)}% Complete</span>
               </div>
-              <div style={{ color: timeLeft <= 10 ? 'red' : 'inherit', fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '8px', textAlign: 'right' }}>
-                ⏱ Time Left: {timeLeft}s
+              <div style={{ color: timeLeft <= 15 ? '#dc2626' : '#1e293b', fontWeight: 'bold', fontSize: '0.95rem', marginBottom: '8px', textAlign: 'right', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '1.05rem' }}>⏱</span>
+                <span>
+                  {isCodeQ ? 'Coding Timer: ' : 'Time Left: '}
+                  {Math.floor(Math.max(0, timeLeft) / 60)}:{String(Math.max(0, timeLeft) % 60).padStart(2, '0')}
+                </span>
+                {isCodeQ && (
+                  <span style={{ fontSize: '11px', background: '#dbeafe', color: '#1d4ed8', padding: '2px 8px', borderRadius: '4px', marginLeft: '4px', fontWeight: 700 }}>
+                    5 Mins
+                  </span>
+                )}
               </div>
               <div className="progress-track">
                 <div
