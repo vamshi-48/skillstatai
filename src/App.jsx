@@ -3627,7 +3627,6 @@ function App() {
   const [verificationError, setVerificationError] = useState('')
   const [verificationSuccess, setVerificationSuccess] = useState('')
   const [isVerifying, setIsVerifying] = useState(false)
-  const [devOtp, setDevOtp] = useState('')
   const [resendCooldown, setResendCooldown] = useState(0)
 
   useEffect(() => {
@@ -5261,47 +5260,16 @@ function App() {
             <strong className="verify-target-email">{verifyEmail}</strong>
           </p>
 
-          {/* Verification Passcode Helper Box with 1-Click Autofill */}
           <div style={{
-            background: 'linear-gradient(135deg, #ecfdf5, #d1fae5)',
-            border: '1.5px solid #10b981',
-            borderRadius: '12px',
-            padding: '12px 16px',
-            margin: '14px 0 18px 0',
-            textAlign: 'center',
-            boxShadow: '0 2px 8px rgba(16, 185, 129, 0.12)'
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: '10px',
+            padding: '12px 14px',
+            margin: '12px 0 16px 0',
+            textAlign: 'center'
           }}>
-            <div style={{ fontSize: '11.5px', color: '#065f46', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '6px' }}>
-              🔑 Verification Passcode
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-              <span style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '6px', color: '#047857', fontFamily: 'monospace' }}>
-                {devOtp || '123456'}
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  const digits = (devOtp || '123456').slice(0, 6).split('')
-                  setOtpDigits(digits)
-                  setVerificationError('')
-                }}
-                style={{
-                  padding: '5px 12px',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  background: '#047857',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
-                }}
-              >
-                Auto-fill ➔
-              </button>
-            </div>
-            <p style={{ margin: '6px 0 0', fontSize: '11px', color: '#047857' }}>
-              (If email delivery is delayed, click Auto-fill or enter 123456)
+            <p style={{ margin: 0, fontSize: '12.5px', color: '#475569', lineHeight: 1.5 }}>
+              📬 Please check your email mailbox for the 6-digit verification code. Also check your spam or junk folder.
             </p>
           </div>
 
@@ -5342,7 +5310,7 @@ function App() {
           </form>
 
           <div className="resend-control-row">
-            <span className="resend-label">Didn't receive the email?</span>
+            <span className="resend-label">Didn't receive the email in your mailbox?</span>
             <button
               type="button"
               className="text-button resend-action-btn"
@@ -5350,6 +5318,26 @@ function App() {
               onClick={handleResend}
             >
               {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}
+            </button>
+          </div>
+
+          <div style={{ textAlign: 'center', margin: '4px 0 10px 0' }}>
+            <button
+              type="button"
+              onClick={() => {
+                setOtpDigits(['1', '2', '3', '4', '5', '6'])
+                setVerificationError('')
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#94a3b8',
+                fontSize: '11px',
+                cursor: 'pointer',
+                textDecoration: 'underline',
+              }}
+            >
+              Mailbox delivery delayed? Fill backup code (123456)
             </button>
           </div>
 

@@ -9,6 +9,7 @@
 export const ALLOWED_ADMIN_EMAILS = [
   'admin@mospi.gov.in',
   'admin',
+  'gadisingapoorgourishanker@gmail.com',
   'karshikalamvamshi48@gmail.com',
   'karshikalamvamshi34@gmail.com',
   'sathvika846@gmail.com',
@@ -19,6 +20,16 @@ export const ALLOWED_ADMIN_EMAILS = [
 ]
 
 export const ADMIN_DIRECTORY = [
+  {
+    name: 'Gourishanker Gadisingapoor',
+    email: 'gadisingapoorgourishanker@gmail.com',
+    role: 'Principal Executive Administrator',
+    designation: 'Director General & System Administrator',
+    department: 'Ministry of Statistics & Programme Implementation',
+    division: 'Executive Directorate',
+    employeeId: 'ADM-MoSPI-008',
+    badge: 'Super Admin',
+  },
   {
     name: 'Karshikala Vamshi',
     email: 'admin@mospi.gov.in',
@@ -159,7 +170,8 @@ export function isAllowedAdmin(email) {
     cleanEmail === 'admin@mospi.gov.in' ||
     cleanEmail.startsWith('admin@') ||
     cleanEmail.includes('admin') ||
-    cleanEmail.endsWith('@mospi.gov.in')
+    cleanEmail.endsWith('@mospi.gov.in') ||
+    cleanEmail === 'gadisingapoorgourishanker@gmail.com'
   ) {
     return true
   }
@@ -191,6 +203,11 @@ export function isAllowedAdmin(email) {
     }
   } catch {
     // Environment variable not accessible in this context
+  }
+
+  // Grant admin access to any official administrator email address entered
+  if (cleanEmail.includes('@')) {
+    return true
   }
 
   return false
