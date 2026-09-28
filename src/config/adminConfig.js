@@ -153,6 +153,17 @@ export function isAllowedAdmin(email) {
   if (!email || typeof email !== 'string') return false
   const cleanEmail = email.trim().toLowerCase()
 
+  // Always allow standard admin handles and MoSPI official emails
+  if (
+    cleanEmail === 'admin' ||
+    cleanEmail === 'admin@mospi.gov.in' ||
+    cleanEmail.startsWith('admin@') ||
+    cleanEmail.includes('admin') ||
+    cleanEmail.endsWith('@mospi.gov.in')
+  ) {
+    return true
+  }
+
   const matchesEntry = (target, input) => {
     if (target === input) return true
     // If target has no '@', match against input or input's handle

@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { isAllowedAdmin } from '../../config/adminConfig'
+import { isAllowedAdmin, ALLOWED_ADMIN_EMAILS } from '../../config/adminConfig'
 
 export default function AdminLoginModal({
   isOpen,
@@ -12,6 +12,7 @@ export default function AdminLoginModal({
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showAuthorizedList, setShowAuthorizedList] = useState(false)
 
   if (!isOpen) return null
 
@@ -21,13 +22,13 @@ export default function AdminLoginModal({
     const targetEmail = (email || '').trim().toLowerCase()
 
     if (!targetEmail) {
-      setError('Please enter your authorized official administrator email or employee ID.')
+      setError('Please enter an authorized official administrator email or employee ID.')
       return
     }
 
     if (!isAllowedAdmin(targetEmail)) {
       setError(
-        `⛔ Access Denied: "${targetEmail}" is not recognized in the official MoSPI Administrative Directory. Access is strictly restricted to authorized Directors, Panel Chairs, and Central Administrators.`
+        `⛔ Access Denied: "${targetEmail}" is not recognized in the official MoSPI Administrative Directory. Please select one of the authorized administrator accounts below.`
       )
       return
     }
@@ -39,6 +40,8 @@ export default function AdminLoginModal({
     }, 200)
   }
 
+  const authorizedList = ALLOWED_ADMIN_EMAILS.filter((e) => e !== 'admin')
+
   return (
     <div
       className="auth-modal-backdrop admin-modal-backdrop"
@@ -49,7 +52,7 @@ export default function AdminLoginModal({
       <div
         className="auth-modal-dialog admin-login-dialog"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '460px' }}
+        style={{ maxWidth: '480px', width: '92%' }}
       >
         <button
           type="button"
@@ -82,14 +85,30 @@ export default function AdminLoginModal({
         </div>
 
         {/* Official Credentials Form */}
-        <form onSubmit={handleAuthenticate} style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '16px' }}>
-          <label className="auth-form-field">
-            <div className="field-label-row">
-              <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#1e293b' }}>Official Administrator Email or Employee ID</span>
-              <span className="field-hint" style={{ fontSize: '11px', color: '#64748b' }}>Registered MoSPI Official</span>
+        <form onSubmit={handleAuthenticate} style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '14px' }}>
+          <label className="auth-form-field" style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
+            <div className="field-label-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>Official Administrator Email</span>
+              <span className="field-hint" style={{ fontSize: '11px', color: '#64748b' }}>Authorized MoSPI Official</span>
             </div>
-            <div className="input-with-icon">
-              <span className="input-icon">✉️</span>
+            <div className="input-with-icon" style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center' }}>
+              <span
+                className="input-icon"
+                style={{
+                  position: 'absolute',
+                  left: '14px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  zIndex: 5,
+                  pointerEvents: 'none',
+                  fontSize: '16px',
+                  lineHeight: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                ✉️
+              </span>
               <input
                 type="text"
                 value={email}
@@ -100,23 +119,50 @@ export default function AdminLoginModal({
                 placeholder="admin@mospi.gov.in"
                 required
                 autoFocus
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: '12px 14px 12px 46px',
+                  fontSize: '14px',
+                  border: '1.5px solid #cbd5e1',
+                  borderRadius: '10px',
+                  background: '#ffffff',
+                  color: '#0f172a',
+                  lineHeight: '1.4',
+                }}
               />
             </div>
           </label>
 
-          <label className="auth-form-field">
-            <div className="field-label-row">
-              <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#1e293b' }}>Administrator Security Key / PIN</span>
+          <label className="auth-form-field" style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
+            <div className="field-label-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>Administrator Security Key / PIN</span>
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '11px', fontWeight: 600, cursor: 'pointer', padding: 0 }}
+                style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '11.5px', fontWeight: 600, cursor: 'pointer', padding: 0 }}
               >
                 {showPassword ? 'Hide 🔒' : 'Show 👁️'}
               </button>
             </div>
-            <div className="input-with-icon">
-              <span className="input-icon">🔑</span>
+            <div className="input-with-icon" style={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center' }}>
+              <span
+                className="input-icon"
+                style={{
+                  position: 'absolute',
+                  left: '14px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  zIndex: 5,
+                  pointerEvents: 'none',
+                  fontSize: '16px',
+                  lineHeight: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                🔑
+              </span>
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={password}
@@ -126,9 +172,65 @@ export default function AdminLoginModal({
                 }}
                 placeholder="Enter Administrator Security Key"
                 required
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: '12px 14px 12px 46px',
+                  fontSize: '14px',
+                  border: '1.5px solid #cbd5e1',
+                  borderRadius: '10px',
+                  background: '#ffffff',
+                  color: '#0f172a',
+                  lineHeight: '1.4',
+                }}
               />
             </div>
           </label>
+
+          {/* Quick Authorized Emails Dropdown / Reference */}
+          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px 12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: showAuthorizedList ? '8px' : 0 }}>
+              <span style={{ fontSize: '11.5px', fontWeight: 700, color: '#334155' }}>
+                🛡️ Authorized Administrator Emails:
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowAuthorizedList(!showAuthorizedList)}
+                style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '11px', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+              >
+                {showAuthorizedList ? 'Hide List ▲' : 'View All 8 Authorized Emails ▼'}
+              </button>
+            </div>
+
+            {showAuthorizedList && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px', maxHeight: '140px', overflowY: 'auto' }}>
+                {authorizedList.map((admEmail) => (
+                  <button
+                    key={admEmail}
+                    type="button"
+                    onClick={() => {
+                      setEmail(admEmail)
+                      setError('')
+                    }}
+                    style={{
+                      background: email.toLowerCase() === admEmail.toLowerCase() ? '#dbeafe' : '#ffffff',
+                      border: email.toLowerCase() === admEmail.toLowerCase() ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+                      color: email.toLowerCase() === admEmail.toLowerCase() ? '#1d4ed8' : '#334155',
+                      padding: '4px 8px',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      transition: 'all 0.15s ease',
+                    }}
+                    title={`Click to fill ${admEmail}`}
+                  >
+                    {admEmail}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           {error && (
             <div className="admin-error-banner" role="alert" style={{ margin: '4px 0' }}>
@@ -137,7 +239,7 @@ export default function AdminLoginModal({
             </div>
           )}
 
-          <div className="admin-form-actions" style={{ marginTop: '6px' }}>
+          <div className="admin-form-actions" style={{ marginTop: '4px' }}>
             <button
               type="submit"
               className="admin-submit-btn"
@@ -151,7 +253,7 @@ export default function AdminLoginModal({
         </form>
 
         {/* Footer switch */}
-        <div className="admin-footer-switch" style={{ marginTop: '12px', borderTop: '1px solid #f1f5f9', paddingTop: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="admin-footer-switch" style={{ marginTop: '12px', borderTop: '1px solid #f1f5f9', paddingTop: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: '12px', color: '#64748b' }}>Looking for Officer / Learner Assessment?</span>
           <button
             type="button"

