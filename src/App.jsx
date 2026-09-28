@@ -138,9 +138,6 @@ async function apiRequest(url, options = {}) {
 
   const payload = await response.json().catch(() => ({}))
   if (!response.ok) {
-    if (url.includes('/api/state') || url.includes('/api/auth')) {
-      return handleOfflineApiFallback(url, options)
-    }
     throw new Error(payload.error || 'Request failed')
   }
   return payload
